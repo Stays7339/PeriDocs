@@ -71,4 +71,12 @@ build/
 # ------------------------------
 # Optional: ignore your data folders if you have large datasets
 # ------------------------------
-data/
+data/*
+!data/.gitkeep
+
+
+# ignore everything in static folder
+app/static/*
+
+# --- data folder ---
+data/journals.json
