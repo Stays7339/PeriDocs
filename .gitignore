@@ -1,0 +1,74 @@
+# ------------------------------
+# Python
+# ------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# ------------------------------
+# Virtual Environment
+# ------------------------------
+venv/
+env/
+ENV/
+.venv/
+# you can add any other env folder you use
+
+# ------------------------------
+# VS Code
+# ------------------------------
+.vscode/
+.history/
+*.code-workspace
+
+# ------------------------------
+# OS / system
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Logs and databases
+# ------------------------------
+*.log
+*.sqlite3
+
+# ------------------------------
+# Other common Python stuff
+# ------------------------------
+__pycache__/
+*.pytest_cache/
+*.mypy_cache/
+*.coverage
+htmlcov/
+.coverage.*
+
+# ------------------------------
+# Node.js / frontend (if you add any)
+# ------------------------------
+node_modules/
+dist/
+build/
+
+# ------------------------------
+# Optional: ignore your data folders if you have large datasets
+# ------------------------------
+data/
