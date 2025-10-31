@@ -6,135 +6,27 @@
   <title>PeriDocs Prototype</title>
   <!-- Cabinet Grotesk from Fontshare -->
   <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #bfc1dd;
-      --card: #f0f0eb;
-      --muted: #bfc8cc;
-      --accent: #7f86b0;
-      --text: #111;
-      --radius: 12px;
-      font-family: 'Cabinet Grotesk', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-    }
-
-    html, body {
-      height: 100%;
-      margin: 0;
-      background: linear-gradient(180deg, var(--bg), #e9e9f3);
-      font-family: var(--font-family);
-      color: var(--text);
-      line-height: 1.5;
-    }
-
-    * { box-sizing: border-box; }
-
-    .wrap {
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 32px;
-    }
-
-    .card {
-      width: 720px;
-      max-width: 96%;
-      background: var(--card);
-      border-radius: var(--radius);
-      box-shadow: 0 10px 30px rgba(17,17,17,0.06);
-      padding: 28px;
-    }
-
-    h1 {
-      margin: 6px 0 12px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    form {
-      display: flex;
-      flex-direction: column;
-    }
-
-    textarea {
-      width: 100%;
-      padding: 0.75rem;
-      border: 1px solid var(--muted);
-      border-radius: 0.25rem;
-      resize: vertical;
-      font-family: inherit;
-      font-size: 1rem;
-      margin-top: 0.5rem;
-    }
-
-    .meta {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      margin-top: 12px;
-    }
-
-    button, .btn.primary {
-      margin-top: 1rem;
-      background-color: var(--accent);
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 0.25rem;
-      cursor: pointer;
-      font-weight: bold;
-      color: white;
-    }
-
-    button:hover, .btn.primary:hover {
-      background-color: #6b708f;
-    }
-
-    .btn.ghost {
-      background: transparent;
-      border: 1px solid var(--muted);
-      color: var(--text);
-    }
-
-    footer {
-      margin-top: 18px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-      margin: 0 0.5rem;
-    }
-
-    footer a:hover {
-      text-decoration: underline;
-    }
-
-    footer:after {
-      content: "© PeriDocs 2025";
-      display: block;
-      margin-top: 4px;
-      font-size: 0.8rem;
-      color: var(--muted);
-    }
-  </style>
+  <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Jot your thoughts. Join the conversation.</h1>
       <form action="/submit" method="post">
-        <textarea name="text" rows="10" placeholder="We don't share or sell any of your identifiable user data. We're here to listen :)"></textarea>
-        <button type="submit">Analyze & Search</button>
+        <textarea name="text" rows="10" placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."></textarea>
+        <div class="meta">
+          <button type="submit" class="primary">Analyze & Search</button>
+        </div>
       </form>
 
       <footer>
-        <a href="#">Contact</a>|
-        <a href="#">Terms of Service</a>|
-        <a href="#">Privacy Policy</a>|
-        <a href="#">About</a>
+        <p>We keep your text private by default. See our <a href="/privacy">privacy & data policy</a>.</p>
+        <p>
+          <a href="#">Contact</a> | 
+          <a href="#">Terms of Service</a> | 
+          <a href="#">Privacy Policy</a> | 
+          <a href="#">About</a>
+        </p>
       </footer>
     </div>
   </div>
