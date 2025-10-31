@@ -1,138 +1,142 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PeriDocs Prototype</title>
+  <!-- Cabinet Grotesk from Fontshare -->
+  <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #bfc1dd;
+      --card: #f0f0eb;
+      --muted: #bfc8cc;
+      --accent: #7f86b0;
+      --text: #111;
+      --radius: 12px;
+      font-family: 'Cabinet Grotesk', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
 
-<title>PeriDocs Prototype</title>
+    html, body {
+      height: 100%;
+      margin: 0;
+      background: linear-gradient(180deg, var(--bg), #e9e9f3);
+      font-family: var(--font-family);
+      color: var(--text);
+      line-height: 1.5;
+    }
 
-<!-- Import Cabinet Grotesk font -->
-<link rel="stylesheet" href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,700&display=swap">
+    * { box-sizing: border-box; }
 
-<style>
-  /* --- Reset & base styles --- */
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
+    .wrap {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 32px;
+    }
 
-  html, body {
-    height: 100%;
-    font-family: 'Cabinet Grotesk', sans-serif;
-    background-color: #f0f0eb; /* fallback */
-    background-image: url('/static/olga-thelavart-vS3idIiYxX0-unsplash-medium-size.jpg'); /* replace with your resized image */
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    color: #2c2c2c; /* neutral dark text */
-    line-height: 1.5;
-  }
+    .card {
+      width: 720px;
+      max-width: 96%;
+      background: var(--card);
+      border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(17,17,17,0.06);
+      padding: 28px;
+    }
 
-  /* Text selection color */
-  ::selection {
-    background: #bfc8cc;
-    color: #2c2c2c;
-  }
+    h1 {
+      margin: 6px 0 12px;
+      font-weight: 600;
+      color: var(--text);
+    }
 
-  /* --- Header / hamburger menu --- */
-  header {
-    display: flex;
-    justify-content: flex-end;
-    padding: 1rem;
-  }
+    form {
+      display: flex;
+      flex-direction: column;
+    }
 
-  .hamburger {
-    background-color: #bfc1dd;
-    border: none;
-    padding: 0.5rem 0.75rem;
-    cursor: pointer;
-    font-size: 1.2rem;
-    border-radius: 0.25rem;
-  }
+    textarea {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid var(--muted);
+      border-radius: 0.25rem;
+      resize: vertical;
+      font-family: inherit;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+    }
 
-  /* --- Main content --- */
-  main {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    min-height: calc(100vh - 120px); /* account for header + footer */
-    padding: 2rem;
-  }
+    .meta {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      margin-top: 12px;
+    }
 
-  form {
-    background-color: rgba(255, 255, 255, 0.9); /* slightly translucent white */
-    padding: 2rem;
-    border-radius: 0.5rem;
-    max-width: 600px;
-    width: 100%;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-  }
+    button, .btn.primary {
+      margin-top: 1rem;
+      background-color: var(--accent);
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 0.25rem;
+      cursor: pointer;
+      font-weight: bold;
+      color: white;
+    }
 
-  textarea {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid #bfc8cc;
-    border-radius: 0.25rem;
-    resize: vertical;
-    font-family: inherit;
-    font-size: 1rem;
-  }
+    button:hover, .btn.primary:hover {
+      background-color: #6b708f;
+    }
 
-  button {
-    margin-top: 1rem;
-    background-color: #bfc1dd;
-    border: none;
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.25rem;
-    cursor: pointer;
-    font-weight: bold;
-  }
+    .btn.ghost {
+      background: transparent;
+      border: 1px solid var(--muted);
+      color: var(--text);
+    }
 
-  button:hover {
-    background-color: #aab0d2;
-  }
+    footer {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
 
-  /* --- Footer --- */
-  footer {
-    background-color: #bfc1dd;
-    padding: 1rem 2rem;
-    text-align: center;
-    font-size: 0.9rem;
-    color: #2c2c2c;
-  }
+    footer a {
+      color: var(--muted);
+      text-decoration: none;
+      margin: 0 0.5rem;
+    }
 
-  footer a {
-    color: #2c2c2c;
-    text-decoration: none;
-    margin: 0 0.5rem;
-  }
+    footer a:hover {
+      text-decoration: underline;
+    }
 
-  footer a:hover {
-    text-decoration: underline;
-  }
-</style>
+    footer:after {
+      content: "© PeriDocs 2025";
+      display: block;
+      margin-top: 4px;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+  </style>
 </head>
 <body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Jot your thoughts. Join the conversation.</h1>
+      <form action="/submit" method="post">
+        <textarea name="text" rows="10" placeholder="We don't share or sell any of your identifiable user data. We're here to listen :)"></textarea>
+        <button type="submit">Analyze & Search</button>
+      </form>
 
-<header>
-  <button class="hamburger">☰</button>
-</header>
-
-<main>
-  <form action="/submit" method="post">
-    <h1>Jot your thoughts. Join the  conversation. We do not collect, share, or sell any of your indentifiable user data.</h1>
-    <textarea name="text" rows="10" placeholder="Type your text here..."></textarea>
-    <button type="submit">Analyze & Save</button>
-  </form>
-</main>
-
-<footer>
-  <a href="#">Contact</a>|
-  <a href="#">Terms of Service</a>|
-  <a href="#">Privacy Policy</a>|
-  <a href="#">About</a>
-</footer>
-
+      <footer>
+        <a href="#">Contact</a>|
+        <a href="#">Terms of Service</a>|
+        <a href="#">Privacy Policy</a>|
+        <a href="#">About</a>
+      </footer>
+    </div>
+  </div>
 </body>
 </html>

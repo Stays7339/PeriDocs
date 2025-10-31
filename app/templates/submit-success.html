@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Entry saved — PeriDocs</title>
+  <!-- Cabinet Grotesk from Fontshare -->
+  <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --bg:#bfc1dd;
+      --card:#f0f0eb;
+      --muted:#bfc8cc;
+      --accent:#7f86b0;
+      --text:#111;
+      --radius:12px;
+      font-family: 'Cabinet Grotesk', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,var(--bg),#e9e9f3);}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:32px}
+    .card{width:720px;max-width:96%;background:var(--card);border-radius:var(--radius);box-shadow:0 10px 30px rgba(17,17,17,0.06);padding:28px}
+    .id{font-size:13px;color:var(--muted);letter-spacing:0.6px}
+    h1{margin:6px 0 12px;font-weight:600;color:var(--text)}
+    p.mirror{font-size:15px;margin:8px 0 18px;color:#222}
+    .excerpt{background:#fff;border-radius:8px;padding:12px;border:1px solid rgba(0,0,0,0.04);font-size:14px;color:#222}
+    .meta{display:flex;gap:12px;align-items:center;margin-top:12px}
+    .btn{display:inline-block;padding:10px 14px;border-radius:10px;text-decoration:none;font-weight:600}
+    .primary{background:var(--accent);color:white}
+    .ghost{background:transparent;border:1px solid var(--muted);color:var(--text)}
+    footer{margin-top:18px;font-size:12px;color:var(--muted)}
+    .source{font-size:12px;color:var(--muted);margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="main" aria-labelledby="saved-heading">
+      <div class="id">Saved • ID <strong>{{ entry_id }}</strong></div>
+      <h1 id="saved-heading">Your entry is safely stored</h1>
+
+      <p class="mirror">{{ paraphrase }}</p>
+
+      <div>
+        <div class="excerpt">
+          {{ matched_excerpt }}
+        </div>
+        <div class="source">Matched editorial: <strong>{{ matched_source_id }}</strong></div>
+      </div>
+
+      <div class="meta">
+        <a class="btn primary" href="/save/{{ entry_id }}">Save this entry (private)</a>
+        <a class="btn ghost" href="/">Return</a>
+      </div>
+
+      <footer>
+        We keep your text private by default. See our <a href="/privacy">privacy & data policy</a>.
+      </footer>
+    </div>
+  </div>
+</body>
+</html>

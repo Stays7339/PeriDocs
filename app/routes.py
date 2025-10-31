@@ -2,6 +2,7 @@
 
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
+from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 
@@ -45,5 +46,20 @@ async def read_index(request: Request):
 async def submit_text(request: Request, text: str = Form(...)):
     result = analyze_text(text)
     save_data({"text": text, "nlp": result})
-    # redirect back to home (or show minimal success message)
-    return templates.TemplateResponse("index.html", {"request": request})
+    return RedirectResponse(url="/submit-success", status_code=303)
+
+
+@app.get("/submit-success", response_class=HTMLResponse)
+async def submit_success(request: Request):
+    data = load_data()
+    last_entry = data[-1] if data else {}
+    return templates.TemplateResponse(
+        "submit-success.html",
+        {
+            "request": request,
+            "entry_id": len(data),
+            "paraphrase": last_entry.get("text", ""),
+            "matched_excerpt": last_entry.get("nlp", {}).get("tokens", []),
+            "matched_source_id": "N/A"
+        }
+    )

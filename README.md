@@ -1,11 +1,11 @@
-#PeriDocs
+# PeriDocs
 
 Curated, paraphrased discussions and public journal links about neurological well-being.
 Early-stage prototype.
 
 ---
 
-##Setup
+## Setup
 
    1. Clone this repository:
     git clone https://github.com/Stays7339/PeriDocs.git
@@ -23,11 +23,11 @@ Early-stage prototype.
 
 ---
 
-##Project Structure
+## Project Structure
 
 PeriDocs-code/
 │
-├─ venv/ # Python virtual environment
+├─ venv/ # Python virtual environment 
 │
 ├─ app/ # Backend + frontend
 │ ├─ routes.py # Streamlined FastAPI routes. This is now the main FastAPI app.
@@ -55,7 +55,7 @@ PeriDocs-code/
     http://127.0.0.1:8000/
 
 ---
-##Notes:
+## Notes:
 
     main.py (a short FastAPI test script) has been deleted.
 
