@@ -11,33 +11,51 @@
 <body>
   <div class="wrap">
     <div class="card" role="main" aria-labelledby="saved-heading">
+      
       <div class="id">Saved • ID <strong>{{ entry_id }}</strong></div>
       <h1 id="saved-heading">Your entry is safely stored</h1>
 
+      <!-- Mirror / paraphrase -->
       <p class="mirror">{{ paraphrase }}</p>
 
-      <div>
-        <div class="excerpt">
-          {{ matched_excerpt }}
-        </div>
-        <div class="source">Matched editorial: <strong>{{ matched_source_id }}</strong></div>
-      </div>
+      <!-- Detailed metrics -->
+      <ul class="metrics">
+        <li><strong>Entry ID:</strong> {{ entry_id }}</li>
+        <li><strong>Paraphrase Mirror:</strong> {{ paraphrase }}</li>
+        <li><strong>Sentiment:</strong> (score {{ sentiment_score }})</li>
+        <li><strong>Entity Count:</strong> {{ entity_count }}</li>
+        <li><strong>Entities:</strong> 
+          {% if entities %}
+            <ul>
+              {% for e in entities %}
+                <li>{{ e.text }} ({{ e.label }})</li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            None
+          {% endif %}
+        </li>
+        <li><strong>Repetition Multiplier:</strong> {{ repetition_multiplier }}</li>
+        <li><strong>Matched editorial:</strong> {{ matched_excerpt }} (source_id: {{ matched_source_id }})</li>
+      </ul>
 
       <div class="meta">
         <a class="btn primary" href="/save/{{ entry_id }}">Save this entry (private)</a>
         <a class="btn ghost" href="/">Return</a>
       </div>
-       <footer>
-  <p class="inline-links">
-    We keep your text private by default. See our <a href="/privacy">privacy & data policy</a>.
-  </p>
-  <p class="nav-links">
-    <a href="#">Contact</a> | 
-    <a href="#">Terms of Service</a> | 
-    <a href="#">Privacy Policy</a> | 
-    <a href="#">About</a>
-  </p>
-</footer>
+
+      <footer>
+        <p class="inline-links">
+          We keep your text private by default. See our <a href="/privacy">privacy & data policy</a>.
+        </p>
+        <p class="nav-links">
+          <a href="#">Contact</a> | 
+          <a href="#">Terms of Service</a> | 
+          <a href="#">Privacy Policy</a> | 
+          <a href="#">About</a>
+        </p>
+      </footer>
+
     </div>
   </div>
 </body>

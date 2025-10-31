@@ -25,26 +25,33 @@ Early-stage prototype.
 
 ## Project Structure
 
-PeriDocs-code/
+PeriDocs-code/                  # Root project folder
 │
-├─ venv/ # Python virtual environment 
+├─ venv/                        # Python virtual environment (ignored by Git)
+│   ├─ bin/                     # Executables (python, pip, etc.)
+│   ├─ include/                 # Headers for building packages
+│   ├─ lib/                     # Installed site-packages
+│   ├─ share/                   # Shared resources for venv
+│   └─ pyvenv.cfg               # venv config
 │
-├─ app/ # Backend + frontend
-│ ├─ routes.py # Streamlined FastAPI routes. This is now the main FastAPI app.
-│ ├─ nlp.py # spaCy wrappers & text processing
-│ ├─ templates/
-│ │ └─ index.html # Current aesthetic HTML
-│ └─ static/
-│ └─ [undisclosed file] # Compressed background image (local-only)
+├─ app/                         # Backend + frontend code
+│   ├─ routes.py                # FastAPI routes; this is the main app now
+│   ├─ nlp.py                   # spaCy wrappers & text processing
+│   ├─ templates/               # Jinja2 HTML templates
+│   │   ├─ index.html
+│   │   └─ submit-success.html
+│   ├─ static/                  # CSS, JS, images
+│   │   └─ style.css
+│   └─ __pycache__/             # Compiled Python cache
 │
-├─ data/ # Local data storage
-│ └─ journals.json # Ignored by Git
+├─ data/                        # Local data storage (ignored by Git except .gitkeep)
+│   ├─ journals.json            # Journal entries
+│   └─ .gitkeep                 # Keeps folder in Git
 │
-├─ tests/ # Optional: pytest/unittest scripts
-│
-├─ requirements.txt # Pinned pip packages
-├─ .gitignore # Includes venv, journals.json, logs, etc.
-└─ README.md
+├─ README.md                     # Project overview, usage, setup
+├─ requirements.txt              # Pinned Python packages
+└─ .gitignore                    # Ignored files/folders (venv, journals.json, logs, etc.)
+
 
 
 ---
@@ -57,12 +64,24 @@ PeriDocs-code/
 ---
 ## Notes:
 
-    main.py (a short FastAPI test script) has been deleted.
+    --reload watches for file changes after saves.
+    
+    main.py (a short FastAPI test script) has been deleted. routes.py is the primary app now, replacing main.py .
 
     The background image file remains local and is not committed to GitHub.
 
-    data/journals.json will be ignored by Git and used for local journaling data.
+    data/journals.json should be ignored by Git and used for local journaling data.
     > The prototype is under active development. Visual and data assets (like the background image and font references) are intentionally undisclosed in this public repo.
+
+    Backend entrypoint: app.routes:app
+
+    Templates: app/templates/
+
+    Static files: app/static/
+
+    Local journal storage: data/journals.json
+
+    Virtual environment: venv/ (excluded from Git)
 
 
 ---
