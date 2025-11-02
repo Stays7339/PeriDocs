@@ -116,6 +116,12 @@ async def read_index(request: Request):
 # Submit new journal entry
 @app.post("/submit", response_class=HTMLResponse)
 async def submit_text(request: Request, text: str = Form(...)):
+    #Refuse empty journal entry submission
+    text = text.strip()
+    if not text:
+        # Redirect back to homepage without saving
+        return RedirectResponse(url="/#empty", status_code=303)
+
     # Process text with NLP
     features = document_features(text)
     entry = {

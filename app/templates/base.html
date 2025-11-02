@@ -1,0 +1,84 @@
+{# base.html - shared layout for all pages #}
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{% block title %}PeriDocs{% endblock %}</title>
+
+  <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+
+  <style>
+    header.site-wordmark {
+      position: fixed;
+      top: 1rem;
+      left: 1rem;
+      font-family: 'Cabinet Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 1.75rem;
+      z-index: 1000;
+      color: var(--text);
+      opacity: 0.95;
+      pointer-events: none;
+    }
+
+    #feedback-btn, #theme-toggle-btn {
+      position: fixed;
+      bottom: 1.5rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.9rem;
+      z-index: 1000;
+      box-shadow: 0 4px 12px rgba(17,17,17,0.12);
+      transition: background 0.16s ease;
+    }
+
+    #feedback-btn:hover, #theme-toggle-btn:hover {
+      background: #6b708f;
+    }
+
+    #feedback-btn { right: 1.5rem; }
+    #theme-toggle-btn { left: 1.5rem; }
+
+    @media (max-width: 600px) {
+      header.site-wordmark { left: 0.75rem; font-size: 1.66rem; }
+      #feedback-btn, #theme-toggle-btn {
+        bottom: 1rem;
+        padding: 0.5rem 0.9rem;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="site-wordmark">PeriDocs.org</header>
+
+  {% block content %}{% endblock %}
+
+  <!-- Floating buttons -->
+  <button id="theme-toggle-btn" aria-label="Toggle theme">Dark Mode</button>
+  <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
+
+  {% include 'includes/modal-feedback.html' %}
+
+  <!-- JS Config -->
+  <script>
+    // Enable cooldown globally and set cooldown duration in ms
+    window.PeriDocsConfig = {
+      enableCooldown: true,
+      cooldownTimeMs: 30000
+    };
+  </script>
+
+  <!-- JS Scripts -->
+  <script src="/static/feedback.js" defer></script>
+  <script src="/static/theme-toggle.js" defer></script>
+  <script src="/static/cooldown.js" defer></script>
+</body>
+</html>

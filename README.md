@@ -25,38 +25,44 @@ Early-stage prototype.
 
 ## Project Structure
 
+```text
 PeriDocs-code/                  # Root project folder
 │
 ├─ venv/                        # Python virtual environment (ignored by Git)
 │   ├─ bin/                     # Executables (python, pip, etc.)
 │   ├─ include/                 # Headers for building packages
-│   ├─ lib/                     # Installed site-packages
-│   ├─ share/                   # Shared resources for venv
-│   └─ pyvenv.cfg               # venv config
+│   ├─ lib/                     # Installed Python packages
+│   ├─ share/                   # Shared resources for the virtual environment
+│   └─ pyvenv.cfg               # Virtual environment configuration
 │
-├─ app/                         # Backend + frontend code
-│   ├─ routes.py                # FastAPI routes; this is the main app now
-│   ├─ nlp.py                   # spaCy wrappers & text processing
+├─ app/                         # Backend + frontend application code
+│   ├─ routes.py                # FastAPI route definitions (main app logic)
+│   ├─ nlp.py                   # spaCy wrappers and text processing utilities
 │   ├─ templates/               # Jinja2 HTML templates
-│   │   ├─ index.html
-│   │   ├─ about.html
-│   │   ├─ privacy.html
-│   │   ├─ includes/               # Jinja2 HTML templates
-│   │     ├─ modal-feedback.html
-│   │   └─ submit-success.html
-│   ├─ static/                  # CSS, JS, images
-│   │   └─ style.css
-│   │   └─ feedback.css         
-│   └─ __pycache__/             # Compiled Python cache
+│   │   ├─ index.html           # Main homepage template
+│   │   ├─ about.html           # About page template
+│   │   ├─ privacy.html         # Privacy policy page template
+│   │   ├─ base.html            # Layout template for all webpages
+│   │   ├─ submit-success.html  # Submission success template
+│   │   ├─ includes/            # Partial templates (included in other pages)
+│   │   │   ├─ modal-feedback.html # Feedback modal HTML
+│   ├─ static/                  # Frontend static files
+│   │   ├─ cooldown.js          # Handles global cooldown for all submission forms on PeriDocs
+│   │   ├─ style.css            # Main stylesheet
+│   │   ├─ theme-toggle.js      # Dark Mode toggle
+│   │   └─ feedback.js          # Feedback modal JS
+│   └─ __pycache__/             # Python compiled bytecode cache
 │
-├─ data/                        # Local data storage (ignored by Git except .gitkeep)
-│   ├─ journals.json            # Journal entries
+├─ data/                        # Local data storage (ignored except .gitkeep)
+│   ├─ journals.json            # Stored journal entries
+│   ├─ feedback.json            # Stored feedback and software report inquiries
 │   └─ .gitkeep                 # Keeps folder in Git
 │
-├─ README.md                     # Project overview, usage, setup
-├─ requirements.txt              # Pinned Python packages
-└─ .gitignore                    # Ignored files/folders (venv, journals.json, logs, etc.)
+├─ README.md                     # Project overview, setup, and usage instructions
+├─ requirements.txt              # Pinned Python dependencies
+└─ .gitignore                    # Files and folders ignored by Git
 
+```
 
 
 ---
