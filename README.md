@@ -39,9 +39,14 @@ PeriDocs-code/                  # Root project folder
 │   ├─ nlp.py                   # spaCy wrappers & text processing
 │   ├─ templates/               # Jinja2 HTML templates
 │   │   ├─ index.html
+│   │   ├─ about.html
+│   │   ├─ privacy.html
+│   │   ├─ includes/               # Jinja2 HTML templates
+│   │     ├─ modal-feedback.html
 │   │   └─ submit-success.html
 │   ├─ static/                  # CSS, JS, images
 │   │   └─ style.css
+│   │   └─ feedback.css         
 │   └─ __pycache__/             # Compiled Python cache
 │
 ├─ data/                        # Local data storage (ignored by Git except .gitkeep)
@@ -86,7 +91,7 @@ PeriDocs-code/                  # Root project folder
 
 ---
 
-That version uses Markdown’s key syntax features exactly where they matter:
+This version uses Markdown’s key syntax features exactly where they matter:
 
 | Symbol | Meaning | Used For |
 |---------|----------|-----------|
@@ -98,6 +103,3 @@ That version uses Markdown’s key syntax features exactly where they matter:
 | `>` | Blockquote | Notes, warnings, or commentary |
 
 ---
-
-If you copy that **as-is** into your `README.md`, GitHub will automatically render it with proper bold headers, boxes around code blocks, and spacing — no extra formatting steps needed.
-

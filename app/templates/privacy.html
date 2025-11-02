@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy — PeriDocs</title>
+    <style>
+        body {
+            font-family: "Inter", "Segoe UI", sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #0f1117;
+            color: #f3f3f3;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 40px 20px;
+            box-sizing: border-box;
+        }
+
+        .policy-card {
+            max-width: 850px;
+            width: 100%;
+            background: #1c1f27;
+            border-radius: 10px;
+            padding: 40px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            overflow-y: auto;
+            max-height: 90vh;
+            scrollbar-width: thin;
+            scrollbar-color: #666 #1c1f27;
+        }
+
+        .policy-card::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .policy-card::-webkit-scrollbar-thumb {
+            background-color: #666;
+            border-radius: 4px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.8em;
+            margin-bottom: 1em;
+            color: #f8f8f8;
+        }
+
+        h2 {
+            color: #a3d9ff;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+            margin-top: 2em;
+        }
+
+        p {
+            line-height: 1.6;
+            margin: 0.8em 0;
+        }
+
+        code {
+            background: #111319;
+            padding: 2px 5px;
+            border-radius: 4px;
+            color: #c6e2ff;
+            font-size: 0.9em;
+        }
+
+        footer {
+            text-align: center;
+            padding: 15px 0;
+            font-size: 0.85em;
+            color: #777;
+            border-top: 1px solid #222;
+        }
+
+        a {
+            color: #7cc2ff;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="policy-card">
+            <h1>PeriDocs Privacy Policy</h1>
+
+            <p><strong>Effective Date:</strong> November 2025</p>
+            <p>
+                PeriDocs is committed to protecting your privacy and ensuring transparency about how data is handled across our platform. This document outlines our principles, how we process limited information, and how we respond to legitimate safety concerns.
+            </p>
+
+            <h2>1. What We Collect and Why</h2>
+            <p>
+                We process the bare minimum of technical data needed to operate the service securely. When you submit content, our servers may temporarily handle your network address (IP) for essential security, rate limiting, and abuse prevention.
+            </p>
+            <p>
+                We store only a <strong>pseudonymized identifier</strong> derived from your IP address for internal moderation and analytics. The raw IP is not retained in routine logs. We will only ever retain an encrypted version in the event of a legitimate safety escalation.
+            </p>
+
+            <h2>2. Role of Legal Operations (Currently Internal)</h2>
+            <p>
+                At this early stage, PeriDocs operates as a two-person independent platform. The same administrator currently manages both technical and legal operations. In this capacity, decrypted data access is restricted to authorized personnel only and may occur solely when there is credible threat content or legal obligation.
+            </p>
+            <p>
+                Every such action is recorded in an internal audit file noting the date, time, and reason for escalation. Routine decryption of any IP-related data is strictly prohibited.
+            </p>
+
+            <h2>3. Incident and Safety Handling</h2>
+            <p>
+                PeriDocs uses a privacy-first approach to safety reporting. We do not retain raw IP addresses in general logs. Instead, we generate short, non-reversible pseudonyms for analytics and moderation.
+            </p>
+            <p>
+                If a submission appears to threaten real-world harm, the originating IP is encrypted with a public key held solely by our legal contact. This encrypted data may be decrypted and shared with appropriate authorities <strong>only</strong> to prevent or report imminent danger or unlawful acts.
+            </p>
+            <p>
+                We never sell or share IP information for marketing, profiling, or advertising.
+            </p>
+
+            <h2>4. International and Legal Compliance</h2>
+            <p>
+                We may disclose information when required to comply with U.S. law enforcement requests or to protect someone’s vital interests.
+            </p>
+            <p>
+                If we expand into international jurisdictions, we will act in accordance with the GDPR lawful basis of <em>vital interests</em> (Article 6(1)(d)) when reporting imminent threats.
+            </p>
+
+            <h2>5. No Telemetry and Minimal Logging</h2>
+            <p>
+                PeriDocs collects no behavioral telemetry, advertising metrics, or analytics profiles. Session activity is not tracked or sold. All logs used for debugging are ephemeral and automatically deleted within a short retention period.
+            </p>
+
+            <h2>6. Data Security and HMAC Pseudonymization</h2>
+            <p>
+                Every temporary user identifier is generated using an <strong>HMAC (Hash-based Message Authentication Code)</strong> derived from the user’s IP and a private secret key known only to PeriDocs staff. This ensures that even if someone intercepts identifiers, they cannot reverse-engineer the original IP.
+            </p>
+            <p>
+                A new salt is introduced at fixed intervals to reduce traceability across sessions while maintaining short-term continuity for moderation. Encrypted incident data is stored securely at <code>data/incidents.json</code> and can be decrypted only by legal operations personnel in the event of a verified safety threat.
+            </p>
+
+            <h2>7. Contact</h2>
+            <p>
+                For privacy or safety concerns, contact: <a href="mailto:legal@peridocs.org">legal@peridocs.org</a>.  
+                We respond to verified safety reports with care and in compliance with our public obligations.
+            </p>
+        </div>
+    </div>
+
+    <footer>
+        &copy; 2025 PeriDocs. All rights reserved. |
+        <a href="/about">About</a> |
+        <a href="/privacy">Privacy Policy</a> |
+        <a href="/terms">Terms</a>
+    </footer>
+</body>
+</html>

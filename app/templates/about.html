@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>About — PeriDocs</title>
+  <!-- Cabinet Grotesk from Fontshare -->
+  <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <div class="card" role="main" aria-labelledby="about-heading">
+      <h1 id="about-heading">About Your Saved Entry</h1>
+
+      <p><strong>Saved , ID</strong><br>
+      Every entry you create gets a unique ID, like <code>5edae32d</code>. Think of it as your entry's fingerprint, unique to you and private. It helps the system keep track of your entries safely.</p>
+
+      <p><strong>Your entry is safely stored</strong><br>
+      Confirms your text has been saved successfully. You can come back later and reference it with the Entry ID. Nothing is lost.</p>
+
+      <p><strong>Entry ID</strong><br>
+      Reiterates your unique ID. You can copy it if you want to reference this entry in support requests or for your own tracking.</p>
+
+      <p><strong>Paraphrase Mirror</strong><br>
+      A simplified version of what you wrote. It mirrors your thoughts so you can see them from a fresh perspective. Example:<br>
+      <em>Your text:</em> "And if I look too close, I start to lose focus."<br>
+      <em>Paraphrase Mirror:</em> "I start losing focus when I look too closely."</p>
+
+      <p><strong>Sentiment Score</strong><br>
+      Analyzed for emotional tone,<br>
+      0–49 , generally negative<br>
+      50 , neutral<br>
+      51–100 , generally positive<br>
+      A score of 50 is neutral — your text doesn’t lean strongly positive or negative.</p>
+
+      <p><strong>Entity Count & Entities</strong><br>
+      Entities are key names, places, or things mentioned in your text. If none are detected, it will show 0 and an empty list ().</p>
+
+      <p><strong>Repetition Multiplier</strong><br>
+      This measures repeated ideas across your entries using a glass-box method:<br>
+      <ul>
+        <li><strong>Vector Embeddings:</strong> Each entry is converted into a numeric vector that captures its semantic meaning.</li>
+        <li><strong>Cosine Similarity:</strong> The similarity between your current entry and previous entries is computed as a score from 0 (completely different) to 1 (identical in meaning).</li>
+        <li><strong>Sentiment Adjustment:</strong> Positive entries are slightly weighted higher, negative entries slightly lower.</li>
+        <li><strong>Multiplier Calculation:</strong> Scores are multiplied by previous entry multipliers to get the new repetition multiplier. Values slightly above 1.0 indicate mild similarity.</li>
+        <li><strong>Interpretation:</strong> 1.0 , no repetition detected. &gt;1.0 , mild semantic overlap. Higher numbers indicate stronger repetition patterns.</li>
+      </ul></p>
+
+      <p><strong>Matched Editorial</strong><br>
+      Finds the closest previous entry that matches your current one. Can be your own earlier entry or others' entries. Helps you see patterns and feel connected.<br>
+      <em>source_id</em> shows the ID of the matched entry.</p>
+
+      <p><strong>Closest match found</strong><br>
+      Repeat of the matched snippet for emphasis. Quickly spot similar entries.</p>
+
+      <p><strong>Not parsed correctly?</strong><br>
+      If something looks off (paraphrase or entity detection), you can report it for review.</p>
+
+      <p><strong>Save this entry (private)</strong><br>
+      Saves a private copy separate from your temporary session. Ensures nothing is lost and nothing is shared publicly.</p>
+
+      <p><strong>Return</strong><br>
+      Takes you back to the main page so you can continue journaling.</p>
+
+    </div>
+  </div>
+</body>
+</html>

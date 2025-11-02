@@ -1,0 +1,24 @@
+<!-- feedback modal include -->
+<div id="feedback-modal" class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-heading">
+  <div class="feedback-modal-content">
+    <h2 id="feedback-heading">Send feedback</h2>
+    <form id="feedback-form">
+        <div class="modal-notification" style="display:none;"></div>
+      <textarea 
+        name="feedback_text" 
+        placeholder="Let us know what worked or what went wrong..."
+        required
+      ></textarea>
+      <p class="feedback-instructions">
+  Please include as much detail as possible about how to recreate the error you saw. We collect next to no information about the user, their device, or their browsing session in the background, so the more you can describe the issue, the better our chances are of resolving it. -PeriDocs :)
+</p>
+      <div class="feedback-modal-actions">
+        <button type="button" class="btn ghost" id="cancel-feedback">Cancel</button>
+        <button type="submit" class="btn primary">Submit</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- floating button (visible at all times) -->
+<button id="feedback-btn" class="feedback-btn" aria-label="Give feedback">Feedback</button>

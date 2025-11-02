@@ -1,62 +1,150 @@
+<!--
+  File: submit-success.html
+  Project: PeriDocs
+  Description: Confirmation page displayed after a user submits a journal entry.
+  Notes: Includes concise privacy summary and visual hierarchy improvements.
+-->
+
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Entry saved — PeriDocs</title>
+  <title>Entry saved, PeriDocs</title>
+
   <!-- Cabinet Grotesk from Fontshare -->
   <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
+
+  <style>
+    .feedback-bar {
+      margin-top: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: #f8f9fb;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      text-align: center;
+      color: #333;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    .feedback-bar button {
+      display: inline-block;
+      margin: 0.3rem;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+
+    .feedback-bar button.report {
+      background: #fff4f4;
+      color: #c00;
+      border: 1px solid #f2c1c1;
+    }
+
+    .feedback-bar button.report:hover {
+      background: #ffe9e9;
+    }
+
+    .matched-snippet {
+      margin-top: 1rem;
+      padding: 0.8rem 1rem;
+      border-left: 4px solid #d9e1f2;
+      background: #fafbff;
+      border-radius: 6px;
+      font-size: 0.92rem;
+      color: #444;
+    }
+
+    .matched-snippet strong {
+      color: #2b3a67;
+    }
+
+    .privacy-summary {
+      font-size: 0.85rem;
+      color: #555;
+      margin-top: -0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    @media (max-width: 600px) {
+      .feedback-bar button {
+        display: block;
+        width: 100%;
+        margin: 0.25rem 0;
+      }
+    }
+  </style>
 </head>
+
 <body>
   <div class="wrap">
     <div class="card" role="main" aria-labelledby="saved-heading">
-      
-      <div class="id">Saved • ID <strong>{{ entry_id }}</strong></div>
-      <h1 id="saved-heading">Your entry is safely stored</h1>
+
+      <div class="id">Saved • Entry <strong>{{ entry_id }}</strong></div>
+
+      <h1 id="saved-heading">Your entry has been saved successfully.</h1>
+      <p class="privacy-summary">
+        Your submission is stored securely and visible only to authorized PeriDocs staff for moderation and safety review.
+        We never share identifying details with other users or the public. See our
+        <a href="/privacy-policy">privacy and data policy</a>.
+      </p>
 
       <!-- Mirror / paraphrase -->
-      <p class="mirror">{{ paraphrase }}</p>
+      <div class="excerpt">{{ paraphrase }}</div>
 
       <!-- Detailed metrics -->
       <ul class="metrics">
-        <li><strong>Entry ID:</strong> {{ entry_id }}</li>
-        <li><strong>Paraphrase Mirror:</strong> {{ paraphrase }}</li>
-        <li><strong>Sentiment:</strong> (score {{ sentiment_score }})</li>
+        <li><strong>Sentiment:</strong> Score {{ sentiment_score }}</li>
         <li><strong>Entity Count:</strong> {{ entity_count }}</li>
-        <li><strong>Entities:</strong> 
-          {% if entities %}
-            <ul>
-              {% for e in entities %}
-                <li>{{ e.text }} ({{ e.label }})</li>
-              {% endfor %}
-            </ul>
+        <li>
+          <strong>Entities:</strong>
+          {% if entities and entities|length > 0 %}
+            {{ entities|join(', ') }}
           {% else %}
             None
           {% endif %}
         </li>
-        <li><strong>Repetition Multiplier:</strong> {{ repetition_multiplier }}</li>
-        <li><strong>Matched editorial:</strong> {{ matched_excerpt }} (source_id: {{ matched_source_id }})</li>
+        <li><strong>Strength of similarities between your entry and other entries on PeriDocs:</strong> {{ repetition_percentage }}%</li>
       </ul>
 
+      <!-- Semantic match summary -->
+      <div class="matched-snippet">
+        <strong>Closest match found:</strong><br>
+        {{ matched_excerpt }}<br>
+        <small>(Source ID: {{ matched_source_id }})</small>
+      </div>
+
+      <!-- Feedback button section -->
+      <div class="feedback-bar" role="region" aria-label="Feedback buttons">
+        Not parsed correctly?
+        <button type="button" class="report report-btn">Report Issue</button>
+      </div>
+
       <div class="meta">
-        <a class="btn primary" href="/save/{{ entry_id }}">Save this entry (private)</a>
+        <a class="btn primary" href="/save/{{ entry_id }}">Save this entry privately</a>
         <a class="btn ghost" href="/">Return</a>
       </div>
 
       <footer>
         <p class="inline-links">
-          We keep your text private by default. See our <a href="/privacy">privacy & data policy</a>.
+          Your text remains private by default. See our 
+          <a href="/privacy">privacy and data policy</a>.
         </p>
         <p class="nav-links">
-          <a href="#">Contact</a> | 
-          <a href="#">Terms of Service</a> | 
-          <a href="#">Privacy Policy</a> | 
-          <a href="#">About</a>
+          <a href="/about">Contact</a> |
+          <a href="/terms-of-service">Terms of Service</a> |
+          <a href="/privacy-policy">Privacy Policy</a> |
+          <a href="/about">About</a>
         </p>
       </footer>
-
     </div>
   </div>
+
+  {% include 'includes/modal-feedback.html' %}
+  <script src="/static/feedback.js" defer></script>
 </body>
 </html>

@@ -7,20 +7,22 @@ import re
 import time
 import os
 import json
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Any
 import numpy as np
 from sentence_transformers import SentenceTransformer, util
-model = SentenceTransformer('all-MiniLM-L6-v2')
 import torch
 
-# paths
+# --- Sentence embeddings model (for semantic similarity + typo tolerance) ---
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+# --- paths ---
 JOURNALS_PATH = "../data/journals.json"
 
-# Load spaCy model once
+# --- Load spaCy model once ---
 nlp = spacy.load("en_core_web_sm", disable=["parser"])
 nlp.add_pipe("sentencizer")
 
-# sentiment and emotional lexicons
+# --- sentiment and emotional lexicons ---
 _POSITIVE = {
     "good", "great", "happy", "relieved", "calm", "hopeful", "pleased",
     "content", "safe", "better", "improved", "relief", "grateful"
@@ -36,28 +38,30 @@ _CRISES = [
     "suicide",
     "can't go on",
     "tired of living",
-    "wish i were dead"
+    "wish i were dead",
+    "end it all",
+    "ultimate price",
+    "unalive",
+    "sewerslide"
 ]
 _INTENSIFIERS = {"very", "extremely", "incredibly", "super", "really", "so", "utterly"}
 _DEINTENSIFIERS = {"slightly", "a bit", "a little", "somewhat", "kinda", "sorta"}
 _FILLERS = {"um", "uh", "like", "you know", "i guess", "i think", "sorta", "kinda"}
+_COLLOQUIAL_ADD = {"bruh", "idk", "ykwim", "ong", "deadass"}
 
 # ---------- CORE HELPERS ----------
 
 def check_crisis_phrases(text: str) -> List[str]:
-    hits = [p for p in _CRISES if p in text.lower()]
-    return hits
+    return [p for p in _CRISES if p in text.lower()]
 
 def sha_short(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
-
 
 def token_summary(doc) -> List[Dict[str, Any]]:
     return [
         {"text": t.text, "lemma": t.lemma_.lower(), "pos": t.pos_, "is_stop": t.is_stop}
         for t in doc
     ]
-
 
 def repetition_score(text: str) -> float:
     tokens = re.findall(r"\b\w+\b", text.lower())
@@ -76,7 +80,6 @@ def repetition_score(text: str) -> float:
         freq[t] = freq.get(t, 0) + 1
     dup_count = sum(1 for v in freq.values() if v > 1)
     return 1.0 + (0.25 * max_consec) + (0.1 * math.log1p(dup_count))
-
 
 def sentiment_heuristic(doc) -> Dict[str, Any]:
     pos = 0.0
@@ -105,7 +108,7 @@ def sentiment_heuristic(doc) -> Dict[str, Any]:
                 neg += 1.0 * multiplier
     rep_multiplier = repetition_score(" ".join(tokens))
     raw = (pos - neg) * rep_multiplier
-    score = math.tanh(raw / 3.0)
+    score = math.tanh(raw / 3.0)  # scaled to [-1,1]
     bucket = "neutral"
     if score <= -0.3:
         bucket = "negative"
@@ -119,10 +122,13 @@ def sentiment_heuristic(doc) -> Dict[str, Any]:
         "bucket": bucket,
     }
 
-
 def extract_entities(doc):
-    return [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
-
+    ents = [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
+    # include colloquial markers as pseudo-entities
+    for t in doc:
+        if t.text.lower() in _COLLOQUIAL_ADD and t.text not in [e["text"] for e in ents]:
+            ents.append({"text": t.text, "label": "COLLOQUIAL"})
+    return ents
 
 def rule_paraphrase_text(doc, max_len=140) -> str:
     sents = list(doc.sents)
@@ -136,9 +142,12 @@ def rule_paraphrase_text(doc, max_len=140) -> str:
     sent_scores.sort(key=lambda x: abs(x[0]), reverse=True)
     top_texts = [t for _, t in sent_scores[:2]]
     combined = " ".join(top_texts)
+    # remove filler words
     for f in _FILLERS:
         combined = re.sub(r"\b" + re.escape(f) + r"\b", "", combined, flags=re.I)
+    # remove consecutive repeated words
     combined = re.sub(r"\b(\w+)(?:\s+\1){1,}\b", r"\1", combined, flags=re.I)
+    # remove repeated punctuation
     combined = re.sub(r"([!?.,]){2,}", r"\1", combined)
     combined = " ".join(combined.split())
     if len(combined) > max_len:
@@ -155,7 +164,6 @@ def rule_paraphrase_text(doc, max_len=140) -> str:
         mirror = f"You wrote: {combined}"
     return mirror
 
-
 def document_features(text: str) -> Dict[str, Any]:
     doc = nlp(text)
     ent = extract_entities(doc)
@@ -164,6 +172,8 @@ def document_features(text: str) -> Dict[str, Any]:
     token_info = token_summary(doc)
     sentences = list(doc.sents)
     avg_sent_len = sum(len(s.text.split()) for s in sentences) / max(1, len(sentences))
+    # embedding for semantic similarity / typo-tolerance
+    embedding = model.encode(text, convert_to_numpy=True).tolist()
     features = {
         "sha8": sha_short(text + str(time.time())),
         "tokens": token_info,
@@ -173,18 +183,15 @@ def document_features(text: str) -> Dict[str, Any]:
         "avg_sentence_length": avg_sent_len,
         "sentence_count": len(sentences),
         "repetition_multiplier": repetition_score(text),
+        "embedding": embedding
     }
     return features
 
-
 # ---------- MAIN RUN FOR TESTING ----------
-
 if __name__ == "__main__":
     test_text = "I wanna kill myself"
-    crisis_hits = [p for p in _CRISES if p in test_text.lower()]
-
+    crisis_hits = check_crisis_phrases(test_text)
     print("Saving journals.json to:", os.path.abspath(JOURNALS_PATH))
-
     if crisis_hits:
         print(f"⚠️ CRISIS DETECTED: High-risk phrases found: {crisis_hits}")
         print("Entry not saved automatically.")
