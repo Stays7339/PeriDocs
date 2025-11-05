@@ -13,7 +13,6 @@ import numpy as np
 from .nlp import document_features
 from datetime import datetime
 
-
 # --- FastAPI app setup ---
 app = FastAPI()
 
@@ -29,8 +28,6 @@ DATA_FILE = os.path.join(BASE_DIR, "..", "data", "journals.json")
 FEEDBACK_FILE = os.path.join(BASE_DIR, "..", "data", "feedback.json")
 
 # --- Helper functions ---
-
-# Load JSON data from a file, return empty list if missing/corrupt
 def load_data(file_path=DATA_FILE):
     if not os.path.exists(file_path):
         return []
@@ -40,28 +37,23 @@ def load_data(file_path=DATA_FILE):
         except json.JSONDecodeError:
             return []
 
-# Save a new entry to JSON file
 def save_data(entry, file_path=DATA_FILE):
     data = load_data(file_path)
     data.append(entry)
     with open(file_path, "w") as f:
         json.dump(data, f, indent=2)
 
-# Load feedback entries specifically
 def load_feedback():
     return load_data(FEEDBACK_FILE)
 
-# Save feedback entry
 def save_feedback(entry):
     save_data(entry, file_path=FEEDBACK_FILE)
 
 def ensure_feedback_file():
-    """Create feedback.json if it doesn't exist and initialize as empty list."""
     if not os.path.exists(FEEDBACK_FILE):
         with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
 
-# Compute cosine similarity between two vectors
 def compute_similarity(vec1, vec2):
     if vec1 is None or vec2 is None:
         return 0.0
@@ -71,7 +63,6 @@ def compute_similarity(vec1, vec2):
         return 0.0
     return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
 
-# Find the best matching previous entry
 def find_best_match(entry_vec, all_entries, top_n=1):
     best_score = -1
     best_match = None
@@ -92,7 +83,6 @@ def find_best_match(entry_vec, all_entries, top_n=1):
             best_match = candidate
     return best_match
 
-# Create a readable excerpt from tokens
 def readable_excerpt(tokens, max_words=15):
     if not tokens:
         return "None"
@@ -102,7 +92,6 @@ def readable_excerpt(tokens, max_words=15):
         excerpt += "…"
     return excerpt or "None"
 
-# Convert sentiment score from [-1,1] to [0,100] percentage
 def sentiment_percentage(score):
     return max(0, min(100, int((score + 1) / 2 * 100)))
 
@@ -114,15 +103,14 @@ async def read_index(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
 # Submit new journal entry
-@app.post("/submit", response_class=HTMLResponse)
+@app.post("/submit")
 async def submit_text(request: Request, text: str = Form(...)):
-    #Refuse empty journal entry submission
     text = text.strip()
     if not text:
-        # Redirect back to homepage without saving
+        if request.headers.get("accept") == "application/json":
+            return JSONResponse({"status": "error", "message": "No text provided"}, status_code=400)
         return RedirectResponse(url="/#empty", status_code=303)
 
-    # Process text with NLP
     features = document_features(text)
     entry = {
         "text": text,
@@ -131,6 +119,15 @@ async def submit_text(request: Request, text: str = Form(...)):
         "timestamp": time.time()
     }
     save_data(entry)
+
+    if request.headers.get("accept") == "application/json":
+        return JSONResponse({
+            "status": "ok",
+            "message": "Journal submitted",
+            "entry_id": features["sha8"],
+            "redirect_url": f"/submit-success?id={features['sha8']}"
+        })
+
     return RedirectResponse(url=f"/submit-success?id={features['sha8']}", status_code=303)
 
 # Show submit success page with metrics
@@ -138,19 +135,13 @@ async def submit_text(request: Request, text: str = Form(...)):
 async def submit_success(request: Request, id: str = None):
     data = load_data()
     last_entry = None
-
-    # Find entry by ID if provided
     if id:
         for e in data:
             if e.get("entry_id") == id:
                 last_entry = e
                 break
-
-    # Fallback to last entry
     if not last_entry and data:
         last_entry = data[-1]
-
-    # If still none, create empty placeholder
     if not last_entry:
         last_entry = {
             "text": "",
@@ -164,15 +155,9 @@ async def submit_success(request: Request, id: str = None):
             "entry_id": "N/A"
         }
 
-    # Extract NLP metrics
     nlp_data = last_entry.get("nlp", {})
     entities = nlp_data.get("entities") or []
-    entity_list = []
-    for ent in entities:
-        text = ent.get("text") or None
-        label = ent.get("label") or None
-        if text and label:
-            entity_list.append(f"{text} ({label})")
+    entity_list = [f"{ent['text']} ({ent['label']})" for ent in entities if ent.get("text") and ent.get("label")]
     if not entity_list:
         entity_list = ["None"]
     entity_count = len(entity_list)
@@ -188,7 +173,6 @@ async def submit_success(request: Request, id: str = None):
     repetition_percentage = int((repetition_multiplier - 1.0) * 100)
     paraphrase = nlp_data.get("paraphrase_mirror", "")
 
-    # Return properly indented
     return templates.TemplateResponse(
         "submit-success.html",
         {
@@ -204,58 +188,51 @@ async def submit_success(request: Request, id: str = None):
         }
     )
 
-#feedback button
+# Feedback submission
 @app.post("/feedback")
 async def submit_feedback(request: Request):
-    """
-    Accepts JSON like:
-    {
-        "feedback_text": "Something went wrong",
-        "type": "feedback"  # or "report"
-    }
-    and appends to feedback.json
-    """
     data = await request.json()
     feedback_text = data.get("feedback_text", "").strip()
     feedback_type = data.get("type", "feedback")
+    ip_hash = data.get("ip_hash", "unknown")
 
     if not feedback_text:
         return JSONResponse({"status": "error", "message": "No text provided"}, status_code=400)
 
-    # Ensure the feedback.json file exists
     ensure_feedback_file()
 
-    # DEBUG: Show where the file is expected
-    print("Attempting to write feedback to:", FEEDBACK_FILE)
-
-    # Load current feedback
     try:
         with open(FEEDBACK_FILE, "r", encoding="utf-8") as f:
             feedback_list = json.load(f)
     except json.JSONDecodeError:
-        # In case file is empty or malformed, reset as empty list
         feedback_list = []
 
-    # Append new feedback
     feedback_entry = {
         "timestamp": datetime.utcnow().isoformat(),
         "type": feedback_type,
-        "text": feedback_text
+        "text": feedback_text,
+        "ip_hash": ip_hash
     }
     feedback_list.append(feedback_entry)
 
-    # Write back safely with debug
     try:
         with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
             json.dump(feedback_list, f, ensure_ascii=False, indent=2)
-        print("Feedback written successfully to:", FEEDBACK_FILE)
     except Exception as e:
         print("Failed to write feedback.json:", e)
+        return JSONResponse({"status": "error", "message": "Server error"}, status_code=500)
 
     return {"status": "ok"}
 
+# --- Static pages ---
+@app.get("/terms-of-service", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    return templates.TemplateResponse("terms-of-service.html", {"request": request})
 
-# --- Privacy Policy weblink ---
 @app.get("/privacy-policy", response_class=HTMLResponse)
 async def privacy_page(request: Request):
     return templates.TemplateResponse("privacy.html", {"request": request})
+
+@app.get("/about", response_class=HTMLResponse)
+async def about(request: Request):
+    return templates.TemplateResponse("about.html", {"request": request})

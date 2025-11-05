@@ -2,7 +2,7 @@
 <div id="feedback-modal" class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-heading">
   <div class="feedback-modal-content">
     <h2 id="feedback-heading">Send feedback</h2>
-    <form id="feedback-form">
+    <form id="feedback-form" action="/feedback" method="POST">
         <div class="modal-notification" style="display:none;"></div>
       <textarea 
         name="feedback_text" 
@@ -19,6 +19,3 @@
     </form>
   </div>
 </div>
-
-<!-- floating button (visible at all times) -->
-<button id="feedback-btn" class="feedback-btn" aria-label="Give feedback">Feedback</button>

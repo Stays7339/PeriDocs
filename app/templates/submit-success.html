@@ -1,10 +1,12 @@
-<!-- File: submit-success.html - PeriDocs --> <!doctype html>
+{# submit-success.html - PeriDocs #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
 {% block content %}
-  <div class="wrap">
-    <div class="card">
+<div class="wrap">
+  <div class="card">
+    <div class="card-content">
+
       <div class="id">Saved • Entry <strong>{{ entry_id }}</strong></div>
       <h1>Your entry has been saved successfully.</h1>
 
@@ -32,22 +34,29 @@
         <button type="button" class="report-parse-btn" onclick="openFeedbackModal('report')">Report Issue</button>
       </blockquote>
 
-      <div class="meta">
+      <div class="meta" style="margin-top:12px;">
         <a class="btn primary" href="/save/{{ entry_id }}">Save this entry privately</a>
         <a class="btn ghost" href="/">Return</a>
       </div>
 
-      <footer>
-        <p class="inline-links">
-          Your text remains private by default. See our <a href="/privacy-policy">privacy policy</a>.
-        </p>
-        <p class="nav-links">
-          <a href="/about">Contact</a> |
-          <a href="/terms-of-service">Terms</a> |
-          <a href="/privacy-policy">Privacy</a> |
-          <a href="/about">About</a>
-        </p>
-      </footer>
+      {# Notification container for alerts or cooldown messages #}
+      <div id="feedback-notification" style="
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        font-size: 0.9rem;
+        z-index: 1001;
+        display: none;
+        transition: opacity 0.3s ease;
+        background-color: #F5E8A3;
+        color: #000;
+      "></div>
+
     </div>
+    {% include 'includes/footer.html' %}
   </div>
+</div>
 {% endblock %}

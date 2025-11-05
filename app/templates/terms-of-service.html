@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Terms of Service — PeriDocs{% endblock %}
+
+{% block content %}
+<div class="wrap">
+  <div class="card">
+    <div class="card-content">
+      <h1>PeriDocs Terms of Service</h1>
+
+      <p><strong>Effective Date:</strong> 3 November 2025</p>
+
+      <h2>1. Acceptance of Terms</h2>
+      <p>
+        By accessing or using PeriDocs ("we","us","Service"), the individual(s) using the Service ("User", "Users") agrees to these Terms of Service ("Terms"). 
+        If you do not agree, do not use the Service.
+      </p>
+
+      <h2>2. Description of Service</h2>
+      <p>
+        PeriDocs is an educational platform that analyzes user-submitted text and provides semantic, 
+        sentiment, and entity-based insights connected to reviewed materials and community experiences. 
+        The Service is intended solely for personal learning, reflection, and educational purposes.
+      </p>
+
+      <h2>3. User Content and Privacy</h2>
+      <p>
+        The Service stores entries securely, pseudonymizes IP addresses via HMAC for operational purposes, 
+        and encrypts IP addresses in escalated crisis or legal incidents. In normal use, PeriDocs staff and 
+        developers only see pseudonymized identifiers derived from IPs. The server (the Service's computers) sees 
+        the IP for each request, but raw addresses are encrypted and stored only in verified crisis or legal escalations. Only 
+        authorized legal operations personnel can decrypt these original IP records, and every access is logged in an 
+        auditable trail. User consents to this minimal data collection by using the Service. User retains ownership of submitted content. 
+
+        By submitting content, User grants the Service a <strong>worldwide, royalty-free, sublicensable, and transferable license</strong> 
+        to use, reproduce, distribute, and display submitted content solely for:
+        <ul>
+          <li>-Operating the Service</li>
+          <li>-Providing analysis</li>
+          <li>-Sharing anonymized submissions</li>
+          <li>-Aggregated statistics and derivative insights generated internally (e.g., vector embeddings, cosine similarity data used in <code>nlp.py</code>)</li>
+        </ul>
+        To clarify aforementioned terms:
+        <ul>
+          <li><strong>-Worldwide:</strong> Content may be used anywhere in the world.</li>
+          <li><strong>-Royalty-free:</strong> User is not owed any payment for PeriDocs’ use.</li>
+          <li><strong>-Sublicensable:</strong> PeriDocs may grant rights to trusted partners or service providers for operational purposes.</li>
+          <li><strong>-Transferable:</strong> PeriDocs may transfer the license to a successor entity (e.g., in case of acquisition).</li>
+        </ul>
+
+        This license does not grant PeriDocs ownership; User retains all copyrights. Entries are stored perpetually unless removed via email request. User is responsible for saving their entry ID. Algorithms may be fallible; results are educational only.
+        <strong>Removal and License Revocation:</strong> User may revoke this license by submitting a removal request 
+        via <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with the entry's unique ID. 
+        PeriDocs will remove the specific entry and revoke the license; aggregated statistics and derivative insights 
+        may persist as anonymized, non-identifiable data. Cross-reference our <a href="/privacy-policy">Privacy Policy</a> for additional privacy compliance details.
+
+        In cases where an entry triggers a safety or legal escalation, encrypted incident records may be stored and disclosed only to authorized legal operations personnel or law enforcement as legally required. All actions involving decryption or promotion of such data are logged in an auditable trail with timestamps, justification, and actor identification.
+      </p>
+
+      <h2>4. Prohibited Use</h2>
+      <p>
+        User may not submit content that violates laws, infringes third-party rights or 
+        intellectual property, or is intended to harm others, nor content giving rise to a reasonable suspicion of such intent. Submissions indicating imminent harm may 
+        trigger crisis escalation procedures. Submissions are used internally for analysis, insight generation, 
+        and indexing. Attempts to extract, scrape, or reuse PeriDocs content (including aggregated or derivative insights) outside personal or subscribed use are prohibited, reflecting broader industry legal protections such as those upheld by Reddit against unauthorized scraping.
+      </p>
+
+      <h2>5. No Medical or Mental Health Advice</h2>
+      <p>
+        PeriDocs does not provide medical, mental health, or therapeutic advice. Insights generated are for 
+        educational and reflective purposes only and do not replace professional care.
+      </p>
+
+      <h2>6. Escalations and Legal Compliance</h2>
+      <p>
+        In cases of flagged entries indicating risk of harm or other legal concerns, encrypted incident records 
+        may be stored and disclosed only to authorized legal operations personnel or law enforcement as required by law. 
+        All actions are logged in an auditable trail.
+      </p>
+
+      <h2>7. Limitation of Liability</h2>
+      <p>
+        PeriDocs is provided "as-is." The Service is not responsible for any reliance on content or outcomes derived 
+        from submissions. Use is at User's own risk.
+      </p>
+
+      <h2>8. Refunds and Payments</h2>
+      <p>
+        Paid features or subscription refunds are handled via <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. 
+        Free access remains fully functional, while paid tiers provide enhanced features such as tracking, 
+        search history, and curated deep-dive content.
+      </p>
+
+      <h2>9. Changes to Terms</h2>
+      <p>
+        PeriDocs may update these Terms from time to time. Continued use constitutes acceptance of the updated Terms.
+      </p>
+
+      <h2>10. Jurisdiction</h2>
+      <p>
+        These Terms are governed by the laws of Atlanta, Georgia, USA and applicable international privacy and data protection laws. 
+        Cross-reference our <a href="/privacy-policy">Privacy Policy</a> for details on data handling.
+      </p>
+
+      <h2>11. Contact</h2>
+      <p>
+        Questions regarding these Terms can be sent to <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
+      </p>
+    </div>
+    {% include 'includes/footer.html' %}
+  </div>
+</div>
+{% endblock %}

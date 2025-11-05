@@ -1,4 +1,3 @@
-{# base.html - shared layout for all pages #}
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -6,21 +5,48 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>{% block title %}PeriDocs{% endblock %}</title>
 
-  <link href="https://api.fontshare.com/css?f[]=cabinet-grotesk@400,600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/static/style.css">
 
   <style>
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* Updated header to include logo + wordmark */
     header.site-wordmark {
-      position: fixed;
-      top: 1rem;
-      left: 1rem;
+      position: absolute;
+      top: 1.25rem;
+      left: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
       font-family: 'Cabinet Grotesk', sans-serif;
-      font-weight: 600;
-      font-size: 1.75rem;
-      z-index: 1000;
+      font-weight: 700;
+      font-size: 1.6rem;
       color: var(--text);
       opacity: 0.95;
-      pointer-events: none;
+      user-select: none;
+      pointer-events: auto;
+    }
+
+    .brand-link {
+      display: flex;
+      align-items: center;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-logo {
+      height: 3.2rem;
+      width: auto;
+      display: block;
+    }
+
+    .brand-text {
+      line-height: 1;
     }
 
     #feedback-btn, #theme-toggle-btn {
@@ -45,40 +71,28 @@
 
     #feedback-btn { right: 1.5rem; }
     #theme-toggle-btn { left: 1.5rem; }
-
-    @media (max-width: 600px) {
-      header.site-wordmark { left: 0.75rem; font-size: 1.66rem; }
-      #feedback-btn, #theme-toggle-btn {
-        bottom: 1rem;
-        padding: 0.5rem 0.9rem;
-      }
-    }
   </style>
 </head>
 
 <body>
-  <header class="site-wordmark">PeriDocs.org</header>
+  <header class="site-wordmark">
+    <a href="/" class="brand-link">
+      <img src="/static/peridocs-logo-v1.png" alt="PeriDocs logo" class="brand-logo">
+      <span class="brand-text">PeriDocs.org</span>
+    </a>
+  </header>
 
-  {% block content %}{% endblock %}
+  <div class="wrap">
+    {% block content %}{% endblock %}
+  </div>
 
-  <!-- Floating buttons -->
   <button id="theme-toggle-btn" aria-label="Toggle theme">Dark Mode</button>
   <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
 
   {% include 'includes/modal-feedback.html' %}
-
-  <!-- JS Config -->
-  <script>
-    // Enable cooldown globally and set cooldown duration in ms
-    window.PeriDocsConfig = {
-      enableCooldown: true,
-      cooldownTimeMs: 30000
-    };
-  </script>
-
-  <!-- JS Scripts -->
   <script src="/static/feedback.js" defer></script>
   <script src="/static/theme-toggle.js" defer></script>
+  <script src="/static/localStorage.js" defer></script>
   <script src="/static/cooldown.js" defer></script>
 </body>
 </html>

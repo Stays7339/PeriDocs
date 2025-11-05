@@ -4,8 +4,9 @@
 {% block title %}PeriDocs Prototype{% endblock %}
 
 {% block content %}
-  <div class="wrap">
-    <div class="card">
+<div class="wrap">
+  <div class="card">
+    <div class="card-content">
       <h1>Jot your thoughts. Join the conversation.</h1>
 
       <form id="journal-form" action="/submit" method="post">
@@ -15,33 +16,21 @@
         </div>
       </form>
 
-      <footer>
-        <p class="inline-links">
-          We keep your text private by default. See our <a href="/privacy">privacy &amp; data policy</a>.
-        </p>
-        <p class="nav-links">
-          <a href="/about">Contact</a> |
-          <a href="/terms-of-service">Terms of Service</a> |
-          <a href="/privacy-policy">Privacy Policy</a> |
-          <a href="/about">About</a>
-        </p>
-      </footer>
+      {# Toast notification container (cooldown.js will manage colors) #}
+      <div id="feedback-notification" style="
+        position: fixed;
+        bottom: 1.5rem;
+        right: 1.5rem;
+        padding: 0.75rem 1rem;
+        border-radius: 6px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        font-size: 0.9rem;
+        z-index: 1001;
+        display: none;
+        transition: opacity 0.3s ease;
+      "></div>
     </div>
+    {% include 'includes/footer.html' %}
   </div>
-
-  {# Notification container for cooldown messages #}
-  <div id="feedback-notification" style="
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    font-size: 0.9rem;
-    z-index: 1001;
-    display: none;
-    transition: opacity 0.3s ease;
-    background-color: #F5E8A3;  /* fallback if JS fails */
-    color: #000;
-  "></div>
+</div>
 {% endblock %}
