@@ -8,3 +8,6 @@ en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_
 sentence-transformers==5.1.2
 torch==2.9.0
 numpy==2.3.4
+cryptography==41.0.3
+python-dotenv==1.0.1
+rapidfuzz==3.14.3

@@ -1,0 +1,527 @@
+/* ----------------------    start of style.css      ---------------------- */
+/* ---------------------- Cabinet Grotesk Font Faces ---------------------- */
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extralight.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extralight.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extralight.ttf') format('truetype');
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Light.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Light.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Regular.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Regular.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Medium.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Medium.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Medium.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Bold.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Bold.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extrabold.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extrabold.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Extrabold.ttf') format('truetype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cabinet Grotesk';
+  src: url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Black.woff2') format('woff2'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Black.woff') format('woff'),
+       url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Black.ttf') format('truetype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ---------------------- Light / Dark Mode Variables ---------------------- */
+:root {
+  --bg: #BFC1DD;
+  --card: #F0F0EB;
+  --muted: #BFC8CC;
+  --accent: #7F86B0;
+  --text: #111;
+  --radius: 12px;
+  font-family: 'Cabinet Grotesk', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --privacy-toast-bg: var(--card);
+  --privacy-toast-text: var(--text);
+  --privacy-toast-link: var(--accent);
+}
+
+html[data-theme='dark'] {
+  --bg: #3A3D5A;
+  --card: #1A1A18;
+  --muted: #4A5155;
+  --accent: #2F302F;
+  --text: #f0e2cc;
+  --privacy-toast-bg: #2A2C3C;
+  --privacy-toast-text: #f0e2cc;
+  --privacy-toast-link: color-mix(in srgb, var(--privacy-toast-text) 75%, black 25%);
+}
+
+/* ---------------------- Global Resets ---------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(180deg, var(--bg), var(--card));
+  color: var(--text);
+  line-height: 1.5;
+  font-family: var(--font-family);
+  overflow: hidden;
+}
+
+/* ---------------------- Layout ---------------------- */
+.wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  width: 100%;
+  padding: 1rem;
+  box-sizing: border-box;
+}
+
+/* ---------------------- Card layout, scrollable content & footer ---------------------- */
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 720px;
+  max-width: 96%;
+  max-height: calc(100vh - 4rem);
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 30px rgba(17,17,17,0.06);
+  padding: 1rem 1rem;
+  box-sizing: border-box;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-content {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  padding-right: 0.5rem;
+}
+
+.card footer {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+  padding-top: 1rem;
+  border-top: none;
+}
+
+.card > *:first-child {
+  margin-top: 1rem;
+}
+
+.card > *:last-child {
+  margin-bottom: 1rem;
+}
+
+.card * {
+  margin: initial;
+  padding: initial;
+  width: auto;
+  max-width: 100%;
+}
+
+/* ---------------------- Typography ---------------------- */
+h1 { 
+  margin: 6px 0 12px; 
+  font-weight: 600; 
+  color: var(--text); 
+}
+
+p, p.mirror { 
+  font-size: 15px; 
+  margin: 8px 0 18px; 
+  color: var(--text); 
+}
+
+.excerpt, 
+.matched-snippet {
+  background: var(--card);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid rgba(0,0,0,0.05);
+  font-size: 14px;
+  color: var(--text);
+}
+
+/* ---------------------- IDs & Sources ---------------------- */
+.id, .source { 
+  font-size: 12px; 
+  color: var(--muted); 
+  margin-top: 8px; 
+}
+
+.id { 
+  letter-spacing: 0.6px; 
+}
+
+/* ---------------------- Forms / Inputs ---------------------- */
+textarea, input[type="text"], input[type="search"], input[type="email"], input[type="number"] {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--muted);
+  border-radius: 0.25rem;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+form { 
+  display: flex; 
+  flex-direction: column; 
+}
+
+/* ---------------------- Buttons ---------------------- */
+button, .btn {
+  display: inline-block;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  transition: background 0.2s ease;
+}
+
+button.primary, .btn.primary {
+  background: var(--accent);
+  color: white;
+  border: none;
+}
+
+button.ghost, .btn.ghost {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--muted);
+}
+
+button:hover, .btn:hover, button.primary:hover, .btn.primary:hover {
+  background-color: #6b708f;
+}
+
+.meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+/* ---------------------- Feedback Button & Modal ---------------------- */
+.feedback-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--accent);
+  color: white;
+  border: none;
+  border-radius: 18px;
+  padding: 10px 16px;
+  font-weight: 600;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+  cursor: pointer;
+  z-index: 1000;
+  transition: background 0.25s ease, transform 0.1s ease;
+}
+
+.feedback-btn:hover {
+  background: #6b708f;
+  transform: translateY(-1px);
+}
+
+.feedback-modal {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(17,17,17,0.55);
+  backdrop-filter: blur(4px);
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+}
+
+.feedback-modal-content {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 24px;
+  width: 90%;
+  max-width: 420px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
+.feedback-modal-content h2 {
+  margin-bottom: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.feedback-modal-content textarea {
+  width: 100%;
+  height: 120px;
+  border: 1px solid var(--muted);
+  border-radius: 8px;
+  resize: vertical;
+  padding: 10px;
+  margin-bottom: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.feedback-instructions {
+  font-size: 0.75rem;
+  color: #555;
+  margin-top: 0.25rem;
+  line-height: 1.2;
+}
+
+.feedback-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ---------------------- Parse Issue Button (submit-success only) ---------------------- */
+.parse-feedback-bar {
+  margin-top: 1.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--card);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  text-align: center;
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.report-parse-btn {
+  display: inline-block;
+  margin: 0.3rem;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.85rem;
+  border-radius: 6px;
+  border: 1px solid #d21f1e;
+  background: #fff4f4;
+  color: #d21f1e;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.report-parse-btn:hover {
+  background: #ffe9e9;
+}
+
+/* ---------------------- Privacy / Cookie Toast ---------------------- */
+#privacy-toast {
+  position: fixed;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  display: none;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 600px;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  z-index: 10000;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  border: 1px solid rgba(0,0,0,0.15);
+  background: var(--privacy-toast-bg);
+  color: var(--privacy-toast-text);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+}
+
+#privacy-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+#privacy-toast.hide {
+  opacity: 0;
+  transform: translateX(-50%) translateY(20px);
+}
+
+#privacy-toast a {
+  color: var(--privacy-toast-link);
+  text-decoration: underline;
+}
+
+#privacy-toast button {
+  background: transparent;
+  border: none;
+  color: var(--privacy-toast-text);
+  font-size: 1.2rem;
+  cursor: pointer;
+  margin-left: auto;
+  opacity: 0.8;
+}
+
+#privacy-toast button:hover {
+  opacity: 1;
+}
+
+/* ---------------------- Privacy Toast Cookie Icon Color Sync ---------------------- */
+
+/* default (light mode) */
+#privacy-toast .cookie-icon {
+  filter: none; /* show normal black icon */
+}
+
+/* dark mode */
+html[data-theme='dark'] #privacy-toast .cookie-icon {
+  filter: invert(1) brightness(0.95) contrast(0.9);
+}
+
+/* ---------------------- Top-left Logo Color Sync ---------------------- */
+
+/* default (light mode) */
+.brand-logo {
+  filter: none;
+}
+
+/* dark mode */
+html[data-theme='dark'] .brand-logo {
+  filter: invert(1) brightness(0.95) contrast(0.9);
+}
+
+/* ---------------------- Footer Nav Links Color Sync ---------------------- */
+.card footer a {
+  color: var(--privacy-toast-link); /* mirrors toast link color in light mode */
+  text-decoration: underline;
+}
+
+html[data-theme='dark'] .card footer a {
+  color: color-mix(in srgb, var(--privacy-toast-text) 75%, black 25%);
+}
+
+
+/* ---------------------- Similarity Percentage Badge ---------------------- */
+.similarity-badge {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text);
+  background: transparent;
+  text-align: center;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+html[data-theme='dark'] .similarity-badge {
+  border-color: var(--accent);
+  color: var(--text);
+}
+
+/* ---------------------- Mobile responsiveness ---------------------- */
+@media (max-width: 640px) {
+  .feedback-btn {
+    bottom: 16px;
+    right: 16px;
+    border-radius: 50%;
+    width: 56px;
+    height: 56px;
+    font-size: 22px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .feedback-modal-content {
+    width: 92%;
+    padding: 20px;
+  }
+
+  .card {
+    width: 90%;
+    padding: 2rem 1.5rem;
+  }
+
+  #privacy-toast {
+    max-width: 90%;
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  #privacy-toast img {
+    width: 60px;
+    height: 60px;
+  }
+}

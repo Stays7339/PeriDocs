@@ -1,4 +1,4 @@
-{# submit-success.html - PeriDocs #}
+{# submit-success.html — updated with emotion summary #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
@@ -7,39 +7,55 @@
   <div class="card">
     <div class="card-content">
 
+      <!-- Entry ID and confirmation -->
       <div class="id">Saved • Entry <strong>{{ entry_id }}</strong></div>
       <h1>Your entry has been saved successfully.</h1>
 
+      <!-- Privacy note -->
       <p class="privacy-summary">
-        Your submission is stored securely and visible only to authorized PeriDocs staff for moderation and safety review. We never share identifying details with other users or the public.
+        Your submission is stored securely and visible only to authorized PeriDocs staff for moderation and safety review.
         See our <a href="/privacy-policy">privacy and data policy</a>.
       </p>
 
-      <div class="excerpt">{{ paraphrase }}</div>
+      <!-- Full text submission, PII-redacted -->
+      <div class="excerpt">{{ safe_text }}</div>
 
+      <!-- Metrics summary -->
       <ul class="metrics">
-        <li><strong>Sentiment:</strong> {{ sentiment_score }}</li>
+        <li><strong>Sentiment:</strong> {{ sentiment_score }} ({{ sentiment_label }})</li>
+        <li><strong>Dominant Emotion:</strong> {{ dominant_emotion }}</li>
+        <li><strong>Emotion Distribution:</strong> {{ emotion_summary }}</li>
         <li><strong>Entities:</strong> {{ entities | join(', ') if entities else 'None' }}</li>
-        <li><strong>Similarity overlap:</strong> {{ repetition_percentage }}%</li>
+        <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>
       </ul>
 
+      <!-- Top 20 matched entries -->
+      {% if top_matches %}
       <blockquote class="matched-snippet">
-        <strong>Closest match found:</strong><br>
-        {{ matched_excerpt }}<br>
-        <small>(Source ID: {{ matched_source_id }})</small>
+        <strong>Closest match(es) found:</strong><br>
+        {% for match in top_matches %}
+          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+            <span>{{ match.excerpt }}</span>
+            <span class="similarity-badge">{{ match.similarity_pct }}%</span>
+          </div>
+          <small>(Source ID: {{ match.entry_id }})</small><br>
+        {% endfor %}
       </blockquote>
+      {% endif %}
 
+      <!-- Parse feedback button -->
       <blockquote class="parse-feedback-bar">
         <span>Not parsed correctly?</span>
         <button type="button" class="report-parse-btn" onclick="openFeedbackModal('report')">Report Issue</button>
       </blockquote>
 
+      <!-- Action buttons -->
       <div class="meta" style="margin-top:12px;">
         <a class="btn primary" href="/save/{{ entry_id }}">Save this entry privately</a>
         <a class="btn ghost" href="/">Return</a>
       </div>
 
-      {# Notification container for alerts or cooldown messages #}
+      <!-- Notification container for feedback toast -->
       <div id="feedback-notification" style="
         position: fixed;
         bottom: 1.5rem;

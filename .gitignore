@@ -76,7 +76,10 @@ data/*
 
 
 # ignore everything in static folder
-app/static/*
+app/static/CabineyGrotesk_Complete/*
 
 # --- data folder ---
 data/journals.json
+
+# # Ignore sensitive env files and environment variables
+.env
