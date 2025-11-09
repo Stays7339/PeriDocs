@@ -2,13 +2,13 @@
 from __future__ import annotations
 import spacy
 import hashlib
+import numpy as np
 import math
 import re
 import time
 import os
 import json
 from typing import Dict, List, Any, Optional
-import numpy as np
 from sentence_transformers import SentenceTransformer
 from cryptography.fernet import Fernet
 from rapidfuzz import fuzz
@@ -16,7 +16,6 @@ from dotenv import load_dotenv
 
 # ---------------- ENV & MODEL SETUP ----------------
 load_dotenv()  # load PERIDOCS_AES_KEY from .env
-
 AES_KEY = os.environ.get("PERIDOCS_AES_KEY")
 if not AES_KEY:
     raise RuntimeError("PERIDOCS_AES_KEY env variable not set")
@@ -32,15 +31,83 @@ HIGH_PROFILE_PATH = "../data/high_profile_addresses.json"
 nlp = spacy.load("en_core_web_sm", disable=["parser"])
 nlp.add_pipe("sentencizer")
 
+# ---------------- COMMON NAMES / PII PATTERNS ----------------
+COMMON_NAMES = {"John", "Jane", "Michael", "Emily", "Chris", "Sarah"}  # minimal example
+EMAIL_PATTERN = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b'
+SSN_PATTERN = r'\b\d{3}-\d{2}-\d{4}\b'
+PHONE_PATTERN = r'\b(?:\+?1[-.\s]?|)(?:\(?\d{3}\)?[-.\s]?){2}\d{4}\b'
+ADDRESS_PATTERN = r'\b\d{1,5}\s\w+(?:\s\w+){0,5}\b'  # crude placeholder
+
 # ---------------- LEXICONS ----------------
-_POSITIVE = {"good", "great", "happy", "relieved", "calm", "hopeful", "pleased",
-             "content", "safe", "better", "improved", "relief", "grateful"}
-_NEGATIVE = {"bad", "sad", "angry", "anxious", "scared", "afraid", "suicidal", "hopeless",
-             "terrible", "worse", "panic", "triggered", "overwhelmed"}
-_INTENSIFIERS = {"very", "extremely", "incredibly", "super", "really", "so", "utterly"}
-_DEINTENSIFIERS = {"slightly", "a bit", "a little", "somewhat", "kinda", "sorta"}
-_FILLERS = {"um", "uh", "like", "you know", "i guess", "i think", "sorta", "kinda"}
-_COLLOQUIAL_ADD = {"bruh", "idk", "ykwim", "ong", "deadass"}
+_POSITIVE = {
+    "good", "great", "wonderful", "lovely", "amazing", "awesome", "fantastic", "excellent", 
+    "superb", "splendid", "brilliant", "delightful", "cheerful", "upbeat", "optimistic", 
+    "hopeful", "serene", "peaceful", "satisfied", "fulfilled", "grateful", "thankful", "blessed", 
+    "comfortable", "secure", "proud", "inspired", "motivated", "driven", "confident", "assured", 
+    "certain", "accomplished", "relieved", "happy", "joyful", "elated", "ecstatic", "thrilled", 
+    "overjoyed", "pleased", "content", "calm", "chill", "easygoing", "stable", "flourishing", 
+    "thriving", "empowered", "liberated", "relaxed", "balanced", "soothed", "touched", "moved", 
+    "affectionate", "loving", "caring", "kind", "compassionate", "generous", "open", "honest", 
+    "real", "authentic", "grounded", "centered", "trusting", "enthusiastic", "eager", "determined", 
+    "bold", "daring", "fearless", "excited", "energized", "awake", "alive", "present", "mindful", 
+    "patient", "forgiving", "gentle", "wise", "capable", "resilient", "adaptable", "creative", 
+    "innovative", "visionary", "harmonious", "vibrant", "radiant", "glowing", "self-assured", 
+    "peaceful"
+}
+
+_NEGATIVE = {
+    "bad", "awful", "terrible", "horrible", "dreadful", "depressing", "sad", "sorrowful", "hopeless", 
+    "helpless", "miserable", "worthless", "guilty", "ashamed", "embarrassed", "humiliated", 
+    "angry", "furious", "enraged", "bitter", "resentful", "jealous", "envious", "hateful", 
+    "spiteful", "scared", "frightened", "terrified", "panicked", "anxious", "uneasy", "nervous", 
+    "tense", "stressed", "overwhelmed", "burdened", "exhausted", "drained", "tired", "fatigued", 
+    "restless", "broken", "shattered", "ruined", "devastated", "heartbroken", "lonely", 
+    "isolated", "rejected", "neglected", "ignored", "unseen", "unheard", "unloved", 
+    "unsafe", "insecure", "uncertain", "doubtful", "regretful", "remorseful", "lost", "confused", 
+    "stuck", "trapped", "powerless", "weak", "vulnerable", "fragile", "unstable", "jittery", 
+    "jumpy", "paranoid", "disgusted", "grossed out", "revolted", "nauseated", "sickened", 
+    "horrified", "appalled", "disturbed", "irritated", "annoyed", "agitated", "offended", 
+    "disrespected", "betrayed", "suffocated", "constricted", "anxious", "suicidal", "despairing"
+}
+
+_INTENSIFIERS = {
+    "very", "extremely", "really", "super", "mega", "ultra", "hella", "wicked", "mad", "damn", 
+    "totally", "absolutely", "completely", "entirely", "wholly", "thoroughly", "purely", 
+    "incredibly", "seriously", "ridiculously", "insanely", "wildly", "crazily", "tremendously", 
+    "vastly", "extraordinarily", "phenomenally", "beyond", "especially", "overwhelmingly", 
+    "intensely", "powerfully", "deeply", "so", "heaping", "freaking", "absurdly", "notably", 
+    "strikingly", "severely", "exponentially", "monumentally", "outlandishly", "excessively", 
+    "passionately", "strongly", "mightily"
+}
+
+_DEINTENSIFIERS = {
+    "slightly", "somewhat", "kind of", "sort of", "a little", "a bit", "barely", "hardly", 
+    "mildly", "faintly", "loosely", "gently", "modestly", "softly", "quietly", "weakly", "thinly", 
+    "tenuously", "partially", "incompletely", "fractionally", "semi", "quasi", "not really", 
+    "not much", "only a little", "just a touch", "halfway", "tepidly", "limply", "almost", 
+    "nearly", "practically", "virtually", "kindasorta", "lowkey", "vaguely", "barely-there", 
+    "meh", "subduedly", "temperedly", "cautiously", "lightly", "marginally", "minutely", 
+    "slowly", "hesitantly", "passably"
+}
+
+_FILLERS = {
+    "um", "uh", "like", "you know", "i guess", "i think", "sorta", "kinda", "maybe", "literally", 
+    "honestly", "basically", "actually", "okay", "alright", "well", "right", "you feel me", "y’know", 
+    "idk", "hmm", "er", "ah", "so yeah", "anyway", "tbh", "ngl", "probs", "kinda like", "sorta like", 
+    "not gonna lie", "real talk", "lowkey", "highkey", "i mean", "i suppose", "i dunno", "i guess so", 
+    "okay so", "i was like", "he was like", "you get me", "i swear", "i’m just sayin", "ykwim", "lmao", 
+    "bruh", "deadass", "ong", "fr", "legit", "frrr"
+}
+
+_COLLOQUIAL_ADD = {
+    "bruh", "bro", "fam", "fr", "ong", "on god", "deadass", "bet", "nah", "lmao", "lol", "smh", 
+    "frfr", "tf", "wtf", "damn", "ykwim", "ion", "idk", "prolly", "finna", "boutta", "gotta", 
+    "wanna", "tryna", "kinda", "sorta", "lowkey", "highkey", "ngl", "tbh", "no cap", "cap", "sheesh", 
+    "brodie", "gang", "yo", "ayo", "nah fr", "oop", "chile", "dawg", "dude", "homie", "mannn", 
+    "sis", "y’all", "bruv", "lmfao", "oml", "whew", "aight", "ight", "bettt", "bruhhhh", "brooo", 
+    "damn bro", "ong fr", "dead serious", "i’m cryin", "that’s wild", "for real", "say less"
+}
+
 _CRISIS_PHRASES = [
     "kill myself", "want to die", "end my life", "suicide", "can't go on",
     "tired of living", "wish i were dead", "end it all", "ultimate price", "unalive", "sewerslide"
@@ -48,13 +115,60 @@ _CRISIS_PHRASES = [
 
 # ---------------- EMOTION LEXICONS ----------------
 _EMOTION_LEXICONS = {
-    "joy": {"happy", "joy", "glad", "relieved", "grateful", "pleased", "content", "hopeful", "excited"},
-    "sadness": {"sad", "unhappy", "depressed", "down", "crying", "lonely", "hopeless", "heartbroken"},
-    "anger": {"angry", "furious", "mad", "irritated", "annoyed", "pissed", "rage", "resentful"},
-    "fear": {"scared", "afraid", "terrified", "anxious", "worried", "panicked", "fearful", "nervous"},
-    "disgust": {"disgusted", "gross", "nasty", "repulsed", "sickened", "ew", "horrified"},
-    "surprise": {"shocked", "amazed", "astonished", "startled", "surprised", "wow", "unexpected"}
+    "joy": {"happy", "joyful", "glad", "relieved", "grateful", "delighted", "ecstatic", "elated", 
+            "cheerful", "content", "amused", "optimistic", "radiant", "thrilled", "blissful", 
+            "playful", "warm", "loving", "affectionate", "appreciative", "inspired", "lighthearted", 
+            "peaceful", "smiling", "laughing", "carefree", "excited", "upbeat", "sunny", "serene", 
+            "satisfied", "rejuvenated", "comforted", "pleased", "overjoyed", "enthusiastic", "giddy", "radiant"},
+    "sadness": {"sad", "unhappy", "depressed", "lonely", "dejected", "heartbroken", "sorrowful", 
+                "downcast", "grieving", "melancholy", "despondent", "tearful", "wistful", "hopeless", 
+                "lost", "empty", "mourning", "hurt", "regretful", "remorseful", "anguished", 
+                "defeated", "isolated", "pained", "bereaved", "discouraged", "forlorn", "despairing", 
+                "weary", "pitiful", "somber", "miserable", "broken", "blue"},
+    "anger": {"angry", "furious", "enraged", "livid", "pissed", "irritated", "annoyed", "aggravated", 
+              "hostile", "resentful", "bitter", "indignant", "mad", "wrathful", "vengeful", "fuming", 
+              "irate", "exasperated", "incensed", "offended", "provoked", "defiant", "fed up", "hateful", 
+              "combative", "argumentative", "spiteful", "belligerent", "outraged", "testy", "fiery", 
+              "snappy", "sour", "hostile"},
+    "fear": {"scared", "afraid", "terrified", "panicked", "anxious", "alarmed", "worried", "frightened", 
+             "nervous", "uneasy", "tense", "cautious", "apprehensive", "jittery", "jumpy", "paranoid", 
+             "petrified", "horrified", "intimidated", "startled", "spooked", "distressed", "restless", 
+             "insecure", "shocked", "fearful", "dread-filled", "hesitant", "trembling", "shaky", 
+             "skittish", "sweaty-palmed"},
+    "disgust": {"disgusted", "grossed out", "nauseated", "revolted", "repulsed", "sickened", "horrified", 
+                "appalled", "offended", "disturbed", "creeped out", "weirded out", "icky", "yucky", 
+                "nasty", "vile", "foul", "stinky", "filthy", "slimy", "grimy", "grotesque", "unpleasant", 
+                "cringe", "ew", "distasteful", "rotten", "corrupted", "tainted", "loathsome", 
+                "abhorrent", "detestable", "abominable"},
+    "surprise": {"surprised", "shocked", "amazed", "astonished", "startled", "wowed", "impressed", 
+                 "stunned", "astounded", "speechless", "gobsmacked", "bewildered", "incredulous", 
+                 "floored", "flabbergasted", "taken aback", "caught off guard", "wide-eyed", "amazed", 
+                 "whoa", "oof", "unbelievable", "unexpected", "out-of-nowhere", "unforeseen", 
+                 "spontaneous", "unpredictable", "rare", "jarring"}
 }
+
+# ---------------- SENTIMENT SCORE ----------------
+
+def sentiment_label(score: float) -> str:
+    """Convert a -1.0–1.0 sentiment score to a textual label"""
+    if score >= 0.6:
+        return "very positive"
+    elif score >= 0.2:
+        return "positive"
+    elif score > -0.2:
+        return "neutral"
+    elif score > -0.6:
+        return "negative"
+    else:
+        return "very negative"
+
+# ---------------- PRECOMPUTE TOKEN EMBEDDINGS ----------------
+TOKEN_EMBED_PRECOMPUTE: Dict[str, np.ndarray] = {}
+all_tokens_for_lookup = set().union(
+    *_EMOTION_LEXICONS.values(), _POSITIVE, _NEGATIVE, _INTENSIFIERS, _DEINTENSIFIERS
+)
+for tok in all_tokens_for_lookup:
+    TOKEN_EMBED_PRECOMPUTE[tok] = model.encode(tok, convert_to_numpy=True)
 
 # ---------------- HIGH-PROFILE ADDRESSES ----------------
 if os.path.exists(HIGH_PROFILE_PATH):
@@ -70,29 +184,46 @@ def encrypt_text(text: str) -> str:
 def decrypt_text(ciphertext: str) -> str:
     return fernet.decrypt(ciphertext.encode("utf-8")).decode("utf-8")
 
-# ---------------- PII REDACTION (with optional fuzzy matching) ----------------
+# ---------------- PII REDACTION ----------------
 def redact_pii(text: str, use_fuzzy: bool = True, threshold: int = 85) -> str:
-    """
-    Redact plain street addresses while leaving HIGH_PROFILE_ADDRESSES intact.
-    Optionally uses fuzzy matching via rapidfuzz.
-    """
     safe_text = text
-    pattern = r"\d{1,5}\s[\w\s]+,?\s[\w\s]+,?\s\w{2,3}\s?\d{0,5}"
-    matches = re.findall(pattern, text, flags=re.IGNORECASE)
+    safe_text = re.sub(EMAIL_PATTERN, '[EMAIL]', safe_text)
+    safe_text = re.sub(SSN_PATTERN, '[SSN]', safe_text)
+    safe_text = re.sub(PHONE_PATTERN, '[PHONE]', safe_text)
+
+    matches = re.findall(ADDRESS_PATTERN, safe_text, flags=re.IGNORECASE)
     for match in matches:
         keep = False
         for hp in HIGH_PROFILE_ADDRESSES:
-            if use_fuzzy:
-                score = fuzz.ratio(match.lower(), hp.lower())
-                if score >= threshold:
-                    keep = True
-                    break
-            else:
-                if match.lower() == hp.lower():
-                    keep = True
-                    break
+            if use_fuzzy and fuzz.ratio(match.lower(), hp.lower()) >= threshold:
+                keep = True
+                break
+            elif not use_fuzzy and match.lower() == hp.lower():
+                keep = True
+                break
         if not keep:
-            safe_text = safe_text.replace(match, "[REDACTED]")
+            safe_text = safe_text.replace(match, '[ADDRESS]')
+
+    doc = nlp(safe_text)
+    spans = []
+
+    for ent in doc.ents:
+        if ent.label_ == "PERSON":
+            for w in ent.text.split():
+                if w.lower() not in COMMON_NAMES:
+                    for match_obj in re.finditer(rf'\b{re.escape(w)}\b', safe_text):
+                        spans.append((match_obj.start(), match_obj.end()))
+
+    words = safe_text.split()
+    for w in words:
+        clean_word = re.sub(r'\W+', '', w)
+        if clean_word.istitle() and clean_word.lower() not in COMMON_NAMES:
+            for match_obj in re.finditer(rf'\b{re.escape(clean_word)}\b', safe_text):
+                spans.append((match_obj.start(), match_obj.end()))
+
+    for start, end in sorted(spans, reverse=True):
+        safe_text = safe_text[:start] + '[NAME]' + safe_text[end:]
+
     return safe_text
 
 # ---------------- CRISIS DETECTION ----------------
@@ -135,139 +266,109 @@ def repetition_score(text: str) -> float:
 
 # ---------------- EMOTION-AWARE SENTIMENT ----------------
 def emotion_profile(doc) -> Dict[str, Any]:
-    """
-    Returns a highly sensitive emotion + sentiment profile.
-    Integrates intensifiers, negations, and repetition effects.
-    """
     scores = {e: 0.0 for e in _EMOTION_LEXICONS}
     pos, neg = 0.0, 0.0
     tokens = [t.text.lower() for t in doc]
 
     for i, t in enumerate(tokens):
-        # emotion scoring
-        for emo, lex in _EMOTION_LEXICONS.items():
-            if t in lex:
-                multiplier = 1.0
-                if i > 0 and tokens[i - 1] in _INTENSIFIERS:
-                    multiplier *= 1.7
-                if i > 0 and tokens[i - 1] in _DEINTENSIFIERS:
-                    multiplier *= 0.6
-                if any(tok in ("not", "n't", "never") for tok in tokens[max(0, i - 3):i]):
-                    if emo in ("joy", "relief", "calm"):
-                        scores["sadness"] += 1.0 * multiplier
-                    else:
-                        scores["joy"] += 0.7 * multiplier
-                else:
-                    scores[emo] += 1.0 * multiplier
-
-        # general sentiment layer
-        if t in _POSITIVE:
-            pos += 1.0
-        elif t in _NEGATIVE:
-            neg += 1.0
-
-    rep_multiplier = repetition_score(" ".join(tokens))
-    for emo in scores:
-        scores[emo] *= rep_multiplier
-
-    total = sum(scores.values()) or 1.0
-    norm = {k: round(v / total, 3) for k, v in scores.items()}
-
-    raw_sentiment = (pos - neg) * rep_multiplier
-    sentiment_score = math.tanh(raw_sentiment / 2.0)
-
-    if sentiment_score <= -0.25:
-        sentiment_bucket = "negative"
-    elif sentiment_score >= 0.25:
-        sentiment_bucket = "positive"
-    else:
-        sentiment_bucket = "neutral"
-
-    return {
-        "emotions": norm,
-        "dominant_emotion": max(norm, key=norm.get),
-        "sentiment_score": sentiment_score,
-        "sentiment_bucket": sentiment_bucket,
-        "repetition_multiplier": rep_multiplier,
-    }
-
-# ---------------- ENTITY EXTRACTION ----------------
-def extract_entities(doc):
-    ents = [{"text": ent.text, "label": ent.label_} for ent in doc.ents]
-    for t in doc:
-        if t.text.lower() in _COLLOQUIAL_ADD and t.text not in [e["text"] for e in ents]:
-            ents.append({"text": t.text, "label": "COLLOQUIAL"})
-    return ents
-
-# ---------------- PARAPHRASE MIRROR ----------------
-def rule_paraphrase_text(doc, max_len=140) -> str:
-    sents = list(doc.sents)
-    if not sents:
-        return ""
-    sent_scores = []
-    for sent in sents:
-        sent_doc = nlp(sent.text)
-        sh = emotion_profile(sent_doc)
-        sent_scores.append((abs(sh["sentiment_score"]), sent.text))
-    sent_scores.sort(key=lambda x: x[0], reverse=True)
-    top_texts = [t for _, t in sent_scores[:2]]
-    combined = " ".join(top_texts)
-    for f in _FILLERS:
-        combined = re.sub(r"\b" + re.escape(f) + r"\b", "", combined, flags=re.I)
-    combined = re.sub(r"\b(\w+)(?:\s+\1){1,}\b", r"\1", combined, flags=re.I)
-    combined = re.sub(r"([!?.,]){2,}", r"\1", combined)
-    combined = " ".join(combined.split())
-    if len(combined) > max_len:
-        combined = combined[: max_len - 1].rstrip()
-        last_p = max(combined.rfind("."), combined.rfind("!"), combined.rfind("?"))
-        if last_p > 20:
-            combined = combined[: last_p + 1]
+        if t in TOKEN_EMBED_PRECOMPUTE:
+            tok_emb = TOKEN_EMBED_PRECOMPUTE[t]
         else:
-            combined = combined.rstrip(" ,;:")
-            combined += "…"
-    if re.search(r"\bI\b|\bI'm\b|\bI\'m\b", combined, flags=re.I):
-        mirror = combined
-    else:
-        mirror = f"You wrote: {combined}"
-    return mirror
+            tok_emb = model.encode(t, convert_to_numpy=True)
+            TOKEN_EMBED_PRECOMPUTE[t] = tok_emb
 
-# ---------------- DOCUMENT FEATURES ----------------
-def document_features(text: str, redact_fuzzy: bool = True) -> Dict[str, Any]:
+        intensity = 1.0
+        if i > 0:
+            if tokens[i - 1] in _INTENSIFIERS:
+                intensity *= 1.5
+            elif tokens[i - 1] in _DEINTENSIFIERS:
+                intensity *= 0.5
+
+        for emotion, lex in _EMOTION_LEXICONS.items():
+            if lex:  # ensure non-empty
+                sim = np.dot(tok_emb, np.mean([TOKEN_EMBED_PRECOMPUTE[w] for w in lex], axis=0))
+                scores[emotion] += sim * intensity
+
+        if t in _POSITIVE:
+            pos += intensity
+        elif t in _NEGATIVE:
+            neg += intensity
+
+    return {"raw_scores": scores, "valence": pos - neg, "arousal": pos + neg}
+
+# ---------------- MAIN PROCESSING ----------------
+def process_entry(text: str) -> Dict[str, Any]:
     crisis_msg = crisis_notification(text)
     if crisis_msg:
-        return {"crisis_notification": crisis_msg}
+        return {"crisis_warning": crisis_msg}
 
-    doc = nlp(text)
-    emotion_data = emotion_profile(doc)
-    features = {
-        "sha8": hashlib.sha256((text + str(time.time())).encode("utf-8")).hexdigest()[:8],
-        "tokens": token_summary(doc),
-        "entities": extract_entities(doc),
-        "sentiment_score": emotion_data["sentiment_score"],
-        "sentiment_bucket": emotion_data["sentiment_bucket"],
-        "dominant_emotion": emotion_data["dominant_emotion"],
-        "emotion_distribution": emotion_data["emotions"],
-        "paraphrase_mirror": rule_paraphrase_text(doc),
-        "avg_sentence_length": sum(len(s.text.split()) for s in doc.sents)/max(1,len(list(doc.sents))),
-        "sentence_count": len(list(doc.sents)),
-        "repetition_multiplier": repetition_score(text),
-        "embedding": model.encode(text, convert_to_numpy=True).tolist(),
-        "safe_text": redact_pii(text, use_fuzzy=redact_fuzzy),
-        "encrypted_text": encrypt_text(text)
+    safe_text = redact_pii(text)
+    encrypted_text = encrypt_text(text)
+    doc = nlp(safe_text)
+    tokens = token_summary(doc)
+    repetition = repetition_score(safe_text)
+    embedding = model.encode(safe_text, convert_to_numpy=True)
+    entities = [{"text": ent.text, "label": ent.label_} for ent in doc.ents] if doc.ents else []
+    emotions = emotion_profile(doc)
+    sha8 = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+    return {
+        "sha8": sha8,
+        "encrypted_text": encrypted_text,
+        "safe_text": safe_text,
+        "tokens": tokens,
+        "entities": entities,
+        "embedding": embedding.tolist() if embedding is not None else [],
+        "repetition_multiplier": repetition,
+        "emotions": emotions
     }
-    return features
 
-# ---------------- MODERATOR CLASSIFICATION HOOKS ----------------
-MOD_CLASSIFICATIONS: Dict[str, Dict[str, Any]] = {}
+# ---------------- DOCUMENT FEATURES ----------------
+def _json_safe(obj):
+    if isinstance(obj, dict):
+        return {k: _json_safe(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [_json_safe(v) for v in obj]
+    elif isinstance(obj, (np.float32, np.float64, np.int32, np.int64)):
+        return float(obj)
+    elif isinstance(obj, np.ndarray):
+        return _json_safe(obj.tolist())
+    else:
+        return obj
 
-def update_classification(entry_id: str, new_class: Dict[str, Any]):
-    MOD_CLASSIFICATIONS[entry_id] = new_class
+def document_features(text: str) -> Dict[str, Any]:
+    safe_text = redact_pii(text)
+    encrypted_text = encrypt_text(text)
+    sha8 = hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
 
-def get_classification(entry_id: str) -> Optional[Dict[str, Any]]:
-    return MOD_CLASSIFICATIONS.get(entry_id, None)
+    doc = nlp(safe_text)
+    tokens = token_summary(doc)
+    repetition = repetition_score(safe_text)
+    embedding = model.encode(safe_text, convert_to_numpy=True)
+    entities = [{"text": ent.text, "label": ent.label_} for ent in doc.ents] if doc.ents else []
+    emotions = emotion_profile(doc)
+    dominant_emotion = max(emotions["raw_scores"], key=emotions["raw_scores"].get) if emotions["raw_scores"] else "unknown"
+    valence = emotions["valence"]
+    sentiment_score = max(-1.0, min(1.0, valence / 10.0))
+    sentiment_bucket = sentiment_label(sentiment_score)
+    sentences = list(doc.sents)
+    avg_sentence_length = sum(len(s.text.split()) for s in sentences) / max(1, len(sentences))
 
-# ---------------- TEST / EXAMPLE ----------------
-if __name__ == "__main__":
-    test_text = "I'm really happy but also kind of scared about what comes next!"
-    features = document_features(test_text)
-    print(json.dumps(features, indent=2))
+    features = {
+        "sha8": sha8,
+        "encrypted_text": encrypted_text,
+        "safe_text": safe_text,
+        "sentiment_score": sentiment_score,
+        "sentiment_bucket": sentiment_bucket,
+        "dominant_emotion": dominant_emotion,
+        "emotion_distribution": emotions["raw_scores"],
+        "paraphrase_mirror": "",
+        "avg_sentence_length": avg_sentence_length,
+        "sentence_count": len(sentences),
+        "repetition_multiplier": repetition,
+        "embedding": embedding.tolist() if embedding is not None else [],
+        "entities": entities,
+        "tokens": tokens
+    }
+
+    return _json_safe(features)

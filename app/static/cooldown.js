@@ -12,7 +12,6 @@ function getCooldownData() {
   }
 }
 
-
 function setCooldownData(data) {
   localStorage.setItem(COOLDOWN_KEY, JSON.stringify(data));
 }
@@ -52,15 +51,23 @@ function attachCooldownHandlers() {
       e.preventDefault();
       if (!canSubmit(type)) return;
 
-      const formData = new FormData(form);
+      // Journal form uses native submission after brief toast
+      if (type === 'journal') {
+        showToast('Journal submitted!', 'success');
+        setTimeout(() => {
+          form.submit(); // native form submission triggers backend redirect
+        }, 800); // 0.8s delay
+        return;
+      }
 
+      // Feedback/report forms: keep async fetch logic
+      const formData = new FormData(form);
       fetch(form.action, {
         method: form.method || 'POST',
         body: formData,
       })
       .then(res => {
         if (!res.ok) throw new Error('Network response was not ok');
-
         successCallback(form);
       })
       .catch(err => {
@@ -70,41 +77,35 @@ function attachCooldownHandlers() {
     });
   };
 
-  // Journal form: show brief toast before redirect
-  handleForm('#journal-form', 'journal', (form) => {
-    showToast('Journal submitted!', 'success');
-    setTimeout(() => {
-      window.location.href = '/submit-success';
-    }, 800); // 0.8s delay for UX
-  });
+  // Journal form
+  handleForm('#journal-form', 'journal', null);
 
-  //specifiies data types for feedback submissions
- handleForm('#report-form', 'report', async (form) => {
-  const payload = {
-    feedback_text: form.querySelector('textarea')?.value.trim() || "",
-    type: "report",
-    ip_hash: "unknown"
-  };
-  try {
-    const res = await fetch(form.action, {
-      method: form.method || 'POST',
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-    if (!res.ok) throw new Error('Network response was not ok');
-    const data = await res.json();
-    if (data.status === "ok") {
-      showToast('Report submitted!', 'success');
-      form.reset();
-    } else {
-      showToast(data.message || 'Submission failed. Please try again.', 'error');
+  // Feedback/report form
+  handleForm('#report-form', 'report', async (form) => {
+    const payload = {
+      feedback_text: form.querySelector('textarea')?.value.trim() || "",
+      type: "report",
+      ip_hash: "unknown"
+    };
+    try {
+      const res = await fetch(form.action, {
+        method: form.method || 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('Network response was not ok');
+      const data = await res.json();
+      if (data.status === "ok") {
+        showToast('Report submitted!', 'success');
+        form.reset();
+      } else {
+        showToast(data.message || 'Submission failed. Please try again.', 'error');
+      }
+    } catch (err) {
+      showToast('Submission failed. Please try again.', 'error');
+      console.error(err);
     }
-  } catch (err) {
-    showToast('Submission failed. Please try again.', 'error');
-    console.error(err);
-  }
-});
-
+  });
 }
 
 document.addEventListener('DOMContentLoaded', attachCooldownHandlers);

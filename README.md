@@ -171,7 +171,7 @@ You now have PeriDocs running locally.
 
 ## Project Structure
 
-```text
+```
 PeriDocs-code/                         # Root project folder
 │
 ├─ venv/                               # Python virtual environment (ignored by Git)
@@ -184,10 +184,13 @@ PeriDocs-code/                         # Root project folder
 ├─ app/                                # Backend + frontend application code
 │   ├─ routes.py                       # FastAPI route definitions (main app logic)
 │   ├─ nlp.py                          # spaCy wrappers and text processing utilities
+│   ├─ .env                          # private, proprietary data. Never commit this to Git/GitHub, nor upload publicly.
 │   ├─ templates/                      # Jinja2 HTML templates
 │   │   ├─ index.html                  # Main homepage template
 │   │   ├─ about.html                  # About page template
-│   │   ├─ privacy.html                # Privacy policy page template
+│   │   ├─ privacy.html                # Privacy policy which applies to all users of PeriDocs.org
+│   │   ├─ about.html                  # Public explainer page for the technology used on PeriDocs.org
+│   │   ├─ terms-of-service.html       # Terms of Service which applies to all users of PeriDocs.org
 │   │   ├─ base.html                   # Layout template for all webpages
 │   │   ├─ submit-success.html         # Submission success template
 │   │   ├─ includes/                   # Partial templates (included in other pages)
@@ -198,12 +201,17 @@ PeriDocs-code/                         # Root project folder
 │   │   ├─ style.css                   # Main stylesheet
 │   │   ├─ theme-toggle.js             # Dark Mode toggle
 │   │   ├─ feedback.js                 # Feedback modal JS
-│   │   └─ CabinetGrotesk_Complete/Fonts/WEB/fonts   
+│   │   ├─ localStorage.js             # What the general public commonly refer to as cookies.
+│   │   ├─ peridocs-logo-v1.png        # PeriDocs Icon Logo - transparent background, black lining and fill.
+│   │   ├─ peridocs-logo-v1-white.png  # PeriDocs Icon Logo - white background, black lining and fill.
+│   │   ├─ favicon.png                 # PeriDocs Icon Logo for the internet browser tab.
+│   │   └─ CabinetGrotesk_Complete/Fonts/WEB/fonts   #All used fonts live in this folder path
 │   └─ __pycache__/                    # Python compiled bytecode cache
 │
 ├─ data/                               # Local data storage (ignored except .gitkeep)
 │   ├─ journals.json                   # Stored journal entries
 │   ├─ feedback.json                   # Stored feedback and report inquiries
+│   ├─ high-profile-addresses.json     # Empty for now, but created as one way to prevent PII exposure and leaks.
 │   └─ .gitkeep                        # Keeps folder in Git
 │
 ├─ README.md                           # Project overview, setup, and usage instructions
@@ -226,5 +234,3 @@ PeriDocs-code/                         # Root project folder
 * Virtual environment: `venv/` (excluded from Git)
 
 ---
-
-Would you like me to append an optional “Common Issues and Fixes” section (covering things like venv activation errors, pip SSL errors, and port conflicts) at the end, or leave it at this level of completeness?

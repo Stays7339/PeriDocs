@@ -1,4 +1,4 @@
-# app/routes.py — annotated version with emotion display added
+# app/routes.py
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -10,6 +10,7 @@ import time
 import numpy as np
 from datetime import datetime
 from .nlp import document_features
+import hashlib
 
 # --- Load encryption key from .env file ---
 load_dotenv()  # ensures AES key is available via environment variable
@@ -26,7 +27,6 @@ FEEDBACK_FILE = os.path.join(BASE_DIR, "..", "data", "feedback.json")
 
 # --- Helper functions ---
 def load_data(file_path=DATA_FILE):
-    """Load JSON data safely, returning [] if missing or malformed"""
     if not os.path.exists(file_path):
         return []
     with open(file_path, "r") as f:
@@ -36,20 +36,40 @@ def load_data(file_path=DATA_FILE):
             return []
 
 def save_data(entry, file_path=DATA_FILE):
-    """Append new journal entry and rewrite file neatly"""
+    """
+    Append a new journal entry to the JSON file, ensuring all values are JSON-serializable.
+    """
     data = load_data(file_path)
-    data.append(entry)
-    with open(file_path, "w") as f:
-        json.dump(data, f, indent=2)
+    
+    # Sanitize the entry itself
+    safe_entry = json_safe(entry)
+    
+    data.append(safe_entry)
+    
+    # Final pass on the full dataset just in case
+    safe_data = json_safe(data)
+    
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(safe_data, f, ensure_ascii=False, indent=2)
+
 
 def ensure_feedback_file():
-    """Ensure feedback file exists for storage"""
     if not os.path.exists(FEEDBACK_FILE):
         with open(FEEDBACK_FILE, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
 
+# --- JSON-safety function ---
+def json_safe(data):
+    if isinstance(data, dict):
+        return {k: json_safe(v) for k, v in data.items()}
+    elif isinstance(data, list):
+        return [json_safe(v) for v in data]
+    elif isinstance(data, (np.float32, np.float64, np.int32, np.int64)):
+        return float(data)
+    else:
+        return data
+
 def compute_similarity(vec1, vec2):
-    """Compute cosine similarity between two embedding vectors"""
     if vec1 is None or vec2 is None:
         return 0.0
     vec1 = np.array(vec1)
@@ -59,10 +79,9 @@ def compute_similarity(vec1, vec2):
     return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
 
 def find_top_matches(entry_vec, all_entries, top_n=20):
-    """Return top N similar entries by cosine similarity"""
     scored_entries = []
     for candidate in all_entries:
-        candidate_vec = candidate.get("nlp", {}).get("embedding")
+        candidate_vec = candidate.get("embedding")
         if candidate_vec is None:
             continue
         sim = compute_similarity(entry_vec, candidate_vec)
@@ -81,7 +100,6 @@ def find_top_matches(entry_vec, all_entries, top_n=20):
     return scored_entries[:top_n]
 
 def readable_excerpt(tokens, max_words=15):
-    """Generate short readable excerpt for matched snippets"""
     if not tokens:
         return "None"
     words = [t.get("text", "") for t in tokens if t.get("text")]
@@ -91,11 +109,9 @@ def readable_excerpt(tokens, max_words=15):
     return excerpt or "None"
 
 def sentiment_percentage(score):
-    """Convert -1.0–1.0 sentiment to 0–100 range"""
     return max(0, min(100, int((score + 1) / 2 * 100)))
 
 def sentiment_label(score):
-    """Text label from sentiment float"""
     if score >= 0.6:
         return "very positive"
     elif score >= 0.2:
@@ -110,59 +126,56 @@ def sentiment_label(score):
 # --- Routes ---
 @app.get("/", response_class=HTMLResponse)
 async def read_index(request: Request):
-    """Serve index page"""
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.post("/submit")
 async def submit_text(request: Request, text: str = Form(...)):
-    """Process user journal submission"""
     text = text.strip()
     if not text:
         if request.headers.get("accept") == "application/json":
             return JSONResponse({"status": "error", "message": "No text provided"}, status_code=400)
         return RedirectResponse(url="/#empty", status_code=303)
 
-    # --- NLP extraction (sentiment, emotion, embeddings, redaction, etc.) ---
     features = document_features(text)
+    features = json_safe(features)  # --- JSON-safe conversion ---
 
-    # --- Construct structured journal entry ---
+    sha8 = features.get("sha8") or hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+    # --- Promote frequently used fields to root ---
     entry = {
-        "entry_id": features.get("sha8"),
+        "entry_id": sha8,
         "timestamp": time.time(),
         "encrypted_text": features.get("encrypted_text"),
         "safe_text": features.get("safe_text"),
-        # NLP section stores derived features only
+        "tokens": features.get("tokens", []),
+        "entities": features.get("entities", []),
+        "embedding": features.get("embedding", []),
         "nlp": {
-            "sentiment_score": features.get("sentiment_score"),
-            "sentiment_bucket": features.get("sentiment_bucket"),
-            "dominant_emotion": features.get("dominant_emotion"),
-            "emotion_distribution": features.get("emotion_distribution"),
-            "paraphrase_mirror": features.get("paraphrase_mirror"),
-            "avg_sentence_length": features.get("avg_sentence_length"),
-            "sentence_count": features.get("sentence_count"),
-            "repetition_multiplier": features.get("repetition_multiplier"),
-            "embedding": features.get("embedding"),
-            "entities": features.get("entities", []),
-            "tokens": features.get("tokens", [])
+            "sentiment_score": features.get("sentiment_score", 0.0),
+            "sentiment_bucket": features.get("sentiment_bucket", "neutral"),
+            "dominant_emotion": features.get("dominant_emotion", "unknown"),
+            "emotion_distribution": features.get("emotion_distribution", {}),
+            "paraphrase_mirror": features.get("paraphrase_mirror", ""),
+            "avg_sentence_length": features.get("avg_sentence_length", 0.0),
+            "sentence_count": features.get("sentence_count", 0),
+            "repetition_multiplier": features.get("repetition_multiplier", 1.0),
         }
     }
 
     save_data(entry)
 
-    # --- Response handling ---
     if request.headers.get("accept") == "application/json":
         return JSONResponse({
             "status": "ok",
             "message": "Journal submitted successfully",
-            "entry_id": features["sha8"],
-            "redirect_url": f"/submit-success?id={features['sha8']}"
+            "entry_id": sha8,
+            "redirect_url": f"/submit-success?id={sha8}"
         })
 
-    return RedirectResponse(url=f"/submit-success?id={features['sha8']}", status_code=303)
+    return RedirectResponse(url=f"/submit-success?id={sha8}", status_code=303)
 
 @app.get("/submit-success", response_class=HTMLResponse)
 async def submit_success(request: Request, id: str = None):
-    """Render success page with analysis + emotion breakdown"""
     data = load_data()
     last_entry = None
     if id:
@@ -173,16 +186,19 @@ async def submit_success(request: Request, id: str = None):
     if not last_entry and data:
         last_entry = data[-1]
     if not last_entry:
-        last_entry = {"nlp": {"sentiment_score": 0.0, "sentiment_bucket": "neutral", "tokens": []}}
+        last_entry = {"tokens": [], "entities": [], "embedding": [], "nlp": {"sentiment_score": 0.0, "sentiment_bucket": "neutral"}}
 
+    # --- Extract NLP values ---
     nlp_data = last_entry.get("nlp", {})
-    entities = nlp_data.get("entities") or []
+    tokens = last_entry.get("tokens", [])
+    entities = last_entry.get("entities", [])
+    embedding = last_entry.get("embedding", [])
+
     entity_list = [f"{ent['text']} ({ent['label']})" for ent in entities if ent.get("text") and ent.get("label")]
     if not entity_list:
         entity_list = ["None"]
 
-    entry_vec = nlp_data.get("embedding")
-    top_matches = find_top_matches(entry_vec, [e for e in data if e.get("entry_id") != last_entry.get("entry_id")], top_n=20)
+    top_matches = find_top_matches(embedding, [e for e in data if e.get("entry_id") != last_entry.get("entry_id")], top_n=20)
 
     match_list = []
     similarity_sum = 0.0
@@ -191,31 +207,30 @@ async def submit_success(request: Request, id: str = None):
         sim_pct = int(match["similarity"] * 100)
         similarity_sum += sim_pct
         match_list.append({
-            "excerpt": readable_excerpt(candidate.get("nlp", {}).get("tokens", [])),
+            "excerpt": readable_excerpt(candidate.get("tokens", [])),
             "entry_id": candidate.get("entry_id", "N/A"),
             "similarity_pct": sim_pct
         })
+
     average_similarity_pct = int(similarity_sum / max(1, len(match_list)))
 
-    sentiment_score = sentiment_percentage(nlp_data.get("sentiment_score", 0.0))
-    sentiment_text_label = sentiment_label(nlp_data.get("sentiment_score", 0.0))
-    repetition_multiplier = nlp_data.get("repetition_multiplier", 1.0)
+    sentiment_score_val = nlp_data.get("sentiment_score") or 0.0
+    sentiment_score = sentiment_percentage(sentiment_score_val)
+    sentiment_text_label = sentiment_label(sentiment_score_val)
+
+    repetition_multiplier = nlp_data.get("repetition_multiplier") or 1.0
     repetition_percentage = int((repetition_multiplier - 1.0) * 100)
 
-    # --- New: emotion summarization for template display ---
-    dominant_emotion = nlp_data.get("dominant_emotion", "unknown")
-    emotion_dist = nlp_data.get("emotion_distribution", {})
-    emotion_summary = ", ".join(
-        [f"{k}: {int(v * 100)}%" for k, v in emotion_dist.items() if v > 0.01]
-    ) or "No strong emotions detected"
+    dominant_emotion = nlp_data.get("dominant_emotion") or "unknown"
+    emotion_dist = nlp_data.get("emotion_distribution") or {}
+    emotion_summary = ", ".join([f"{k}: {int(v*100)}%" for k,v in emotion_dist.items() if v > 0.01]) or "No strong emotions detected"
 
-    # --- Render the success template ---
     return templates.TemplateResponse(
         "submit-success.html",
         {
             "request": request,
             "entry_id": last_entry.get("entry_id", "N/A"),
-            "safe_text": nlp_data.get("safe_text", ""),
+            "safe_text": last_entry.get("safe_text", ""),
             "sentiment_score": sentiment_score,
             "sentiment_label": sentiment_text_label,
             "entity_count": len(entity_list),
@@ -224,13 +239,12 @@ async def submit_success(request: Request, id: str = None):
             "top_matches": match_list,
             "average_similarity_pct": average_similarity_pct,
             "dominant_emotion": dominant_emotion,
-            "emotion_summary": emotion_summary  # added for template visibility
+            "emotion_summary": emotion_summary
         }
     )
 
 @app.post("/feedback")
 async def submit_feedback(request: Request):
-    """Store feedback text from modal"""
     data = await request.json()
     feedback_text = data.get("feedback_text", "").strip()
     feedback_type = data.get("type", "feedback")
@@ -263,7 +277,6 @@ async def submit_feedback(request: Request):
 
     return {"status": "ok"}
 
-# --- Static pages (unchanged) ---
 @app.get("/terms-of-service", response_class=HTMLResponse)
 async def terms_of_service(request: Request):
     return templates.TemplateResponse("terms-of-service.html", {"request": request})

@@ -23,15 +23,28 @@
         in cases of crisis or legal escalation.
         </p>
 
-        <h2>2. Crisis and Safety Escalations</h2>
+        <h2>2. Text Analysis and Internal Metrics</h2>
         <p>
-        If a submission indicates potential harm to self or others, the system may flag it. Relevant ephemeral logs are copied into a secured incident file. The originating raw IP may 
-        be encrypted with a private asymmetric key and stored securely in servers fully-managed by PeriDocs. Only authorized 
-        legal operations personnel can decrypt these records and share with law enforcement when legally required. 
-        Every decryption or escalation action is recorded in an auditable log, including timestamp, reason, and actor. Escalation records are retained until resolution or legal retention requirements are met.
+        Submitted text is processed to generate internal numeric representations (embeddings), semantic similarity comparisons, 
+        and sentiment or emotional tone metrics using curated lexicons and NLP models. These analyses are used solely for:
+        <ul>
+          <li>Providing educational and reflective insights to Users</li>
+          <li>Detecting repeated ideas or related content in your writing history</li>
+          <li>Generating anonymized, aggregate statistics for system performance and research</li>
+        </ul>
+        These representations cannot be traced back to individual Users and are never shared publicly or used for profiling, marketing, or clinical judgment.
         </p>
 
-        <h2>3. Data Minimization and Retention</h2>
+        <h2>3. Crisis and Safety Escalations</h2>
+        <p>
+        If a submission indicates potential harm to self or others, the system may flag it. Relevant ephemeral logs are copied into a secured incident file. The originating raw IP may 
+        be encrypted with a private asymmetric key and stored securely on servers fully managed by PeriDocs. Only authorized 
+        legal operations personnel can decrypt these records and share them with law enforcement when legally required. 
+        Every decryption or escalation action is recorded in an auditable log, including timestamp, reason, and actor. Escalation records are retained until resolution or as required by law. 
+        For users outside the U.S., local emergency services are referenced for guidance, while U.S. users are directed to 911 or 988.
+        </p>
+
+        <h2>4. Data Minimization and Retention</h2>
         <p>
         Routine logs of pseudonymized IPs and ephemeral system activity are retained for 30 days and automatically purged. 
         Encrypted escalation records are retained until resolution or legal retention requirements. No behavioral telemetry, 
@@ -39,28 +52,25 @@
         requests removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with their saved entry ID, at which point the license granted in TOS section 3 is revoked.
         </p>
 
-        <h2>4. Local Storage and Sessions</h2>
+        <h2>5. Local Storage and Sessions</h2>
         <p>
         Browser storage is minimal and ephemeral, used only for session tokens, dark mode preferences, or temporary cooldown timers. 
         Session tokens are not linked to personal information.
         </p>
 
-        <h2>5. Legal Compliance</h2>
+        <h2>6. Legal Compliance and Jurisdiction</h2>
         <p>
-        PeriDocs complies with lawful requests from authorities in the jurisdictions where Users of Service reside. 
-        Escalated data may be disclosed only when required to prevent imminent harm or satisfy legal obligations.
-        </p>
-
-        <h2>6. Jurisdiction</h2>
-        <p>
-        This Privacy Policy is governed by the laws of [Insert Jurisdiction] and applicable international privacy regulations.
+        PeriDocs complies with lawful requests from authorities in the jurisdictions where Users of the Service reside. 
+        Escalated data may be disclosed only when required to prevent imminent harm or satisfy legal obligations. 
+        This Privacy Policy is governed by the laws of Atlanta, Georgia, USA and applicable international privacy regulations.
         </p>
 
         <h2>7. Contact</h2>
         <p>
-        For privacy or safety inquiries, or to request content removal, contact <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. 
+        For privacy, safety inquiries, or to request content removal, contact <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. 
         Verified safety reports and removal requests will be addressed in compliance with legal obligations.
         </p>
+
     </div>
       {% include 'includes/footer.html' %}
   </div>

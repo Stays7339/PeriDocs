@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}About PeriDocs — PeriDocs{% endblock %}
+{% block title %}About PeriDocs - PeriDocs{% endblock %}
 
 {% block content %}
 <div class="wrap">
@@ -15,72 +15,71 @@
       <h2>System limitations</h2>
       <p>
         PeriDocs is <strong>not</strong> a mental health service and does not replace professional care. 
-        Analysis operates on text only and cannot infer context outside the words written. Similarity, sentiment, and entity detection are algorithmic and for educational reflection only. 
-        Results should <strong>never</strong> be relied upon for clinical or urgent decisions. Algorithms may be fallible.
+        Analysis operates only on the text you submit and cannot infer context outside the words written. Similarity, sentiment, and entity detection are algorithmic and intended for educational reflection only. 
+        Results should <strong>never</strong> be relied upon for clinical or urgent decisions. Algorithms may be fallible and reflect patterns in your writing rather than absolute truths.
       </p>
 
       <h2>How analysis works</h2>
       <p>
-        When you submit text, <code>nlp.py</code> processes it using spaCy (<code>en_core_web_sm</code>) and MiniLM sentence embeddings (<code>all-MiniLM-L6-v2</code>), along with internal helpers such as NumPy and FastAPI. 
+        When you submit text, <code>nlp.py</code> processes it using spaCy (<code>en_core_web_sm</code>) and MiniLM sentence embeddings (<code>all-MiniLM-L6-v2</code>), along with internal helpers like NumPy and FastAPI. 
         The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
         <ul>
-          <li><strong>Entities:</strong> names, places, organizations, or colloquial markers (e.g., “idk”, “bruh”).</li>
-          <li><strong>Sentiment:</strong> emotional tone scored on a 0–100 scale and categorized into buckets (negative, neutral, positive) using a custom heuristic.</li>
-          <li><strong>Semantic similarity:</strong> compares your text with prior entries to detect repeated ideas or related content.</li>
+          <li><strong>Entities:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions.</li>
+          <li><strong>Sentiment:</strong> emotional tone is detected using a highly sensitive algorithm that recognizes joy, sadness, anger, fear, disgust, and surprise. Intensifiers like “very” or “extremely” and deintensifiers like “slightly” or “a bit” are taken into account, as well as repeated words that may strengthen emotion.</li>
+          <li><strong>Semantic similarity:</strong> compares your text with prior entries to detect repeated ideas, related concepts, or patterns in phrasing using precomputed and real-time embeddings for efficiency.</li>
         </ul>
       </p>
 
       <h2>Your saved entry</h2>
       <p>
-        Each journal entry is assigned a unique SHA256-based ID (e.g., <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
+        Each journal entry is assigned a unique SHA256-based ID (for example, <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
         Entries are stored securely and visible only to authorized PeriDocs staff for moderation, safety review, or research into system performance. 
         User text is <strong>never</strong> shared publicly.
       </p>
 
       <p>
-        <strong>Paraphrase Mirror:</strong> A deterministic condensation of your text, often prefixed with <em>"You wrote: …"</em>. 
-        It removes filler words, repeated words, and punctuation, prioritizing sentences with stronger sentiment. This is intended as a reflective mirror rather than a perfect summary.
+        <strong>Paraphrase Mirror:</strong> A simplified reflection of your text, often prefixed with <em>"You wrote: …"</em>. It removes filler words, repeated words, and extra punctuation while prioritizing sentences with stronger emotional content. This feature is meant as a reflective mirror rather than a precise summary.
       </p>
 
       <p>
-        <strong>Repetition Multiplier:</strong> Measures similarity to previous entries via cosine similarity of sentence embeddings. Values start at 1.0 and increase with semantic overlap. This highlights repeated ideas or closely related content in your writing history.
+        <strong>Repetition Multiplier:</strong> Measures similarity to previous entries based on sentence embedding comparisons. Values start at 1.0 and increase with repeated ideas or similar phrasing, highlighting patterns in your writing history.
       </p>
 
       <p>
-        <strong>Matched Excerpt & Source ID:</strong> Displays the closest prior entry to your current text, along with its unique ID. Computed algorithmically using sentence embeddings; paraphrased to ensure privacy.
+        <strong>Matched Excerpt & Source ID:</strong> Displays the most similar prior entry to your current text with its unique ID. Matches are calculated using embeddings and paraphrased to preserve privacy.
       </p>
 
       <p>
-        <strong>Average Sentence Length & Count:</strong> Informational metrics calculated from your text to provide insight into writing style and structure.
+        <strong>Average Sentence Length & Count:</strong> Provides information about the structure of your writing and helps users reflect on style, pacing, or complexity.
       </p>
 
       <p>
-        <strong>Embedding:</strong> Numeric vectors representing your text for similarity detection. These vectors are never shared publicly and are used solely for internal reflection and analysis.
+        <strong>Embedding:</strong> Numeric vectors representing your text for semantic similarity detection. These vectors are used internally and are never shared publicly.
+      </p>
+
+      <h2>Emotion and sentiment features</h2>
+      <p>
+        PeriDocs detects nuanced emotional tone using a large lexicon of words and phrases for positive and negative feelings, intensifiers, deintensifiers, fillers, and colloquial expressions. 
+        The system accounts for context, repeated words, and negations to provide a balanced and normalized emotion profile. You receive a breakdown across six basic emotions and a sentiment score bucketed as negative, neutral, or positive. 
+        This helps users understand patterns in their emotional expression over time.
       </p>
 
       <h2>Privacy and safety</h2>
       <p>
-        PeriDocs adheres to strict privacy protocols. Routine submissions store a public 8-character 
-        hash ID for general-public browsing <strong>and</strong> a back-end (PeriDocs Staff Only) pseudonymized identifier 
-        derived from your IP using HMAC,  enabling operational analytics and rate-limiting without retaining 
-        raw addresses.  The server sees your IP on each request, but human staff never do. Raw IPs are encrypted 
-        and stored <strong>only</strong> if a submission triggers a verified safety or legal escalation. 
-        Access to decrypted records is restricted to authorized legal personnel, and every action is logged for audit purposes.
-        Users may request content removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with the entry ID, 
-        which revokes the license granted in the Terms of Service. Aggregated, anonymized data may persist for internal analytics.
+        PeriDocs adheres to strict privacy protocols. Each submission receives a public 8-character hash ID for general browsing and a pseudonymized back-end identifier derived from your IP using HMAC for analytics and rate-limiting. The server sees your IP on each request, but human staff do not. Raw IPs are encrypted and stored <strong>only</strong> if a submission triggers a verified safety or legal escalation. 
+        Decrypted records are accessible only to authorized personnel, and all actions are logged. Users may request content removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with the entry ID. Aggregated anonymized data may persist for internal analytics.
       </p>
 
       <h2>Crisis detection</h2>
       <p>
-        Submissions indicating risk of harm to self or others are flagged immediately. In such cases, users are shown a safety notification directing them to professional help rather than saving the entry. 
-        In the U.S., dial <strong>911</strong> for emergencies or <strong>988</strong> for the Suicide & Crisis Lifeline. Outside the U.S., users are referred to local emergency services.
+        Submissions indicating risk of harm to self or others are flagged immediately. Users see a safety notification directing them to professional help rather than saving the entry. In the U.S., dial <strong>911</strong> for emergencies or <strong>988</strong> for the Suicide & Crisis Lifeline. Outside the U.S., users are referred to local emergency services.
       </p>
 
       <h2>Ethical and design philosophy</h2>
       <p>
-        PeriDocs is designed for transparency, accountability, and ethical reflection. Algorithms, repetition detection, paraphrase mirrors, and crisis flags respect user privacy while providing meaningful educational insight. 
-        The interface avoids engagement optimization, favoring clarity, slow exploration, and depth. 
-        PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. The system bridges explicit, algorithmically detectable features and nuanced context without pretending to replace human judgment.
+        PeriDocs prioritizes transparency, accountability, and ethical reflection. Algorithms, repetition detection, paraphrase mirrors, and crisis flags respect user privacy while providing meaningful educational insights. 
+        The interface avoids addictive engagement patterns and encourages careful exploration, reflection, and depth. 
+        PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. The system bridges algorithmic detection and nuanced understanding without pretending to replace human judgment.
       </p>
 
       <h2>Contact</h2>
