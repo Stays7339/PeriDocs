@@ -19,6 +19,19 @@ from core.nlp.emotion_analysis import (
 )
 from core.nlp.emotion_analysis import compute_sentiment_from_profile
 from core.nlp import embeddings
+import os
+
+# ------------------- .env from admin passwords load and sanity check -------------------
+env_path = Path(__file__).parent.parent / ".env"  # points to project root
+if not env_path.exists():
+    raise FileNotFoundError(f".env file not found at {env_path}. Create it with PeriDocs_AES_KEY.")
+
+load_dotenv(dotenv_path=env_path)  # load the variables from .env
+
+AES_KEY = os.environ.get("PeriDocs_AES_KEY")
+if AES_KEY is None or AES_KEY.strip() == "":
+    raise ValueError(".env is missing PeriDocs_AES_KEY or it is empty.")
+# -------------------------------------------------------------------
 
 def test_pipeline():
     test_cases = [

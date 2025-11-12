@@ -15,14 +15,16 @@ Early-stage prototype.
 
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-   ```
+````
 
-   Official site: [https://brew.sh](https://brew.sh)
+Official site: [https://brew.sh](https://brew.sh)
 
-2. Install Python 3.11+ and Git:
+2. Install Python 3.12.7 and Git (pyenv recommended for exact version):
 
    ```bash
-   brew install python@3.11 git
+   brew install pyenv git
+   pyenv install 3.12.7
+   pyenv global 3.12.7
    ```
 
 3. Verify installations:
@@ -32,8 +34,6 @@ Early-stage prototype.
    git --version
    ```
 
-   (If `python3` is not found, run `brew link python@3.11`)
-
 ---
 
 #### For Linux (Ubuntu/Debian-based)
@@ -42,7 +42,7 @@ Early-stage prototype.
 
    ```bash
    sudo apt update && sudo apt upgrade -y
-   sudo apt install -y python3.11 python3.11-venv python3-pip git curl
+   sudo apt install -y python3.12 python3.12-venv python3-pip git curl
    ```
 
 2. Verify installations:
@@ -58,14 +58,13 @@ Early-stage prototype.
 
 #### For Windows
 
-1. Install Git for Windows
-   Download and install from: [https://git-scm.com/download/win](https://git-scm.com/download/win)
+1. Install Git for Windows: [https://git-scm.com/download/win](https://git-scm.com/download/win)
    During setup, choose:
 
    * "Use Git from the Windows Command Prompt"
    * "Checkout Windows-style, commit Unix-style line endings"
 
-2. Install Python 3.11 UP TO BUT NOT AFTER Python 3.13
+2. Install Python 3.12.7 (3.12.7 is the only version confirmed to work with compatibility between required libraries)
    Download from: [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
    During setup:
 
@@ -73,7 +72,6 @@ Early-stage prototype.
    * Include pip during installation
 
 3. Verify installations:
-   Open Command Prompt (or PowerShell):
 
    ```powershell
    python --version
@@ -84,12 +82,14 @@ Early-stage prototype.
 
 ### Step 1. Clone the Repository
 
-Choose a folder to hold the project (for example, Desktop or Documents).
+Choose a folder to hold the project (for example, Desktop/ or Documents/ or PeriDocs-code/).
 
 ```bash
 git clone https://github.com/Stays7339/PeriDocs.git
 cd PeriDocs-code
 ```
+
+> Note: This repository is private. Only collaborators with access can clone it or pull from it.
 
 ---
 
@@ -98,7 +98,7 @@ cd PeriDocs-code
 #### macOS / Linux
 
 ```bash
-python3.11 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 ```
 
@@ -134,7 +134,21 @@ pip install --upgrade pip
 
 ---
 
-### Step 4. Run the App Locally
+### Step 4. Set Up Secrets / Environment Variables
+
+Create a `.env` file in the project root with your local keys:
+
+```
+PERIDOCS_AES_KEY=your-secret-key
+ADMIN_TOKEN=your-admin-token
+```
+
+> Do **not** commit `.env` to GitHub.
+> For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
+
+---
+
+### Step 5. Run the App Locally
 
 Run this command inside the project folder:
 
@@ -150,7 +164,7 @@ INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 
 ---
 
-### Step 5. Open the App
+### Step 6. Open the App
 
 Open your browser and go to:
 
@@ -162,12 +176,15 @@ You now have PeriDocs running locally.
 
 ---
 
-### Step 6. (Optional) Developer Tooling Setup
+### Step 7. (Optional) Developer Tooling Setup
 
 #### VS Code Recommended Setup
 
 1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
 2. Open the PeriDocs-code folder in VS Code.
+
+---
+
 
 ## Canonical Project Directory
 
@@ -278,13 +295,64 @@ PeriDocs-code/                         # Root project folder
 ## Notes
 
 * The `--reload` flag automatically restarts the server when code changes.
-* `main.py` has been deleted; `routes.py` is now the primary entry point.
-* Background image files remain local and are not committed to GitHub.
 * `data/journals.json` is intentionally ignored by Git for local journaling data.
-* Backend entrypoint: `app.routes:app`
-* Templates: `app/templates/`
-* Static files: `app/static/`
-* Local journal storage: `data/journals.json`
-* Virtual environment: `venv/` (excluded from Git)
+* Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
+
+
+*Homebrew isn’t strictly *required*—it’s just the most common and convenient way to install packages like Python, Git, or other developer tools on macOS without having to manually manage binaries or paths. It basically acts as a “package manager” similar to `apt` on Linux.
+
+
 
 ---
+
+### Why Homebrew is recommended
+
+1. **Simplifies installation of dependencies**
+   Installing Python 3.12.7 manually on macOS can be tedious (downloading `.pkg`, configuring paths, handling multiple Python versions). Homebrew automates all that.
+2. **Manages versions easily**
+   You can have multiple Python versions and switch between them via `brew` or `pyenv`.
+3. **Keeps software up-to-date**
+   Homebrew handles updates for you (`brew update` and `brew upgrade`).
+4. **Consistency with Linux workflows**
+   If you or collaborators use Linux, `brew` gives a package-manager experience similar to `apt` or `dnf`.
+
+---
+
+### Alternatives to Homebrew
+
+1. **Python.org installer**
+
+   * Download the official Python 3.12.7 `.pkg` from [python.org](https://www.python.org/downloads/macos/).
+   * Install manually and add it to your PATH.
+   * Pros: No extra package manager required.
+   * Cons: Harder to manage multiple versions or update Python.
+
+2. **pyenv**
+
+   * Can install and switch between multiple Python versions independent of system Python.
+   * On macOS, you often still need some build tools (`xcode-select --install`) but you can install Python via pyenv without Homebrew if you compile from source.
+   * Pros: More precise control over versions, portable between macOS/Linux.
+   * Cons: Slightly more complex setup than Homebrew.
+
+3. **MacPorts**
+
+   * Another package manager for macOS (less popular than Homebrew).
+   * Pros: Full package ecosystem, similar to Homebrew.
+   * Cons: Less community support, not as widely adopted today.
+
+4. **Manual installation of Git and Python**
+
+   * Download and install Git from [git-scm.com](https://git-scm.com/download/mac).
+   * Download and install Python from Python.org.
+   * Add paths manually.
+   * Pros: No extra tools needed.
+   * Cons: Tedious, can cause conflicts with macOS system Python.
+
+ **Summary:**
+
+* **Homebrew is convenient but optional.**
+* If you want absolute minimal setup, you could skip Homebrew and just install Python 3.12.7 and Git manually from their official sources.
+* If you plan on keeping multiple Python versions, using `pyenv` (with or without Homebrew) is highly recommended.
+
+---
+

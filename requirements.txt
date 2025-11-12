@@ -1,14 +1,13 @@
-# file: requirements.txt
+# Core ML / NLP
+torch==2.9.1
+transformers==4.46.2
+sentence-transformers==2.6.1
+tokenizers>=0.20,<0.21
+numpy>=2.3.4
 
-fastapi==0.120.1
-uvicorn==0.38.0
-Jinja2==3.1.6
-spacy==3.8.7
-en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
-sentence-transformers==5.1.2
-torch==2.9.0
-numpy==2.3.4
-cryptography==41.0.3
-python-dotenv==1.0.1
-rapidfuzz==3.14.3
-httpx==0.28.1
+# Sentence-Transformers dependencies
+scikit-learn>=1.7.2
+scipy>=1.16.3
+pillow>=12.0.0
+joblib>=1.5.2
+threadpoolctl>=3.6.0
