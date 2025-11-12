@@ -57,7 +57,7 @@
 
     // Inject cookie icon + links
     toast.innerHTML = `
-      <img src="/static/cookies-icon-by-trinh-ho-from-flaticon-dot-come.png"
+      <img src="/static/cookies-icon-by-trinh-ho-from-flaticon-dot-com.png"
            alt="Cookie icon"
            class="cookie-icon"
            title="Cookie icon by Trinh Ho from Flaticon"

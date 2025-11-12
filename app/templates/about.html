@@ -1,3 +1,4 @@
+<!-- about page for PeriDocs.org -->
 {% extends "base.html" %}
 {% block title %}About PeriDocs - PeriDocs{% endblock %}
 
@@ -25,8 +26,8 @@
         The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
         <ul>
           <li><strong>Entities:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions.</li>
-          <li><strong>Sentiment:</strong> emotional tone is detected using a highly sensitive algorithm that recognizes joy, sadness, anger, fear, disgust, and surprise. Intensifiers like “very” or “extremely” and deintensifiers like “slightly” or “a bit” are taken into account, as well as repeated words that may strengthen emotion.</li>
-          <li><strong>Semantic similarity:</strong> compares your text with prior entries to detect repeated ideas, related concepts, or patterns in phrasing using precomputed and real-time embeddings for efficiency.</li>
+          <li><strong>Sentiment and polarity:</strong> emotional tone is calculated using a lexicon-based emotion profile that measures valence (positivity/negativity) and arousal (emotional intensity). The polarity is normalized and mapped to labels negative, neutral, or positive. Intensifiers, deintensifiers, negations, and repeated words are all taken into account, with a transparent formula applied so users can trace how the score is computed.</li>
+          <li><strong>Semantic similarity:</strong> compares your text with prior entries to detect repeated ideas, related concepts, or patterns in phrasing using embeddings. The system uses precomputed embeddings for efficiency but does not discard information through flattening; full vector data is maintained internally to preserve the richness of word relations. Embeddings are computed <strong>before redaction</strong> so that semantic similarity can be detected across entries while the displayed text is fully anonymized.</li>
         </ul>
       </p>
 
@@ -54,13 +55,13 @@
       </p>
 
       <p>
-        <strong>Embedding:</strong> Numeric vectors representing your text for semantic similarity detection. These vectors are used internally and are never shared publicly.
+        <strong>Embedding vectors:</strong> Numeric vectors representing your text for semantic similarity detection. These vectors are maintained in full internally to preserve the nuance and relational patterns of your words; they are never truncated or flattened for storage, and are never shared publicly. Maintaining embeddings before redaction allows PeriDocs to identify related entries across different users without exposing private content, providing semantic linking for educational reflection while keeping raw text confidential.
       </p>
 
       <h2>Emotion and sentiment features</h2>
       <p>
         PeriDocs detects nuanced emotional tone using a large lexicon of words and phrases for positive and negative feelings, intensifiers, deintensifiers, fillers, and colloquial expressions. 
-        The system accounts for context, repeated words, and negations to provide a balanced and normalized emotion profile. You receive a breakdown across six basic emotions and a sentiment score bucketed as negative, neutral, or positive. 
+        The system accounts for context, repeated words, and negations to provide a balanced and normalized emotion profile. You receive a breakdown across six basic emotions and a sentiment polarity score, which is mapped to negative, neutral, or positive labels with transparent weighting, allowing users to understand how the system derived each score. 
         This helps users understand patterns in their emotional expression over time.
       </p>
 

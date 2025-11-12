@@ -75,6 +75,13 @@ data/*
 !data/.gitkeep
 
 
+# ------------------------------
+# Optional: ignore your models folders if you have large datasets
+# ------------------------------
+models/*
+!models/.gitkeep
+
+
 # ignore everything in static folder
 app/static/CabineyGrotesk_Complete/*
 

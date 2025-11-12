@@ -65,7 +65,7 @@ Early-stage prototype.
    * "Use Git from the Windows Command Prompt"
    * "Checkout Windows-style, commit Unix-style line endings"
 
-2. Install Python 3.11+
+2. Install Python 3.11 UP TO BUT NOT AFTER Python 3.13
    Download from: [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
    During setup:
 
@@ -169,10 +169,27 @@ You now have PeriDocs running locally.
 1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
 2. Open the PeriDocs-code folder in VS Code.
 
-## Project Structure
+## Canonical Project Directory
+
 
 ```
 PeriDocs-code/                         # Root project folder
+│
+├─ models/                             # Where all-MiniLM (open source) lives
+│   ├─ all-MiniLM-L6-v2                # pending summary comment
+│   │  ├─ 1_Pooling/                   # contains just one file (config.json)
+│   │  ├─ 2_Normalize/                 # contains no files
+│   │  ├─ config_sentence_transformers.json                 # pending summary comment
+│   │  ├─ config.json                 # pending summary comment
+│   │  ├─ model.safetensors            # pending summary comment
+│   │  ├─ modules.json                 # pending summary comment
+│   │  ├─ README.md                    # "By default, input text longer than 256 word pieces is truncated."
+│   │  ├─ sentence_bert_config.json    # pending summary comment
+│   │  ├─ special_tokens_map.json      # pending summary comment
+│   │  ├─ tokenizer_config.json        # pending summary comment
+│   │  ├─ tokenizer.json               # pending summary comment
+│   │  └─ vocab.txt                    # pending summary comment
+│   └─ .gitkeep #avoids pushing the whole pre-trained one-way dataset through GitHub
 │
 ├─ venv/                               # Python virtual environment (ignored by Git)
 │   ├─ bin/                            # Executables (python, pip, etc.)
@@ -182,41 +199,78 @@ PeriDocs-code/                         # Root project folder
 │   └─ pyvenv.cfg                      # Virtual environment configuration
 │
 ├─ app/                                # Backend + frontend application code
-│   ├─ routes.py                       # FastAPI route definitions (main app logic)
-│   ├─ nlp.py                          # spaCy wrappers and text processing utilities
-│   ├─ .env                          # private, proprietary data. Never commit this to Git/GitHub, nor upload publicly.
-│   ├─ templates/                      # Jinja2 HTML templates
-│   │   ├─ index.html                  # Main homepage template
-│   │   ├─ about.html                  # About page template
-│   │   ├─ privacy.html                # Privacy policy which applies to all users of PeriDocs.org
-│   │   ├─ about.html                  # Public explainer page for the technology used on PeriDocs.org
-│   │   ├─ terms-of-service.html       # Terms of Service which applies to all users of PeriDocs.org
-│   │   ├─ base.html                   # Layout template for all webpages
-│   │   ├─ submit-success.html         # Submission success template
-│   │   ├─ includes/                   # Partial templates (included in other pages)
-│   │   │   ├─ modal-feedback.html     # Feedback modal HTML
-│   │   |   └─ footer.html             # Navigation links at the bottom of each webpage
-│   ├─ static/                         # Frontend static files
-│   │   ├─ cooldown.js                 # Handles global cooldowns for submission forms
-│   │   ├─ style.css                   # Main stylesheet
-│   │   ├─ theme-toggle.js             # Dark Mode toggle
-│   │   ├─ feedback.js                 # Feedback modal JS
-│   │   ├─ localStorage.js             # What the general public commonly refer to as cookies.
-│   │   ├─ peridocs-logo-v1.png        # PeriDocs Icon Logo - transparent background, black lining and fill.
-│   │   ├─ peridocs-logo-v1-white.png  # PeriDocs Icon Logo - white background, black lining and fill.
-│   │   ├─ favicon.png                 # PeriDocs Icon Logo for the internet browser tab.
-│   │   └─ CabinetGrotesk_Complete/Fonts/WEB/fonts   #All used fonts live in this folder path
-│   └─ __pycache__/                    # Python compiled bytecode cache
+│  ├─ routes/
+│  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
+│  │  ├─ feedback.py                   # "/feedback"
+│  │  ├─ journal.py                    # "/submit", "/submit-success"
+│  │  ├─/lexicon_admin.py              # Hidden admin route for lexicon moderation. Requires ADMIN_TOKEN in .env (string). Not linked from navigation.
+│  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  └─ __pycache__/                
+│  │
+│  ├─ helpers/
+│  │  ├─ __init__.py
+│  │  ├─ display_last_entry.py         # GET: display last entry, sentiment, emotion, repetition
+│  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
+│  │  ├─ json_safe.py                  # JSON secure operations (NumPy-safe)
+│  │  ├─ security.py                   # optional: encryption/decryption, hashing helpers
+│  │  ├─ similarity.py                 # raw similarity computations
+│  │  └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │
+│  ├─ templates/                        # Jinja2 HTML templates
+│  │  ├─ about.html                     # About page template
+│  │  ├─ base.html                      # Layout template
+│  │  ├─ index.html                     # Main homepage template
+│  │  ├─ lexicon_admin.html             # Front-end UI for staff only, planned to be hidden before public release
+│  │  ├─ privacy.html                   # Privacy policy page template
+│  │  ├─ submit-success.html            # Submission success page template
+│  │  ├─ terms-of-service.html          # Terms of Service page template
+│  │  └─ includes/                      # Partial web-page templates
+│  │      ├─ footer.html
+│  │      └─ modal-feedback.html
+│  │
+│  ├─ static/                            # Frontend static files
+│  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
+│  │  ├─ style.css                       # Main stylesheet 
+│  │  ├─ theme-toggle.js                 # Dark Mode toggle
+│  │  ├─ feedback.js                     # Feedback modal JS
+│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
+│  │  ├─ peridocs-logo-v1.png
+│  │  ├─ peridocs-logo-v1-white.png
+│  │  ├─ favicon.png
+│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
+│  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
+│  │
+│  └─ __pycache__/                       # Python compiled bytecode cache
 │
-├─ data/                               # Local data storage (ignored except .gitkeep)
-│   ├─ journals.json                   # Stored journal entries
-│   ├─ feedback.json                   # Stored feedback and report inquiries
-│   ├─ high-profile-addresses.json     # Empty for now, but created as one way to prevent PII exposure and leaks.
-│   └─ .gitkeep                        # Keeps folder in Git
+├─ core/
+│  └─ nlp/                                # Modular NLP functionality (replaces monolithic nlp.py)
+│      ├─ __init__.py                     # Exposes document_features and hooks to all NLP modules
+│      ├─ anchors.py                      # Adds in a set list of anchor words for detections and analysis
+│      ├─ crisis.py                       # crisis detection functions
+│      ├─ embeddings.py                   # token embeddings cache, SentenceTransformer wrapper
+│      ├─ emotion_analysis.py             # Emotion lexicon & summary
+│      ├─ encryption.py                   # encrypt_text / decrypt_text
+│      ├─ fuzzy_utils.py                  # Fuzzy matching lexicon utilities and dynamic lexicon loader for PeriDocs.
+│      ├─ hash_utils.py                   # SHA8 hashing for unique IDs
+│      ├─ pii.py                          # redact_pii, patterns, high-profile addresses
+│      ├─ process_entry.py                # Full NLP processing pipeline for a single journal entry.
+│      ├─ repetition_echo.py              # Repetition / echo weighting
+│      ├─ sentiment_analysis.py           # Polarity, subjectivity, sentiment bucket
+│      ├─ test_pipleline.py               # Tests the features implement for the actual processing of journal entries
+│      └─ text_processing.py              # Tokenization, text cleaning, orchestrates NLP modules
 │
-├─ README.md                           # Project overview, setup, and usage instructions
-├─ requirements.txt                    # Pinned Python dependencies
-└─ .gitignore                          # Files and folders ignored by Git
+├─ data/                                  # Local data storage
+│  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
+│  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ high-profile-addresses.json         # Prevents PII exposure
+│  ├─ journals.json                       # Stored journal entries
+│  ├─ suggest_lexicon.py                  #Scan journal entries for tokens not matched by the current combined lexicons.
+│  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
+│
+├─ .env                                   # Private, proprietary data (never commit)
+├─ README.md                              # Project overview, setup, and usage
+├─ requirements.txt                       # Pinned Python dependencies
+└─ .gitignore                             # Files and folders ignored by Git
 ```
 
 ---

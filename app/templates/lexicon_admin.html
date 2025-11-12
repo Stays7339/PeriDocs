@@ -1,0 +1,53 @@
+<!-- app/templates/lexicon_admin.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Lexicon Admin</h2>
+<p>Suggestions (from scripts/suggest_lexicon.py)</p>
+{% if suggestions %}
+  <ul>
+  {% for s in suggestions %}
+    <li>
+      <strong>{{ s.token }}</strong> — seen {{ s.count }} times
+      <div>Sample: {{ s.sample_contexts | join(' ... ') }}</div>
+      <div>Fuzzy best: {{ s.fuzzy_best.choice if s.fuzzy_best else 'N/A' }} ({{ s.fuzzy_best.score if s.fuzzy_best else '' }})</div>
+      <form method="post" action="/lexicon-admin/apply">
+        <input type="hidden" name="token_to_add" value="{{ s.token }}">
+        <label>Category:
+          <select name="category">
+            <option value="joy">joy</option>
+            <option value="sadness">sadness</option>
+            <option value="anger">anger</option>
+            <option value="fear">fear</option>
+            <option value="disgust">disgust</option>
+            <option value="surprise">surprise</option>
+            <option value="fillers">fillers</option>
+            <option value="colloquial">colloquial</option>
+            <option value="crisis">crisis</option>
+          </select>
+        </label>
+        <button type="submit">Approve into category</button>
+      </form>
+    </li>
+  {% endfor %}
+  </ul>
+{% else %}
+  <p>No suggestions yet.</p>
+{% endif %}
+
+<h3>Manual Add</h3>
+<form method="post" action="/lexicon-admin/apply">
+  <input name="token_to_add" placeholder="word or phrase">
+  <select name="category">
+    <option value="joy">joy</option>
+    <option value="sadness">sadness</option>
+    <option value="anger">anger</option>
+    <option value="fear">fear</option>
+    <option value="disgust">disgust</option>
+    <option value="surprise">surprise</option>
+    <option value="fillers">fillers</option>
+    <option value="colloquial">colloquial</option>
+    <option value="crisis">crisis</option>
+  </select>
+  <button type="submit">Add</button>
+</form>
+{% endblock %}
