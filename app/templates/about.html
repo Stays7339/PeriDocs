@@ -22,13 +22,13 @@
 
       <h2>How analysis works</h2>
       <p>
-        When you submit text, <code>nlp.py</code> processes it using spaCy (<code>en_core_web_sm</code>) and MiniLM sentence embeddings (<code>all-MiniLM-L6-v2</code>), along with internal helpers like NumPy and FastAPI. 
-        The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
-        <ul>
-          <li><strong>Entities:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions.</li>
-          <li><strong>Sentiment and polarity:</strong> emotional tone is calculated using a lexicon-based emotion profile that measures valence (positivity/negativity) and arousal (emotional intensity). The polarity is normalized and mapped to labels negative, neutral, or positive. Intensifiers, deintensifiers, negations, and repeated words are all taken into account, with a transparent formula applied so users can trace how the score is computed.</li>
-          <li><strong>Semantic similarity:</strong> compares your text with prior entries to detect repeated ideas, related concepts, or patterns in phrasing using embeddings. The system uses precomputed embeddings for efficiency but does not discard information through flattening; full vector data is maintained internally to preserve the richness of word relations. Embeddings are computed <strong>before redaction</strong> so that semantic similarity can be detected across entries while the displayed text is fully anonymized.</li>
-        </ul>
+          When you submit text, <code>nlp.py</code> processes it using MiniLM sentence embeddings (<code>all-MiniLM-L6-v2</code>) and internal helpers like NumPy and FastAPI. 
+          The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
+          <ul>
+            <li><strong>Entities & tokens:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions. Detected tokens may be highlighted on the submit-success page for transparency.</li>
+            <li><strong>Sentiment and emotion anchors:</strong> emotional tone is calculated using a lexicon of words and phrases for positive and negative feelings, intensifiers, deintensifiers, and repeated words. Users receive a JSON-visible breakdown across six basic emotions with normalized intensity scores.</li>
+            <li><strong>Semantic similarity:</strong> compares your text with prior entries using embeddings (all-MiniLM / RoBERTa) to detect repeated ideas, related concepts, or phrasing patterns. Cosine similarity captures synonyms, typos, and paraphrases. Fuzzy or edit-distance highlights are optionally used to show recognized proper nouns, slang, or colloquial terms to the user for transparency.</li>
+          </ul>
       </p>
 
       <h2>Your saved entry</h2>

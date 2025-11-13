@@ -1,17 +1,17 @@
-"""
-app/routes/__init__.py
-
-Initializes FastAPI app and attaches all route modules.
-"""
+# app/routes/__init__.py
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+import asyncio
+from core.nlp.embeddings import _load_model
 
-# Initialize main FastAPI application
 app = FastAPI()
 
-# Mount static files (JS, CSS, images)
+@app.on_event("startup")
+async def preload_embedding_model():
+    print("Preloading SentenceTransformer model (all-roberta-large-v1)...")
+    await _load_model()
+    print("Model preloaded and ready!")
+
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-# Import route modules after app is created
 from app.routes import main, journal, feedback  # noqa: F401
-

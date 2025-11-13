@@ -186,27 +186,15 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory
+## Canonical Project Directory as of 13 November 2025
 
 
 ```
 PeriDocs-code/                         # Root project folder
 │
-├─ models/                             # Where all-MiniLM (open source) lives
-│   ├─ all-MiniLM-L6-v2                # pending summary comment
-│   │  ├─ 1_Pooling/                   # contains just one file (config.json)
-│   │  ├─ 2_Normalize/                 # contains no files
-│   │  ├─ config_sentence_transformers.json                 # pending summary comment
-│   │  ├─ config.json                 # pending summary comment
-│   │  ├─ model.safetensors            # pending summary comment
-│   │  ├─ modules.json                 # pending summary comment
-│   │  ├─ README.md                    # "By default, input text longer than 256 word pieces is truncated."
-│   │  ├─ sentence_bert_config.json    # pending summary comment
-│   │  ├─ special_tokens_map.json      # pending summary comment
-│   │  ├─ tokenizer_config.json        # pending summary comment
-│   │  ├─ tokenizer.json               # pending summary comment
-│   │  └─ vocab.txt                    # pending summary comment
-│   └─ .gitkeep #avoids pushing the whole pre-trained one-way dataset through GitHub
+├─ models/                             # Where open source pre-trained context-understanding models lives
+│   ├─ roberta-large/                  # Sentence-understanding model
+│   └─ .gitkeep                        #a voids pushing the whole pre-trained one-way dataset through GitHub
 │
 ├─ venv/                               # Python virtual environment (ignored by Git)
 │   ├─ bin/                            # Executables (python, pip, etc.)
@@ -220,7 +208,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ journal.py                    # "/submit", "/submit-success"
-│  │  ├─/lexicon_admin.py              # Hidden admin route for lexicon moderation. Requires ADMIN_TOKEN in .env (string). Not linked from navigation.
+│  │  ├─ lexicon_admin.py              # Hidden admin route for lexicon moderation. Requires ADMIN_TOKEN in .env (string). Not linked from navigation.
 │  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
 │  │  └─ __pycache__/                
 │  │
@@ -260,21 +248,22 @@ PeriDocs-code/                         # Root project folder
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
 ├─ core/
-│  └─ nlp/                                # Modular NLP functionality (replaces monolithic nlp.py)
-│      ├─ __init__.py                     # Exposes document_features and hooks to all NLP modules
-│      ├─ anchors.py                      # Adds in a set list of anchor words for detections and analysis
-│      ├─ crisis.py                       # crisis detection functions
-│      ├─ embeddings.py                   # token embeddings cache, SentenceTransformer wrapper
-│      ├─ emotion_analysis.py             # Emotion lexicon & summary
-│      ├─ encryption.py                   # encrypt_text / decrypt_text
-│      ├─ fuzzy_utils.py                  # Fuzzy matching lexicon utilities and dynamic lexicon loader for PeriDocs.
-│      ├─ hash_utils.py                   # SHA8 hashing for unique IDs
-│      ├─ pii.py                          # redact_pii, patterns, high-profile addresses
-│      ├─ process_entry.py                # Full NLP processing pipeline for a single journal entry.
-│      ├─ repetition_echo.py              # Repetition / echo weighting
-│      ├─ sentiment_analysis.py           # Polarity, subjectivity, sentiment bucket
-│      ├─ test_pipleline.py               # Tests the features implement for the actual processing of journal entries
-│      └─ text_processing.py              # Tokenization, text cleaning, orchestrates NLP modules
+│   └─ nlp/
+│      ├─ __init__.py                     # Exposes document_features; acts as import hub for NLP modules.
+│      ├─ anchors.py                      # Defines anchor word lists for emotion/semantic weighting.
+│      ├─ crisis.py                       # Detects crisis indicators and escalation flags.
+│      ├─ embeddings.py                   # Handles SentenceTransformer model, embedding caching, and vector ops.
+│      ├─ emotion_analysis.py             # Computes emotion lexicon match, valence/arousal summary, and embedding-weighted emotion distribution.
+│      ├─ encryption.py                   # encrypt_text / decrypt_text functions for sensitive fields.
+│      ├─ fuzzy_utils.py                  # Fuzzy string matching + dynamic lexicon loader.
+│      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
+│      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
+│      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting.
+│      ├─ repetition_echo.py              # Detects and weighs phrase repetition to reduce redundancy bias.
+│      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
+│      ├─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
+│      └─ text_processing.py              # Text normalization, tokenization, basic linguistic preprocessing, and orchestrates lower-level modules.
+│
 │
 ├─ data/                                  # Local data storage
 │  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
@@ -286,6 +275,7 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ .env                                   # Private, proprietary data (never commit)
 ├─ README.md                              # Project overview, setup, and usage
+├─ embeddings_explainer.md                # Overview created by GPT-5, who also drafted the particular wording of the code.
 ├─ requirements.txt                       # Pinned Python dependencies
 └─ .gitignore                             # Files and folders ignored by Git
 ```
@@ -299,11 +289,95 @@ PeriDocs-code/                         # Root project folder
 * Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
 
 
-*Homebrew isn’t strictly *required*—it’s just the most common and convenient way to install packages like Python, Git, or other developer tools on macOS without having to manually manage binaries or paths. It basically acts as a “package manager” similar to `apt` on Linux.
 
+## Fully corrected vertical-flow ASCII map as of 13 November 2025.
 
+```
+Raw Text Input
+    │
+    ▼
+process_entry.py
+    * text_processing.py.clean_text
+    * text_processing.py.tokenize_text
+    * pii.py.redact_pii
+    * repetition_echo.py.weight_repetition
+    * sentiment_analysis.py.analyze_sentiment
+    * crisis.py.detect_crisis
+    │
+    ▼
+text_processing.py.process_text
+    │→ cleaned text
+    │→ token_dicts
+    │→ token_strings
+    │→ features
+    * text_processing.py.document_features
+        │
+        * _lexicon_emotion_features(tokens)
+            │
+            * detect_emotion_tokens(tokens)
+                │
+                * anchors.py._EMOTION_LEXICONS
+                * fuzzy_utils.py.get_combined_lexicons
+                * fuzzy_utils.py.fuzzy_matches_above
+        │ outputs: 
+            token_count
+            emotion_anchor_hits
+            raw_emotion_hits
+        │
+        * emotion_analysis.py.analyze_emotions(raw_text)
+            │
+            * embeddings.py.compute_embedding_vectors
+            │ outputs:
+                embedding_emotion_distribution
+                valence_arousal_summary
+    │
+    ▼
+process_entry.py collects all outputs:
+    cleaned text
+    token_dicts
+    token_strings
+    features = {
+        token_count
+        emotion_anchor_hits
+        raw_emotion_hits
+        embedding_emotion_distribution
+        valence_arousal_summary
+        sentiment
+        repetition_weight
+        crisis_flag
+    }
+    │
+    ▼
+core/nlp/__init__.py
+    * exposes process_entry.py
+    * exposes document_features / hooks to all NLP modules
+    │
+    ▼
+External callers
+    (app/routes/journal.py, app/helpers/display_last_entry.py, etc.)
+```
 
 ---
+
+### Notes on the diagram:
+
+* `*` = Python module dependency
+* `→` = data flow/output
+* `process_entry.py` **does not call `emotion_analysis.py` directly** anymore.
+* `emotion_analysis.py` is invoked **only inside `document_features(raw_text)`**, which is called by `text_processing.py`.
+* `embeddings.py` is used **inside `emotion_analysis.py`**.
+* Secondary modules (`pii.py`, `repetition_echo.py`, `sentiment_analysis.py`, `crisis.py`) feed directly into `process_entry.py`, not `text_processing.py`.
+
+
+
+
+
+
+
+
+## Miscellaneous FAQ
+---
+*Homebrew isn’t strictly *required*—it’s just the most common and convenient way to install packages like Python, Git, or other developer tools on macOS without having to manually manage binaries or paths. It basically acts as a “package manager” similar to `apt` on Linux.
 
 ### Why Homebrew is recommended
 

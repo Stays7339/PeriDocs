@@ -1,5 +1,5 @@
 """
-core/nlp/repeition_echo.py
+core/nlp/repetition_echo.py
 """
 import logging
 from collections import Counter

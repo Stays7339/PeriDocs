@@ -1,9 +1,15 @@
 """
 core/nlp/emotion_analysis.py
-------------------
-Computes normalized emotion distributions, valence/arousal summaries,
-and modified intensity scores for given text using hybrid
-embedding-lexicon analysis. Lexicon constants are imported from anchors.py.
+
+Emotion analysis module for PeriDocs.
+
+Handles:
+- Numeric weighting, normalization, and summary of emotion distributions.
+- Valence/arousal mapping.
+- Modified intensity scores using simplified intensifiers/deintensifiers.
+- Lexicon constants are imported from anchors.py (empty placeholders here).
+
+Backward compatibility: compute_sentiment_from_profile() replaces sentiment_analysis.py.
 """
 
 import numpy as np
@@ -15,30 +21,13 @@ from core.nlp.anchors import get_emotion_anchor
 from core.nlp.fuzzy_utils import get_combined_lexicons
 
 # -------------------------------
-# INTENSIFIERS & DEINTENSIFIERS
+# INTENSIFIERS & DEINTENSIFIERS (streamlined)
 # -------------------------------
-_INTENSIFIERS: Set[str] = {
-    "very", "extremely", "really", "super", "mega", "ultra", "hella", "wicked", "mad", "damn",
-    "totally", "absolutely", "completely", "entirely", "wholly", "thoroughly", "purely",
-    "incredibly", "seriously", "ridiculously", "insanely", "wildly", "crazily", "tremendously",
-    "vastly", "extraordinarily", "phenomenally", "beyond", "especially", "overwhelmingly",
-    "intensely", "powerfully", "deeply", "so", "heaping", "freaking", "absurdly", "notably",
-    "strikingly", "severely", "exponentially", "monumentally", "outlandishly", "excessively",
-    "passionately", "strongly", "mightily"
-}
-
-_DEINTENSIFIERS: Set[str] = {
-    "slightly", "somewhat", "kind of", "sort of", "a little", "a bit", "barely", "hardly",
-    "mildly", "faintly", "loosely", "gently", "modestly", "softly", "quietly", "weakly", "thinly",
-    "tenuously", "partially", "incompletely", "fractionally", "semi", "quasi", "not really",
-    "not much", "only a little", "just a touch", "halfway", "tepidly", "limply", "almost",
-    "nearly", "practically", "virtually", "kindasorta", "lowkey", "vaguely", "barely-there",
-    "meh", "subduedly", "temperedly", "cautiously", "lightly", "marginally", "minutely",
-    "slowly", "hesitantly", "passably"
-}
+_INTENSIFIERS: Set[str] = {"very", "extremely", "really", "super", "ultra"}
+_DEINTENSIFIERS: Set[str] = {"slightly", "somewhat", "a bit", "barely"}
 
 # -------------------------------
-# EMOTION ANCHORS
+# EMOTION ANCHORS (empty placeholders; lexicons live in anchors.py)
 # -------------------------------
 _EMOTION_LEXICONS: Dict[str, Set[str]] = {
     "joy": get_emotion_anchor("joy"),
@@ -62,38 +51,46 @@ def sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-x))
 
 # -------------------------------
+# ASYNC-READY EMBEDDING HOOK
+# -------------------------------
+async def get_embedding_async(text: str, model_name: str = "all-roberta-large-v1") -> np.ndarray:
+    """
+    Placeholder async wrapper for future async endpoints.
+    Currently calls synchronous get_embedding for compatibility.
+    """
+    return get_embedding(text, model_name)
+
+# -------------------------------
 # EMOTION COMPUTATION CORE
 # -------------------------------
 def compute_emotion_profile(
     text: str,
     emotion_analysis: Optional[Dict[str, Set[str]]] = None,
-    model_name: str = "all-MiniLM-L6-v2"
+    model_name: str = "all-roberta-large-v1"
 ) -> Dict[str, float]:
     """
     Computes emotion distribution for a given text using embeddings.
     Uses the passed `emotion_analysis` lexicon or defaults to combined anchors.
-    Prints debug info for lexicons and vector norms.
     """
     combined_lexicons = get_combined_lexicons(_EMOTION_LEXICONS)
     lexicon = emotion_analysis or combined_lexicons
     emotions = list(lexicon.keys())
 
     if not text.strip():
-        print("DEBUG: Empty input string; returning zeros.")
         return {emotion: 0.0 for emotion in emotions}
 
     try:
         text_vec = get_embedding(text, model_name)
-        print(f"DEBUG: Text embedding norm: {np.linalg.norm(text_vec):.6f}")
-        lexicon_vecs = {emo: batch_embeddings(words, model_name) for emo, words in lexicon.items()}
-        for emo, vecs in lexicon_vecs.items():
-            norms = np.linalg.norm(vecs, axis=1)
-            print(f"DEBUG: {emo} lexicon vector norms (first 5): {norms[:5]}")
+        lexicon_vecs = {}
+        for emo, words in lexicon.items():
+            vecs = batch_embeddings(words, model_name)
+            if vecs.size == 0:
+                print(f"[WARNING] No embeddings returned for lexicon '{emo}' | words: {words}")
+            lexicon_vecs[emo] = vecs
+
     except Exception:
-        print("DEBUG: Embeddings failed; returning zeros.")
         return {emotion: 0.0 for emotion in emotions}
 
-    # Compute cosine similarities as before
     scores = {}
     for emo, vectors in lexicon_vecs.items():
         similarities = np.dot(vectors, text_vec) / (
@@ -102,19 +99,16 @@ def compute_emotion_profile(
         similarities = np.clip(similarities, -1, 1)
         scores[emo] = float(np.mean(similarities))
 
-    # Convert raw cosine similarity scores to probability distribution
     raw_vals = np.array(list(scores.values()))
-
-    # PATCH: Ensure non-zero floor for intensity testing
     min_floor = 1e-3
+    raw_vals = np.where(np.isnan(raw_vals) | (raw_vals==0), min_floor, raw_vals)
+
+
     if np.allclose(raw_vals, 0):
         raw_vals[:] = min_floor
 
     exp_vals = np.exp(raw_vals - np.max(raw_vals))
     probs = exp_vals / (np.sum(exp_vals) + 1e-9)
-
-    # Debug lexicon output
-    print("DEBUG: Lexicon sample:", {k: list(v)[:5] for k, v in lexicon.items()})
 
     return dict(zip(emotions, probs))
 
@@ -152,12 +146,12 @@ def apply_intensity_modifiers(text: str, base_profile: Dict[str, float]) -> Dict
     text_lower = text.lower()
 
     for intens in _INTENSIFIERS:
-        if re.search(rf"\b{re.escape(intens)}\b", text_lower):
+        if re.search(rf"\b{re.escape(intens)}\b['’.,!?]?", text_lower):
             for k in modified:
                 modified[k] *= 1.2
 
     for deintens in _DEINTENSIFIERS:
-        if re.search(rf"\b{re.escape(deintens)}\b", text_lower):
+        if re.search(rf"\b{re.escape(deintens)}\b['’.,!?]?", text_lower):
             for k in modified:
                 modified[k] *= 0.8
 
@@ -196,9 +190,6 @@ def get_deintensifiers() -> Set[str]:
 # BACKWARD COMPATIBILITY
 # -------------------------------
 def emotion_profile(text: str) -> Dict[str, Dict[str, float]]:
-    """
-    Legacy wrapper updated: returns both valence/arousal summary and emotion distribution.
-    """
     return analyze_emotions(text)
 
 def compute_sentiment_from_profile(emotion_summary: Dict[str, float]) -> Dict[str, float]:

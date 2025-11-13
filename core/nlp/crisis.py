@@ -1,30 +1,13 @@
 """
-core.nlp.crisis.py
+core/nlp/crisis.py
 
 Functions to detect crisis-related content in user text.
 """
 
 from typing import List
-import re
+from core.nlp.anchors import get_crisis_phrases
 
-# Crisis phrases list (from legacy app/nlp.py)
-CRISIS_PHRASES = [
-    "suicide",
-    "self harm",
-    "self-harm",
-    "cutting",
-    "overdose",
-    "kill myself",
-    "ending it",
-    "hopeless",
-    "worthless",
-    "no way out",
-    "die alone",
-    "want to die",
-    "can't go on",
-    "overwhelmed",
-]
-
+# Behavioral functions remain in crisis.py
 def check_crisis_phrases(text: str) -> List[str]:
     """
     Returns a list of crisis phrases found in the input text.
@@ -33,7 +16,8 @@ def check_crisis_phrases(text: str) -> List[str]:
     if not text:
         return []
     text_lower = text.lower()
-    found_phrases = [phrase for phrase in CRISIS_PHRASES if phrase in text_lower]
+    crisis_phrases = get_crisis_phrases()
+    found_phrases = [phrase for phrase in crisis_phrases if phrase in text_lower]
     return found_phrases
 
 def crisis_notification(text: str) -> str:

@@ -21,3 +21,14 @@ def sha8_hash(text: str) -> str:
     
     full_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     return full_hash[:8]
+
+
+
+def staff_hash(value: str, ip_salt: str = "") -> str:
+    """
+    Staff-only hash variant for moderation purposes.
+    Uses the same base as sha8_hash but with a distinct 'staff:' prefix
+    and optional IP-based salt to prevent cross-user collisions.
+    """
+    combined = f"staff:{ip_salt}:{value}".encode("utf-8")
+    return hashlib.sha256(combined).hexdigest()[:8]
