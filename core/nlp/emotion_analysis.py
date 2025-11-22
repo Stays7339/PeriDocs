@@ -14,9 +14,10 @@ Backward compatibility: compute_sentiment_from_profile() replaces sentiment_anal
 
 import numpy as np
 import re
+import asyncio
 from typing import Dict, Set, Optional
 from math import tanh
-from core.nlp.embeddings import get_embedding, batch_embeddings
+from core.nlp.embeddings import get_embedding, batch_embeddings_async
 from core.nlp.anchors import get_emotion_anchor
 from core.nlp.fuzzy_utils import get_combined_lexicons
 
@@ -51,8 +52,25 @@ def sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-x))
 
 # -------------------------------
-# ASYNC-READY EMBEDDING HOOK
+# ASYNC HELPER
 # -------------------------------
+def run_async(func, *args, **kwargs):
+    """
+    Safely runs an async function from sync context.
+    Handles existing event loops without crashing.
+    """
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        # Inside an active loop; create a task and wait
+        future = asyncio.ensure_future(func(*args, **kwargs))
+        return asyncio.get_event_loop().run_until_complete(future)
+    else:
+        return asyncio.run(func(*args, **kwargs))
+
 async def get_embedding_async(text: str, model_name: str = "all-roberta-large-v1") -> np.ndarray:
     """
     Placeholder async wrapper for future async endpoints.
@@ -83,13 +101,15 @@ def compute_emotion_profile(
         text_vec = get_embedding(text, model_name)
         lexicon_vecs = {}
         for emo, words in lexicon.items():
-            vecs = batch_embeddings(words, model_name)
+            word_list = list(words)  # <-- FIX: convert set to list for deterministic iteration
+            vecs = run_async(batch_embeddings_async, word_list)
             if vecs.size == 0:
-                print(f"[WARNING] No embeddings returned for lexicon '{emo}' | words: {words}")
+                print(f"[WARNING] No embeddings returned for lexicon '{emo}' | words: {word_list}")
             lexicon_vecs[emo] = vecs
 
-    except Exception:
-        return {emotion: 0.0 for emotion in emotions}
+    except Exception as e:
+        # Propagate errors instead of silently returning zeros
+        raise RuntimeError(f"Embedding computation failed: {e}")
 
     scores = {}
     for emo, vectors in lexicon_vecs.items():
@@ -99,15 +119,30 @@ def compute_emotion_profile(
         similarities = np.clip(similarities, -1, 1)
         scores[emo] = float(np.mean(similarities))
 
-    raw_vals = np.array(list(scores.values()))
+    # -------------------------------
+    # Deterministic Softmax (DSMX)
+    # -------------------------------
+    raw_vals = np.array(list(scores.values()), dtype=float)
+
+    # Replace NaN or exact zeros with a tiny positive floor
     min_floor = 1e-3
-    raw_vals = np.where(np.isnan(raw_vals) | (raw_vals==0), min_floor, raw_vals)
+    raw_vals = np.where(np.isnan(raw_vals) | (raw_vals == 0), min_floor, raw_vals)
 
-
+    # Safety: ensure not-all-zero fallback
     if np.allclose(raw_vals, 0):
         raw_vals[:] = min_floor
 
-    exp_vals = np.exp(raw_vals - np.max(raw_vals))
+    # Temperature (τ): lower = sharper, higher = flatter
+    tau = 0.85
+
+    # Centering + temperature scaling
+    centered = (raw_vals - np.max(raw_vals)) / max(tau, 1e-9)
+
+    # Deterministic tie-breaker:
+    tie_break = np.array([hash(e) % 10_000 for e in emotions], dtype=float) * 1e-12
+    centered = centered + tie_break
+
+    exp_vals = np.exp(centered)
     probs = exp_vals / (np.sum(exp_vals) + 1e-9)
 
     return dict(zip(emotions, probs))

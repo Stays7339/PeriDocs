@@ -95,7 +95,7 @@ _EMOTION_LEXICONS = {
                 "abhorrent", "detestable", "abominable"},
     "surprise": {"surprised", "shocked", "amazed", "astonished", "startled", "wowed", "impressed",
                  "stunned", "astounded", "speechless", "gobsmacked", "bewildered", "incredulous",
-                 "floored", "flabbergasted", "taken aback", "caught off guard", "wide-eyed", "amazed",
+                 "floored", "flabbergasted", "taken aback", "caught off guard", "wide-eyed",
                  "whoa", "oof", "unbelievable", "unexpected", "out-of-nowhere", "unforeseen",
                  "spontaneous", "unpredictable", "rare", "jarring"}
 }

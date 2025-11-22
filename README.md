@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 13 November 2025
+## Canonical Project Directory as of 22 November 2025
 
 
 ```
@@ -194,7 +194,38 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives
 │   ├─ roberta-large/                  # Sentence-understanding model
-│   └─ .gitkeep                        #a voids pushing the whole pre-trained one-way dataset through GitHub
+│   │   ├─.locks/
+│   │   │   └─ models--sentence-transformers--all-roberta-large-v1/
+│   │   │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831.lock
+│   │   │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7.lock
+│   │   │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6.lock
+│   │   │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx].lock # Nine more files just like that
+│   │   └─ models--sentence-transformers--all-roberta-large-v1/ # yes the same name
+│   │               ├─ .no_exist/
+│   │               │       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │               │                 └─ added_tokens.json
+│   │               ├─ blobs/
+│   │               │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
+│   │               │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
+│   │               │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
+│   │               │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
+│   │               ├─ refs/
+│   │               │           ├─ main # no . or "dot" extension nor / or "slash" extension
+│   │               └─ snapshots/
+│   │                       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │                                  ├─ 1_Pooling/
+│   │                                  ├─ config_sentence_transformers.json
+│   │                                  ├─ config.json
+│   │                                  ├─ merges.txt
+│   │                                  ├─ model.safetensors
+│   │                                  ├─ modules.json
+│   │                                  ├─ README.md
+│   │                                  ├─ sentence_bert_config.json
+│   │                                  ├─ special_tokens_map.json
+│   │                                  ├─ tokenizer_config.json
+│   │                                  ├─ tokenizer.json
+│   │                                  └─ vocab.json
+│   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
 │
 ├─ venv/                               # Python virtual environment (ignored by Git)
 │   ├─ bin/                            # Executables (python, pip, etc.)
@@ -251,6 +282,7 @@ PeriDocs-code/                         # Root project folder
 │   └─ nlp/
 │      ├─ __init__.py                     # Exposes document_features; acts as import hub for NLP modules.
 │      ├─ anchors.py                      # Defines anchor word lists for emotion/semantic weighting.
+│      ├─ crisis_writer.py                # Pending description.
 │      ├─ crisis.py                       # Detects crisis indicators and escalation flags.
 │      ├─ embeddings.py                   # Handles SentenceTransformer model, embedding caching, and vector ops.
 │      ├─ emotion_analysis.py             # Computes emotion lexicon match, valence/arousal summary, and embedding-weighted emotion distribution.
@@ -258,7 +290,7 @@ PeriDocs-code/                         # Root project folder
 │      ├─ fuzzy_utils.py                  # Fuzzy string matching + dynamic lexicon loader.
 │      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting.
+│      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting. early returns for crises skip embeddings, sentiment, and emotion calculation, which is intentional for security and performance.
 │      ├─ repetition_echo.py              # Detects and weighs phrase repetition to reduce redundancy bias.
 │      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
 │      ├─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
@@ -270,14 +302,27 @@ PeriDocs-code/                         # Root project folder
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
 │  ├─ journals.json                       # Stored journal entries
-│  ├─ suggest_lexicon.py                  #Scan journal entries for tokens not matched by the current combined lexicons.
+│  ├─ suggest_lexicon.py                  # Scan journal entries for tokens not matched by the current combined lexicons.
+│  ├─ names_au.json
+│  ├─ names_ca.json
+│  ├─ names_ie.json
+│  ├─ names_in.json
+│  ├─ names_nz.json
+│  ├─ names_sg.json
+│  ├─ names_uk.json
+│  ├─ names_us.json
+│  ├─ names_za.json
+│  ├─ recorded_crises.json
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
-├─ .env                                   # Private, proprietary data (never commit)
-├─ README.md                              # Project overview, setup, and usage
-├─ embeddings_explainer.md                # Overview created by GPT-5, who also drafted the particular wording of the code.
-├─ requirements.txt                       # Pinned Python dependencies
-└─ .gitignore                             # Files and folders ignored by Git
+├─ .env                      # Private, proprietary data (never commit)
+├─ .gitignore                # Files and folders ignored by Git
+├─ debug_embeddings.py       # Debugging for running emebeddings only, not the full suite
+├─ embeddings_explainer.md   # Overview created by GPT-5, who also drafted the particular wording of the code.
+├─ README.md                 # Project overview, setup, and usage
+├─ requirements.txt          # Pinned Python dependencies
+├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+└─ test_dsmx.py              # testing for deterministic softmax-like scaling for emotion distributions.
 ```
 
 ---

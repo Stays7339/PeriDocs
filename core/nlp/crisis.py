@@ -7,24 +7,16 @@ Functions to detect crisis-related content in user text.
 from typing import List
 from core.nlp.anchors import get_crisis_phrases
 
-# Behavioral functions remain in crisis.py
 def check_crisis_phrases(text: str) -> List[str]:
-    """
-    Returns a list of crisis phrases found in the input text.
-    Case-insensitive search.
-    """
+    """Return crisis phrases found in text, case-insensitive."""
     if not text:
         return []
     text_lower = text.lower()
     crisis_phrases = get_crisis_phrases()
-    found_phrases = [phrase for phrase in crisis_phrases if phrase in text_lower]
-    return found_phrases
+    return [phrase for phrase in crisis_phrases if phrase in text_lower]
 
 def crisis_notification(text: str) -> str:
-    """
-    If any crisis phrase is found in the text, returns a
-    standardized warning message. Otherwise, returns empty string.
-    """
+    """Return standardized warning message if crisis phrases are detected."""
     matches = check_crisis_phrases(text)
     if not matches:
         return ""

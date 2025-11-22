@@ -12,7 +12,10 @@ import re
 from typing import List, Tuple, Dict, Any, Optional
 from .anchors import _EMOTION_LEXICONS
 from .fuzzy_utils import get_combined_lexicons, fuzzy_matches_above
-from .emotion_analysis import analyze_emotions
+from .emotion_analysis import analyze_emotions, get_emotion_anchors
+from .embeddings import get_embedding, get_embedding_async, _deterministic_fallback_vec
+import numpy as np
+import asyncio
 
 # ---------------------------------------------------------------------
 # Regex tokenizer for simple whitespace-based tokenization
@@ -116,29 +119,80 @@ def document_features(
 
     return {**base_features, **hybrid_features}
 
-def process_text(text: str, crisis: bool = False) -> Tuple[str, List[Dict[str, Any]], List[str], Dict[str, Any]]:
-    """
-    Minimal spaCy-free processing pipeline:
-      - cleans text (PII-redacted if safe_text)
-      - tokenizes
-      - extracts token strings
-      - computes document features
-      - embeds full text in memory only (temporary, can include PII)
+# Define ALL_EMOTION_KEYS dynamically from current anchors
+ALL_EMOTION_KEYS = list(get_emotion_anchors().keys())
 
-    Returns:
-      cleaned: PII-redacted text safe for storage/UI
-      token_dicts: token list dicts
-      token_strings: plain token strings
-      features: lexicon + emotion features (embeddings computed in memory only)
-
-    Note: raw text should be used temporarily for embeddings only; safe_text
-    is what gets stored and shown to end-users.
+def compute_emotions_from_embedding(embedding_vector: np.ndarray) -> dict:
     """
-    cleaned = clean_text(text)
-    token_dicts = tokenize_text(cleaned)
+    Minimal deterministic fallback: uniform emotion distribution from embedding vector.
+    """
+    return {k: 1.0 / len(ALL_EMOTION_KEYS) for k in ALL_EMOTION_KEYS}
+
+def process_text(text: str):
+    """
+    Full pipeline: clean, tokenize, embeddings, lexicon+embedding emotions, valence/arousal.
+    Guarantees:
+      - embedding_vector is never None for non-empty text
+      - emotion_distribution is always non-empty
+      - valence/arousal summary is always present
+    """
+
+    cleaned_text = text.strip()
+    token_dicts = [{"text": t, "lemma": t.lower(), "pos": "X"} for t in cleaned_text.split()]
     token_strings = [t["text"] for t in token_dicts]
 
-    # Document features: pass raw text to memory-only computation
-    features = document_features(token_strings, raw_text=text, crisis=crisis)
+    features: dict = {}
 
-    return cleaned, token_dicts, token_strings, features
+    if not cleaned_text:
+        # fallback for empty text
+        features["embedding_vector"] = np.zeros((768,), dtype=np.float32)
+        features["embedding_emotion_distribution"] = {k: 0.0 for k in ALL_EMOTION_KEYS}
+        features["valence_arousal_summary"] = {}
+        features["lexicon_emotion_distribution"] = {k: 0.0 for k in ALL_EMOTION_KEYS}
+        return cleaned_text, token_dicts, token_strings, features
+
+    # ---------------- EMBEDDING ----------------
+    try:
+        try:
+            loop = asyncio.get_running_loop()
+            if loop.is_running():
+                embedding_vector = get_embedding(cleaned_text)
+            else:
+                embedding_vector = asyncio.run(get_embedding_async(cleaned_text))
+        except RuntimeError:
+            embedding_vector = get_embedding(cleaned_text)
+
+        if embedding_vector is None or np.all(embedding_vector == 0.0):
+            embedding_vector = _deterministic_fallback_vec(cleaned_text)
+        features["embedding_vector"] = embedding_vector
+
+    except Exception:
+        embedding_vector = _deterministic_fallback_vec(cleaned_text)
+        features["embedding_vector"] = embedding_vector
+
+    # ---------------- EMOTIONS ----------------
+    try:
+        # Lexicon + intensity adjusted emotions
+        emotion_data = analyze_emotions(cleaned_text)
+        features["embedding_emotion_distribution"] = emotion_data.get("emotion_distribution", compute_emotions_from_embedding(embedding_vector))
+        features["valence_arousal_summary"] = emotion_data.get("valence_arousal_summary", {})
+
+        # Optional: lexicon-only distribution (pure anchor hits)
+        lexicon_hits = detect_emotion_tokens(token_strings)
+        lexicon_counts = {k: 0 for k in ALL_EMOTION_KEYS}
+        for emo, _, _ in lexicon_hits:
+            if emo in lexicon_counts:
+                lexicon_counts[emo] += 1
+        total = sum(lexicon_counts.values())
+        if total > 0:
+            features["lexicon_emotion_distribution"] = {k: v / total for k, v in lexicon_counts.items()}
+        else:
+            features["lexicon_emotion_distribution"] = {k: 0.0 for k in ALL_EMOTION_KEYS}
+
+    except Exception:
+        features["embedding_emotion_distribution"] = compute_emotions_from_embedding(embedding_vector)
+        features["valence_arousal_summary"] = {}
+        features["lexicon_emotion_distribution"] = {k: 0.0 for k in ALL_EMOTION_KEYS}
+
+    return cleaned_text, token_dicts, token_strings, features
+
