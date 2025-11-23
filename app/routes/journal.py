@@ -8,10 +8,12 @@ from fastapi import Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from datetime import datetime
+from typing import Dict
 from app.routes import app
 from app.helpers.file_ops import load_data, save_data
 from app.helpers.top_matches import find_top_matches
 from core.nlp import process_entry, sentiment_label, repetition_score
+from core.nlp.emotion_analysis import normalize_emotion_profile
 
 # Jinja2 templates directory
 templates = Jinja2Templates(directory="app/templates")
@@ -25,16 +27,25 @@ async def submit_journal(request: Request, entry_text: str = Form(...)):
     """
     Process a submitted journal entry:
     - Process with NLP pipeline
+    - Normalize emotion profile globally
     - Store in journals.json
     - Redirect to success page
     """
     nlp_result = process_entry(entry_text)
+
+    # -------------------------------
+    # GLOBAL NORMALIZATION OF EMOTIONS
+    # -------------------------------
+    if "emotions" in nlp_result:
+        nlp_result["emotions"] = normalize_emotion_profile(nlp_result["emotions"])
+
     entry = {
         "id": nlp_result["sha8_id"],
         "text": entry_text,
         "nlp": nlp_result,
         "timestamp": datetime.utcnow().isoformat()
     }
+
     save_data(entry, file_path=DATA_FILE)
     return RedirectResponse("/submit-success?id=" + entry["id"], status_code=303)
 

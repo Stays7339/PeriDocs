@@ -1,5 +1,5 @@
 """
-core/nlp/__init__.py
+core/nlp/__init__.py save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
 
 Main NLP pipeline interface for PeriDocs.
 

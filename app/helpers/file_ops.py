@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional
 DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/journals.json')
 FEEDBACK_FILE = os.path.join(os.path.dirname(__file__), '../../data/feedback.json')
 
+def normalize_emotion_profile(profile: Dict[str, float]) -> Dict[str, float]:
+    total = sum(profile.values())
+    if total > 0:
+        return {k: v / total for k, v in profile.items()}
+    return profile
+
 
 def load_data(file_path: str = DATA_FILE) -> List[Dict[str, Any]]:
     """

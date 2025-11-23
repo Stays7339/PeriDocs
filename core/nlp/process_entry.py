@@ -1,6 +1,10 @@
-# file: core/nlp/process_entry.py
-# updated 20251121 (date and time formatted as follows: YYYYMMDDhhmm)
-
+"""
+file: core/nlp/process_entry.py
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
+orchestrates full entry processing including crisis handling, PII redaction, tokenization, 
+embedding + emotion extraction, repetition scoring, hashing, sentiment, and summary. 
+It wraps an async pipeline with a synchronous helper.
+"""
 from __future__ import annotations
 import asyncio
 import hashlib
@@ -18,8 +22,9 @@ from .hash_utils import sha8_hash, staff_hash
 from .crisis import crisis_notification
 from .encryption import encrypt_text as encrypt_legal_only
 from .emotion_analysis import (
-    apply_intensity_modifiers,
     compute_sentiment_from_profile,
+    analyze_emotions_async,
+    normalize_emotion_profile
 )
 
 # ---------------- RapidFuzz-based Tokenization & Entity Extraction ----------------
@@ -42,34 +47,19 @@ def extract_entities(text: str) -> list[dict]:
             entities.append({"text": word, "label": match[0]})
     return entities
 
-# ---------------- CORE PROCESSING ----------------
 async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
     """
-    Processes a user journal entry with privacy-preserving crisis handling.
+    Process a journal entry:
+    - Handles crisis early returns
+    - Redacts PII for stored tokens
+    - Embedding computation (sync fallback)
+    - Async emotion computation with normalization
+    - Sentiment, repetition, hashes, entities
     """
-
     # ---------------- CRISIS CHECK ----------------
     crisis_msg = crisis_notification(text)
     if crisis_msg:
-        # ======================================================================
-        # EARLY RETURN FOR CRISIS TEXT
-        # ======================================================================
-        # Intentionally skipping embeddings, emotion computation, tokenization, etc.
-        # All keys are returned but set to None or empty dict/list. This is intentional.
-        # Anyone inspecting the output should immediately see that no NLP processing
-        # was performed due to crisis content.
-        # ======================================================================
-
-        # Log to terminal for executive/debug inspection
-        print("\n" + "="*80)
-        print("!!! CRISIS ENTRY DETECTED !!!")
-        print("Original Text:", text)
-        print("NOTE: All None or empty values below are INTENTIONAL for crisis entries.")
-        print("NLP computations are skipped; this is by design.")
-        print("="*80 + "\n")
-
         from .crisis_writer import append_crisis_record
-
         try:
             append_crisis_record({
                 "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -77,7 +67,6 @@ async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
                 "user_ip_hash": hashlib.sha256(user_ip.encode("utf-8")).hexdigest()[:8],
             })
         except Exception as e:
-            # Explicitly raise, do not silently ignore
             raise RuntimeError(f"Failed to write crisis record: {e}") from e
 
         encrypted_text = encrypt_text(text)
@@ -95,14 +84,10 @@ async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
             "embedding": None,
             "embedding_mean": 0.0,
             "repetition_multiplier": 0.0,
-            "emotions": {},  # intentionally empty
-            "emotion": {},   # intentionally empty
-            "sentiment": {"polarity": 0.0, "label": "neutral"},  # safe default
-            "summary": {
-                "primary_emotion": "neutral",
-                "intensity": 0.0,
-                "valence_arousal": {}
-            },
+            "emotions": {},
+            "emotion": {},
+            "sentiment": {"polarity": 0.0, "label": "neutral"},
+            "summary": {"primary_emotion": "neutral", "intensity": 0.0, "valence_arousal": {}},
             "crisis_flag": True,
             "weighted_emotion_distribution": {},
             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -114,57 +99,46 @@ async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
     # ---------------- SAFE TEXT ----------------
     safe_text = redact_pii(text)
 
-    # ---------------- TEXT PROCESSING (Embedding + Emotion) ----------------
-    cleaned, token_dicts, token_strings, features = process_text(text)
-
+    # ---------------- TEXT PROCESSING ----------------
+    # Clean + tokenize + embedding
+    cleaned, _, _, features = process_text(text)
     embedding_vector = features.get("embedding_vector")
+    embedding_mean = float(np.mean(embedding_vector)) if embedding_vector is not None else 0.0
 
-    if embedding_vector is None:
-        # Only use fallback for empty or failed embedding (non-crisis)
-        embedding = None
-        embedding_mean = 0.0
-        # Attempt to use whatever the process_text returned for emotions, else default empty
-        emotion_distribution = features.get("embedding_emotion_distribution") or {}
-        valence_arousal = features.get("valence_arousal_summary") or {}
-        weighted_emotion_distribution = apply_intensity_modifiers(text, emotion_distribution)
-    else:
-        embedding = embedding_vector
-        embedding_mean = float(np.mean(embedding))
-        emotion_distribution = features.get("embedding_emotion_distribution", {})
-        valence_arousal = features.get("valence_arousal_summary", {})
-        weighted_emotion_distribution = apply_intensity_modifiers(text, emotion_distribution)
+    # Async weighted emotion computation
+    async_result = await analyze_emotions_async(text)
+    weighted_emotion_distribution = normalize_emotion_profile(
+        async_result.get("emotion_distribution", {})
+    )
+    valence_arousal = async_result.get("valence_arousal_summary", {})
 
-    # Tokens & Entities
+    # ---------------- TOKENS & ENTITIES ----------------
     tokens = tokenize_text(safe_text)
     entities = extract_entities(safe_text)
 
-    # Hashes
+    # ---------------- HASHES ----------------
     sha8 = sha8_hash(safe_text)
     ip_salt = hashlib.sha256(user_ip.encode("utf-8")).hexdigest()[:8]
     staff_h = staff_hash(text, ip_salt)
     pseudonym_hash = hashlib.sha256((safe_text + ip_salt).encode("utf-8")).hexdigest()[:8]
 
-    # Repetition
+    # ---------------- REPETITION ----------------
     repetition = repetition_score(safe_text)
 
-    # Timestamp
-    timestamp_utc = datetime.now(timezone.utc).isoformat()
-
-    # Sentiment (explicit errors propagate)
+    # ---------------- SENTIMENT ----------------
     if valence_arousal and "valence" in valence_arousal:
         sentiment = compute_sentiment_from_profile(valence_arousal)
     else:
         sentiment = {"polarity": 0.0, "label": "neutral"}
 
-    # Summary
+    # ---------------- SUMMARY ----------------
     primary_emotion = "neutral"
     intensity = 0.0
     if weighted_emotion_distribution:
         primary_emotion = max(weighted_emotion_distribution, key=lambda k: weighted_emotion_distribution.get(k, 0.0))
         intensity = float(max(weighted_emotion_distribution.values(), default=0.0))
 
-    crisis_flag = False
-
+    # ---------------- RETURN STRUCTURE ----------------
     return {
         "sha8": sha8,
         "staff_hash": staff_h,
@@ -173,11 +147,11 @@ async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
         "safe_text": safe_text,
         "tokens": tokens,
         "entities": entities,
-        "embedding": embedding,
+        "embedding": embedding_vector,
         "embedding_mean": embedding_mean,
         "repetition_multiplier": repetition,
         "emotions": {
-            "embedding_emotion_distribution": emotion_distribution,
+            "embedding_emotion_distribution": weighted_emotion_distribution,
             "valence_arousal_summary": valence_arousal,
             "weighted_emotion_distribution": weighted_emotion_distribution
         },
@@ -191,9 +165,9 @@ async def process_entry_async(text: str, user_ip: str) -> Dict[str, Any]:
             "intensity": intensity,
             "valence_arousal": valence_arousal
         },
-        "crisis_flag": crisis_flag,
+        "crisis_flag": False,
         "weighted_emotion_distribution": weighted_emotion_distribution,
-        "timestamp_utc": timestamp_utc,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "ip_salt": ip_salt
     }
 

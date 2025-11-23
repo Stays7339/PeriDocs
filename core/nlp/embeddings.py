@@ -1,4 +1,9 @@
-# file: core/nlp/embeddings.py
+"""
+file: core/nlp/embeddings.py 
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
+SentenceTransformer model loading (sync/async), snapshot folder detection, 
+caching, deterministic fallback embeddings, and encryption helpers.
+"""
 from __future__ import annotations
 import asyncio
 import concurrent.futures
@@ -32,6 +37,7 @@ _model: Optional[SentenceTransformer] = None
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
 _embedding_cache: Dict[str, np.ndarray] = {}
 _embedding_dim: Optional[int] = None  # determined once model is available
+_deterministic_fallback_cache: Dict[str, np.ndarray] = {}
 
 # ---------------- CONFIG ----------------
 # Folder under PROJECT_ROOT/models expected to contain model snapshot folders
@@ -334,20 +340,19 @@ def batch_embeddings(texts: list[str], batch_size: int = 8, allow_fallback: bool
 
 # ---------------- Deterministic fallback (dev only) ----------------
 def _deterministic_fallback_vec(text: str) -> np.ndarray:
-    """
-    Deterministic pseudo-embedding derived from sha256(text) — only for development/fallback.
-    Produces fixed vectors of length _embedding_dim (or 768 if unknown).
-    """
+    if text in _deterministic_fallback_cache:
+        return _deterministic_fallback_cache[text]
     dim = _embedding_dim or 768
     h = hashlib.sha256(text.encode("utf-8")).digest()
     rng = np.frombuffer(h * ((dim // len(h)) + 1), dtype=np.uint8)[:dim].astype(np.float32)
-    # normalize to unit-ish vector
     rng = rng - np.mean(rng)
     norm = np.linalg.norm(rng)
     if norm == 0:
         rng = np.ones((dim,), dtype=np.float32)
         norm = float(np.linalg.norm(rng))
-    return (rng / norm).astype(np.float32)
+    vec = (rng / norm).astype(np.float32)
+    _deterministic_fallback_cache[text] = vec
+    return vec
 
 
 # ---------------- Entry-level helper ----------------

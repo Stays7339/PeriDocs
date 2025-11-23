@@ -1,5 +1,8 @@
-# file: core/nlp/anchors.py
 """
+file: core/nlp/anchors.py
+
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
+
 Anchors and Constants for PeriDocs NLP Pipeline
 -----------------------------------------------
 Filepath: core/nlp/anchors.py

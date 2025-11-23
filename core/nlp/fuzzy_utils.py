@@ -1,5 +1,6 @@
-# core/nlp/fuzzy_utils.py
 """
+core/nlp/fuzzy_utils.py
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
 Fuzzy matching lexicon utilities and dynamic lexicon loader for PeriDocs.
 - Uses rapidfuzz if available (fast); falls back to simple ratio when not.
 - Loads dynamic lexicons from data/dynamic_lexicons.json (created if missing).

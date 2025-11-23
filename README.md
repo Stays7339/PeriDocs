@@ -186,8 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 22 November 2025
-
+## Canonical Project Directory as of 22 November 2025 (202511221924)
 
 ```
 PeriDocs-code/                         # Root project folder
@@ -322,7 +321,8 @@ PeriDocs-code/                         # Root project folder
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
 ├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
-└─ test_dsmx.py              # testing for deterministic softmax-like scaling for emotion distributions.
+├─ test_dsmx.py              # testing for deterministic softmax-like scaling for emotion distributions.
+└─ test_mps.py               # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
 ```
 
 ---
@@ -332,93 +332,6 @@ PeriDocs-code/                         # Root project folder
 * The `--reload` flag automatically restarts the server when code changes.
 * `data/journals.json` is intentionally ignored by Git for local journaling data.
 * Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
-
-
-
-## Fully corrected vertical-flow ASCII map as of 13 November 2025.
-
-```
-Raw Text Input
-    │
-    ▼
-process_entry.py
-    * text_processing.py.clean_text
-    * text_processing.py.tokenize_text
-    * pii.py.redact_pii
-    * repetition_echo.py.weight_repetition
-    * sentiment_analysis.py.analyze_sentiment
-    * crisis.py.detect_crisis
-    │
-    ▼
-text_processing.py.process_text
-    │→ cleaned text
-    │→ token_dicts
-    │→ token_strings
-    │→ features
-    * text_processing.py.document_features
-        │
-        * _lexicon_emotion_features(tokens)
-            │
-            * detect_emotion_tokens(tokens)
-                │
-                * anchors.py._EMOTION_LEXICONS
-                * fuzzy_utils.py.get_combined_lexicons
-                * fuzzy_utils.py.fuzzy_matches_above
-        │ outputs: 
-            token_count
-            emotion_anchor_hits
-            raw_emotion_hits
-        │
-        * emotion_analysis.py.analyze_emotions(raw_text)
-            │
-            * embeddings.py.compute_embedding_vectors
-            │ outputs:
-                embedding_emotion_distribution
-                valence_arousal_summary
-    │
-    ▼
-process_entry.py collects all outputs:
-    cleaned text
-    token_dicts
-    token_strings
-    features = {
-        token_count
-        emotion_anchor_hits
-        raw_emotion_hits
-        embedding_emotion_distribution
-        valence_arousal_summary
-        sentiment
-        repetition_weight
-        crisis_flag
-    }
-    │
-    ▼
-core/nlp/__init__.py
-    * exposes process_entry.py
-    * exposes document_features / hooks to all NLP modules
-    │
-    ▼
-External callers
-    (app/routes/journal.py, app/helpers/display_last_entry.py, etc.)
-```
-
----
-
-### Notes on the diagram:
-
-* `*` = Python module dependency
-* `→` = data flow/output
-* `process_entry.py` **does not call `emotion_analysis.py` directly** anymore.
-* `emotion_analysis.py` is invoked **only inside `document_features(raw_text)`**, which is called by `text_processing.py`.
-* `embeddings.py` is used **inside `emotion_analysis.py`**.
-* Secondary modules (`pii.py`, `repetition_echo.py`, `sentiment_analysis.py`, `crisis.py`) feed directly into `process_entry.py`, not `text_processing.py`.
-
-
-
-
-
-
-
 
 ## Miscellaneous FAQ
 ---

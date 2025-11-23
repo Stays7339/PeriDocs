@@ -1,13 +1,17 @@
-# file: core/nlp/text_processing.py
-# Purpose: Minimal spaCy-free text processing and emotion feature extraction for PeriDocs.
-# Functions:
-#   - clean_text(text)
-#   - tokenize_text(text)
-#   - detect_emotion_tokens(tokens)
-#   - _lexicon_emotion_features(tokens)
-#   - document_features(tokens, raw_text=None)
-#   - process_text(text)
-
+"""
+file: core/nlp/text_processing.py
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
+Purpose: Minimal spaCy-free text processing and emotion feature extraction for PeriDocs.
+Functions:
+   - clean_text(text)
+   - tokenize_text(text)
+   - detect_emotion_tokens(tokens)
+   - _lexicon_emotion_features(tokens)
+   - document_features(tokens, raw_text=None)
+   - process_text(text)
+ tokenization, lexicon-based emotion detection, document feature synthesis, embeddings integration, 
+ and fallback mechanisms.
+"""
 import re
 from typing import List, Tuple, Dict, Any, Optional
 from .anchors import _EMOTION_LEXICONS

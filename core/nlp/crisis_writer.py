@@ -1,5 +1,6 @@
 """
 file: core/nlp/crisis_writer.py
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
 Atomic crisis record writer.
 
 Appends AES-encrypted crisis records to data/recorded_crises.json in an atomic and safe way.

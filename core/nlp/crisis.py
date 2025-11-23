@@ -1,5 +1,6 @@
 """
 core/nlp/crisis.py
+save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
 
 Functions to detect crisis-related content in user text.
 """
