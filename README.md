@@ -15,7 +15,7 @@ Early-stage prototype.
 
    ```bash
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-````
+```
 
 Official site: [https://brew.sh](https://brew.sh)
 

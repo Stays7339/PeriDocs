@@ -136,9 +136,9 @@ def process_text(text: str):
     """
     Full pipeline: clean, tokenize, embeddings, lexicon+embedding emotions, valence/arousal.
     Guarantees:
-      - embedding_vector is never None for non-empty text
-      - emotion_distribution is always non-empty
-      - valence/arousal summary is always present
+      - embedding_vector is never None for non-empty text (except in fallback)
+      - emotion_distribution is always non-empty (except in fallback)
+      - valence_arousal_summary will always be present (may be empty in fallback cases).
     """
 
     cleaned_text = text.strip()

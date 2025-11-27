@@ -22,7 +22,7 @@
 
       <h2>How analysis works</h2>
       <p>
-          When you submit text, <code>nlp.py</code> processes it using MiniLM sentence embeddings (<code>all-MiniLM-L6-v2</code>) and internal helpers like NumPy and FastAPI. 
+          When you submit text, <code>embeddings.py</code> processes it using MiniLM and RoBERTa sentence embeddings (<code>all-MiniLM-L6-v2</code>) and internal helpers like NumPy and FastAPI. 
           The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
           <ul>
             <li><strong>Entities & tokens:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions. Detected tokens may be highlighted on the submit-success page for transparency.</li>
@@ -33,7 +33,7 @@
 
       <h2>Your saved entry</h2>
       <p>
-        Each journal entry is assigned a unique SHA256-based ID (for example, <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
+        Each journal entry is assigned a unique SHA256-based 8-character ID (for example, <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
         Entries are stored securely and visible only to authorized PeriDocs staff for moderation, safety review, or research into system performance. 
         User text is <strong>never</strong> shared publicly.
       </p>
