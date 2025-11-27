@@ -1,6 +1,6 @@
 """
 core/nlp/emotion_analysis.py 
-save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
+save-state updated 202511241720 (updated for display-ready emotion percentages, raw_text, and sorted output)
 
 Emotion analysis module for PeriDocs.
 
@@ -68,10 +68,10 @@ def normalize_vector(v: np.ndarray) -> np.ndarray:
 def sigmoid(x: float) -> float:
     return 1 / (1 + np.exp(-x))
 
-def _deterministic_fallback_vec(text: str, dim: int = 768) -> np.ndarray:
-    if text in _deterministic_fallback_cache:
-        return _deterministic_fallback_cache[text]
-    h = hashlib.sha256(text.encode("utf-8")).digest()
+def _deterministic_fallback_vec(raw_text: str, dim: int = 768) -> np.ndarray:
+    if raw_text in _deterministic_fallback_cache:
+        return _deterministic_fallback_cache[raw_text]
+    h = hashlib.sha256(raw_text.encode("utf-8")).digest()
     rng = np.frombuffer(h * ((dim // len(h)) + 1), dtype=np.uint8)[:dim].astype(np.float32)
     rng -= np.mean(rng)
     norm = np.linalg.norm(rng)
@@ -79,14 +79,14 @@ def _deterministic_fallback_vec(text: str, dim: int = 768) -> np.ndarray:
         rng = np.ones((dim,), dtype=np.float32)
         norm = float(np.linalg.norm(rng))
     vec = (rng / norm).astype(np.float32)
-    _deterministic_fallback_cache[text] = vec
+    _deterministic_fallback_cache[raw_text] = vec
     return vec
 
 # -------------------------------
 # ASYNC EMBEDDINGS
 # -------------------------------
-async def get_embedding_async(text: str, model_name: str = "all-roberta-large-v1") -> np.ndarray:
-    return get_embedding(text, model_name)
+async def get_embedding_async(raw_text: str, model_name: str = "all-roberta-large-v1") -> np.ndarray:
+    return get_embedding(raw_text, model_name)
 
 async def _get_lexicon_embeddings_async(lexicon: Dict[str, Set[str]]) -> Dict[str, np.ndarray]:
     embeddings = {}
@@ -115,7 +115,7 @@ async def _get_lexicon_embeddings_async(lexicon: Dict[str, Set[str]]) -> Dict[st
 # EMOTION PROFILE COMPUTATION
 # -------------------------------
 async def compute_emotion_profile_async(
-    text: str,
+    raw_text: str,
     emotion_analysis: Optional[Dict[str, Set[str]]] = None,
     model_name: str = "all-roberta-large-v1"
 ) -> Dict[str, float]:
@@ -123,11 +123,11 @@ async def compute_emotion_profile_async(
     lexicon = emotion_analysis or combined_lexicons
     emotions = list(lexicon.keys())
 
-    if not text.strip():
+    if not raw_text.strip():
         return {emotion: 0.0 for emotion in emotions}
 
     try:
-        text_vec = await get_embedding_async(text, model_name)
+        text_vec = await get_embedding_async(raw_text, model_name)
         lexicon_vecs = await _get_lexicon_embeddings_async(lexicon)
     except Exception as e:
         raise RuntimeError(f"Embedding computation failed: {e}")
@@ -189,13 +189,22 @@ def apply_intensity_modifiers(tokens: list, base_profile: Dict[str, float], lexi
     return modified
 
 # -------------------------------
+# EMOTION DISPLAY FORMAT
+# -------------------------------
+def format_emotion_distribution(dist: dict) -> str:
+    """Convert raw probabilities to percentages, sort descending, return display string."""
+    percent_dist = {emo: round(prob * 100, 1) for emo, prob in dist.items()}
+    sorted_items = sorted(percent_dist.items(), key=lambda x: x[1], reverse=True)
+    return ", ".join(f"{emo}: {val}%" for emo, val in sorted_items)
+
+# -------------------------------
 # MASTER ASYNC PIPELINE
 # -------------------------------
-async def analyze_emotions_async(text: str) -> Dict[str, Dict[str, float]]:
+async def analyze_emotions_async(raw_text: str) -> Dict[str, Dict[str, float]]:
     TOKEN_RE = re.compile(r"\b\w+(?:['’]\w+)?\b", flags=re.UNICODE)
-    tokens = TOKEN_RE.findall(text)
+    tokens = TOKEN_RE.findall(raw_text)
     lexicon = get_combined_lexicons(_EMOTION_LEXICONS)
-    base_profile = await compute_emotion_profile_async(text, lexicon)
+    base_profile = await compute_emotion_profile_async(raw_text, lexicon)
 
     adjusted_profile = apply_intensity_modifiers(tokens, base_profile, lexicon)
 
@@ -204,40 +213,71 @@ async def analyze_emotions_async(text: str) -> Dict[str, Dict[str, float]]:
     combined_profile = {emo: lex_weight * adjusted_profile.get(emo, 0.0) + emb_weight * base_profile.get(emo, 0.0)
                         for emo in base_profile}
 
+    # Convert to percentages and sort descending
+    percent_dist = {emo: round(prob * 100, 2) for emo, prob in combined_profile.items()}
+    sorted_percent_dist = dict(sorted(percent_dist.items(), key=lambda x: x[1], reverse=True))
+
     summary = summarize_valence_arousal(combined_profile)
 
     return {
-        "emotion_distribution": combined_profile,
+        "emotion_distribution": sorted_percent_dist,
+        "emotion_distribution_str": format_emotion_distribution(combined_profile),
         "valence_arousal_summary": summary
     }
 
-# -------------------------------
-# NORMALIZATION FOR PERCENTAGES
-# -------------------------------
 def normalize_emotion_profile(emotions: dict) -> dict:
-    if "embedding_emotion_distribution" in emotions:
-        profile = emotions["embedding_emotion_distribution"]
-        flat = True
+    """
+    Normalize and flatten the emotion structure so downstream code
+    always receives a simple flat dict: {emotion: float}.
+    Updated 20251126:
+    - Supports new PeriDocs structure that uses 'emotion_distribution'
+      instead of legacy 'weighted_emotion_distribution' or
+      'embedding_emotion_distribution'.
+    """
+
+    # NEW: Prefer the modern PeriDocs structure.
+    if isinstance(emotions, dict):
+        if "emotion_distribution" in emotions and isinstance(emotions["emotion_distribution"], dict):
+            profile = emotions["emotion_distribution"]
+
+        # Legacy support (unchanged)
+        else:
+            weighted = emotions.get("weighted_emotion_distribution")
+            if isinstance(weighted, dict) and weighted:
+                profile = weighted
+            else:
+                embedding = emotions.get("embedding_emotion_distribution")
+                if isinstance(embedding, dict) and embedding:
+                    profile = embedding
+                else:
+                    # If it's already a flat dict of floats, use it directly.
+                    profile = emotions
     else:
-        profile = emotions
-        flat = False
-    total = sum(profile.values())
-    normalized = {k: v / total for k, v in profile.items()} if total > 0 else {k: 0.0 for k in profile}
-    if flat:
-        return {"embedding_emotion_distribution": normalized, **{k: v for k, v in emotions.items() if k != "embedding_emotion_distribution"}}
+        return {}
+
+    # Ensure profile is flat numeric
+    numeric_items = {k: v for k, v in profile.items() if isinstance(v, (int, float))}
+    if not numeric_items:
+        return {}
+
+    total = sum(numeric_items.values())
+    if total > 0:
+        normalized = {k: v / total for k, v in numeric_items.items()}
     else:
-        return normalized
+        normalized = {k: 0.0 for k in numeric_items}
+
+    return normalized
 
 # -------------------------------
 # SYNC FACADES & BACKWARD COMPATIBILITY
 # -------------------------------
-def analyze_emotions(text: str) -> Dict[str, Dict[str, float]]:
+def analyze_emotions(raw_text: str) -> Dict[str, Dict[str, float]]:
     import nest_asyncio
     nest_asyncio.apply()
-    return asyncio.run(analyze_emotions_async(text))
+    return asyncio.run(analyze_emotions_async(raw_text))
 
-def emotion_profile(text: str) -> Dict[str, Dict[str, float]]:
-    return analyze_emotions(text)
+def emotion_profile(raw_text: str) -> Dict[str, Dict[str, float]]:
+    return analyze_emotions(raw_text)
 
 def compute_sentiment_from_profile(emotion_summary: Dict[str, float]) -> Dict[str, float]:
     valence = emotion_summary.get("valence", 0.0)

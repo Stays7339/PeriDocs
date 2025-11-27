@@ -1,4 +1,4 @@
-<!-- submit-success is the page that the user is redirected to so they can see the analysis on their journal entry along with conent curated by PeriDocs staff and recommended by the PeriDocs algorithm-->
+<!-- submit-success is the page that the user is redirected to so they can see the analysis on their journal entry along with content curated by PeriDocs staff and recommended by the PeriDocs algorithm -->
 {# submit-success.html — updated with emotion summary #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
@@ -23,10 +23,17 @@
 
       <!-- Metrics summary -->
       <ul class="metrics">
-        <li><strong>Sentiment:</strong> {{ sentiment_score }} ({{ sentiment_label }})</li>
         <li><strong>Dominant Emotion:</strong> {{ dominant_emotion }}</li>
         <li><strong>Emotion Distribution:</strong> {{ emotion_summary }}</li>
-        <li><strong>Entities:</strong> {{ entities | join(', ') if entities else 'None' }}</li>
+        <li><strong>Entities:</strong>
+          {% if entities %}
+            {% for entity in entities %}
+              {{ entity.text.capitalize() }} ({{ entity.label.capitalize() }}){% if not loop.last %}, {% endif %}
+            {% endfor %}
+          {% else %}
+            None
+          {% endif %}
+        </li>
         <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>
       </ul>
 

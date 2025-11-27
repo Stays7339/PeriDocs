@@ -8,34 +8,26 @@ including sentiment, repetition, and emotion summaries.
 from typing import Optional, Dict, Any
 from app.helpers.file_ops import load_data
 from app.helpers.json_safe import json_safe
-from core.nlp.sentiment_analysis import sentiment_label
+from app.helpers.journal_helpers import sentiment_label
+from core.nlp import repetition_score
 
 def display_last_entry(journals_path: str) -> Optional[Dict[str, Any]]:
-    """
-    Retrieves the most recent journal entry and returns a summary
-    containing key fields for display.
-
-    Returns:
-        dict with keys:
-            - 'id': SHA8 entry ID
-            - 'timestamp': entry timestamp
-            - 'excerpt': first ~15 words of the entry
-            - 'sentiment': textual sentiment label
-            - 'repetition': repetition score or %
-            - 'emotions': dict of emotion intensities
-    """
     entries = load_data(journals_path)
     if not entries:
         return None
 
-    last_entry = entries[-1]
+    # Handle nested lists or malformed entries
+    last_entry = next((e for e in reversed(entries) if isinstance(e, dict)), None)
+    if last_entry is None:
+        return None
+
     nlp_data = last_entry.get('nlp', {})
 
-    text_excerpt = last_entry.get('text', '').split()
+    text_excerpt = last_entry.get('safe_text', '').split()
     excerpt = ' '.join(text_excerpt[:15]) + ('...' if len(text_excerpt) > 15 else '')
 
     sentiment_score = nlp_data.get('sentiment', 0)
-    repetition_score_val = nlp_data.get('repetition', 0)
+    repetition_score_val = repetition_score(last_entry.get('safe_text', ''))
     emotions = nlp_data.get('emotions', {})
 
     summary = {

@@ -1,63 +1,73 @@
-"""
-app/helpers/file_ops.py
-
-Provides file loading, saving, and ensuring feedback storage functionality.
-"""
-
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
+import numpy as np
+from datetime import datetime
 
-# Default file paths (can be overridden)
 DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/journals.json')
-FEEDBACK_FILE = os.path.join(os.path.dirname(__file__), '../../data/feedback.json')
-
-def normalize_emotion_profile(profile: Dict[str, float]) -> Dict[str, float]:
-    total = sum(profile.values())
-    if total > 0:
-        return {k: v / total for k, v in profile.items()}
-    return profile
-
 
 def load_data(file_path: str = DATA_FILE) -> List[Dict[str, Any]]:
-    """
-    Safely load JSON data from a file.
-    Returns an empty list if file doesn't exist or is empty.
-    """
+    """Safely load JSON data, return empty list if file missing or invalid"""
     if not os.path.exists(file_path):
         return []
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
-            if isinstance(data, list):
-                return data
-            else:
-                return []
+        # Flatten one-level nested lists
+        if data and isinstance(data[0], list):
+            data = [item for sublist in data for item in sublist]
+        return data if isinstance(data, list) else []
     except (json.JSONDecodeError, IOError):
         return []
 
-
-def save_data(entry: Dict[str, Any], file_path: str = DATA_FILE) -> None:
-    """
-    Append a new entry to a JSON file safely.
-    Ensures the file always contains a list of entries.
-    """
-    data = load_data(file_path)
-    data.append(entry)
+def save_data(entries: List[Dict[str, Any]], file_path: str = DATA_FILE) -> None:
+    """Safely save JSON list; converts np.ndarray → list automatically"""
+    def default_serializer(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        raise TypeError(f"Cannot serialize type: {type(obj)}")
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(entries, f, ensure_ascii=False, indent=2, default=default_serializer)
     except IOError as e:
         raise RuntimeError(f"Failed to save data to {file_path}: {e}")
 
+def append_entry(entry: Dict[str, Any], file_path: str = DATA_FILE) -> None:
+    """Append single entry safely, flattening if needed"""
+    data = load_data(file_path)
+    data.append(entry)
+    save_data(data, file_path)
 
-def ensure_feedback_file(file_path: str = FEEDBACK_FILE) -> None:
+# ------------------ Feedback helpers ------------------ #
+
+def get_feedback_file() -> str:
     """
-    Ensures the feedback file exists and is initialized as a JSON list.
+    Return feedback file path with 6-hour timestamp window.
+    Creates file and directories if missing.
     """
-    if not os.path.exists(file_path):
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                json.dump([], f, ensure_ascii=False, indent=2)
-        except IOError as e:
-            raise RuntimeError(f"Failed to create feedback file {file_path}: {e}")
+    now = datetime.utcnow()
+    window = now.hour // 6  # 0: 00-05, 1: 06-11, 2: 12-17, 3: 18-23
+    timestamp = now.strftime("%Y%m%d") + f"_{window}"
+    file_path = os.path.join(os.path.dirname(__file__), f"../../data/feedback_{timestamp}.json")
+
+    path_obj = os.path.abspath(file_path)
+    os.makedirs(os.path.dirname(path_obj), exist_ok=True)
+    if not os.path.exists(path_obj):
+        # Initialize empty JSON array
+        with open(path_obj, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+    return path_obj
+
+def ensure_feedback_file(file_path: str = None) -> str:
+    """
+    Ensure feedback file exists.
+    If no path is given, uses timestamped 6-hour window file.
+    Returns the path to use.
+    """
+    if file_path is None:
+        file_path = get_feedback_file()
+    elif not os.path.exists(file_path):
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, 'w', encoding='utf-8') as f:
+            json.dump([], f, ensure_ascii=False, indent=2)
+    return file_path

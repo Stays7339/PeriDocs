@@ -246,6 +246,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ __init__.py
 │  │  ├─ display_last_entry.py         # GET: display last entry, sentiment, emotion, repetition
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
+│  │  ├─ journal_helpers.py            # sentiment, pruning, embedding utilities
 │  │  ├─ json_safe.py                  # JSON secure operations (NumPy-safe)
 │  │  ├─ security.py                   # optional: encryption/decryption, hashing helpers
 │  │  ├─ similarity.py                 # raw similarity computations

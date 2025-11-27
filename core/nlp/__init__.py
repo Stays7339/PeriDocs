@@ -16,6 +16,7 @@ from .pii import redact_pii, COMMON_NAMES
 from .encryption import encrypt_text, decrypt_text
 from .crisis import check_crisis_phrases, crisis_notification
 from .embeddings import get_embedding, TOKEN_EMBED_PRECOMPUTE
+from .sentiment_analysis import compute_sentiment
 from .repetition_echo import repetition_score
 from .emotion_analysis import (
     emotion_profile,

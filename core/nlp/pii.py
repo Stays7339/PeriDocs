@@ -1,29 +1,50 @@
 """
-#file: core/nlp/pii.py
-save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
-PII Redaction Module for PeriDocs
----------------------------------
+core/nlp/pii.py
+
+PeriDocs PII Redaction Module
+-----------------------------
+
 Purpose:
     Centralized handling of Personally Identifiable Information (PII) detection
-    and redaction across the system. 
+    and redaction across the system. Designed for safe storage of journal entries
+    and other textual content while maintaining privacy.
 
-Redacts:
-    - Emails
-    - SSNs (standard and loose/bare 9-digit)
-    - Phone numbers
-    - Physical addresses (high-profile whitelist allowed)
-    - Names (uncommon only)
-    - Preserves first-person pronouns and common English pronouns
+Features:
+---------
+1. Redacts:
+   - Emails
+   - SSNs (standard and loose/bare 9-digit)
+   - Phone numbers
+   - Physical addresses (high-profile whitelist allowed)
+   - Names (optional, uncommon only, respects safe/whitelisted names)
+2. Preserves:
+   - First-person pronouns
+   - Common English pronouns
+   - Safe/whitelisted names
 
-Safe/whitelisted names:
-    - Common first/last names from multiple English-speaking countries
-    - Celebrity names like Zendaya, Beyonce, Gandhi, etc.
+Usage:
+------
+    safe_text = redact_pii(
+        text=raw_text,
+        redact_names=True,    # set False for testing/debugging
+        use_fuzzy=True,
+        threshold=85
+    )
 """
 
 import re
 import json
 from pathlib import Path
 from rapidfuzz import fuzz
+
+# Attempt to import spaCy for NER-based name detection
+try:
+    import spacy
+    NLP = spacy.load("en_core_web_sm")
+    SPACY_AVAILABLE = True
+except ImportError:
+    NLP = None
+    SPACY_AVAILABLE = False
 
 # --------------------
 # Paths & Data Loader
@@ -68,13 +89,26 @@ ADDRESS_PATTERN = r"\d{1,5}\s\w+(?:\s\w+){0,4}\s(?:Street|St|Avenue|Ave|Road|Rd|
 # --------------------
 # Core Redaction Function
 # --------------------
-def redact_pii(text: str, use_fuzzy: bool = True, threshold: int = 85) -> str:
+def redact_pii(text: str, redact_names: bool = False, use_fuzzy: bool = True, threshold: int = 85) -> str:
     """
-    Redacts PII from input text based on rules:
-        - Emails, SSNs, phone numbers
-        - High-profile addresses (fuzzy optional)
-        - Uncommon names (case-insensitive)
-        - Preserves safe names, pronouns, and first-person references
+    Redacts PII from input text.
+
+    Parameters:
+    -----------
+    text : str
+        Raw text to be redacted.
+    redact_names : bool
+        If True, redacts uncommon names (requires spaCy).
+        Default is False for testing/debugging.
+    use_fuzzy : bool
+        Whether to apply fuzzy matching for high-profile addresses.
+    threshold : int
+        Threshold for fuzzy matching of high-profile addresses.
+
+    Returns:
+    --------
+    str
+        Text with PII redacted (emails, phones, SSNs, addresses, optional names).
     """
 
     safe_text = text
@@ -107,14 +141,14 @@ def redact_pii(text: str, use_fuzzy: bool = True, threshold: int = 85) -> str:
             safe_text = safe_text.replace(match, "[ADDRESS]")
 
     # -----------------------
-    # Name redaction: only uncommon names
+    # Name redaction: only if requested and spaCy available
     # -----------------------
-    words = re.findall(r"\b[\w'-]+\b", safe_text)
-    for w in words:
-        w_lower = w.lower()
-        if w_lower in SAFE_PRONOUNS:
-            continue  # skip safe pronouns
-        if w_lower not in COMMON_NAMES:
-            safe_text = re.sub(rf"\b{re.escape(w)}\b", "[NAME]", safe_text, flags=re.IGNORECASE)
+    if redact_names and SPACY_AVAILABLE:
+        doc = NLP(safe_text)
+        for ent in doc.ents:
+            if ent.label_ == "PERSON":
+                # Redact if not in COMMON_NAMES
+                if ent.text.lower() not in COMMON_NAMES:
+                    safe_text = safe_text.replace(ent.text, "[NAME]")
 
     return safe_text

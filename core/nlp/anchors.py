@@ -25,26 +25,6 @@ Contents:
 import re
 from typing import Pattern, List, Set
 
-# ========================
-# PII Patterns
-# ========================
-EMAIL_PATTERN: Pattern = re.compile(
-    r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"
-)
-SSN_PATTERN: Pattern = re.compile(r"\b\d{3}-\d{2}-\d{4}\b")
-SSN_LOOSE_PATTERN: Pattern = re.compile(r"^\d{9}$")  # bare 9 digits
-PHONE_PATTERN: Pattern = re.compile(
-    r"\b(?:\+1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"
-)
-ADDRESS_PATTERN: Pattern = re.compile(
-    r"\d+\s+\w+(?:\s+\w+)*,\s*\w+,\s*[A-Z]{2}\s*\d{5}"
-)
-
-# ========================
-# Shared constants
-# ========================
-COMMON_NAMES: Set[str] = {"John", "Jane", "Michael", "Emily", "Chris", "Sarah"}
-HIGH_PROFILE_ADDRESSES: List[str] = ["1600 Pennsylvania Avenue NW, Washington, DC 20500"]
 
 # ========================
 # Fillers and Colloquial Words
@@ -102,6 +82,38 @@ _EMOTION_LEXICONS = {
                  "whoa", "oof", "unbelievable", "unexpected", "out-of-nowhere", "unforeseen",
                  "spontaneous", "unpredictable", "rare", "jarring"}
 }
+
+
+# canonical emotion labels (you already have these)
+CANONICAL_EMOTIONS = [
+    "sadness", "joy", "fear", "anger", "disgust", "surprise",
+    # include any others your emotion_analysis supports
+]
+
+# dynamic alias mapping
+EMOTION_ALIASES = {
+    "sad": "sadness",
+    "down": "sadness",
+    "lonely": "sadness",
+
+    "happy": "joy",
+    "glad": "joy",
+
+    "scared": "fear",
+    "afraid": "fear",
+    "terrified": "fear",
+
+    "mad": "anger",
+    "furious": "anger",
+    "pissed": "anger",
+
+    "gross": "disgust",
+    "nasty": "disgust",
+
+    "shocked": "surprise",
+    "stunned": "surprise"
+}
+
 
 # ========================
 # Crisis phrases
