@@ -33,8 +33,9 @@ from core.nlp.fuzzy_utils import get_combined_lexicons
 from sentence_transformers import SentenceTransformer
 
 # ------------------- Load .env -------------------
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 env_path = os.path.join(PROJECT_ROOT, ".env")
+
 if not os.path.exists(env_path):
     raise FileNotFoundError(f".env file not found at {env_path}")
 

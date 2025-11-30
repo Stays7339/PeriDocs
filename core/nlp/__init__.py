@@ -20,7 +20,7 @@ from .sentiment_analysis import compute_sentiment
 from .repetition_echo import repetition_score
 from .emotion_analysis import (
     emotion_profile,
-    compute_sentiment_from_profile,
+    compute_sentiment_from_valence_arousal,
     analyze_emotions,
     get_emotion_anchors,
     get_intensifiers,
@@ -31,7 +31,7 @@ from .hash_utils import sha8_hash
 # -------------------------------
 # Backward-compatible alias
 # -------------------------------
-compute_sentiment = compute_sentiment_from_profile
+compute_sentiment = compute_sentiment_from_valence_arousal
 
 # -------------------------------
 # Wrapper for full NLP features

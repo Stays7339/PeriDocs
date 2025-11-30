@@ -22,7 +22,7 @@ from .hash_utils import sha8_hash, staff_hash
 from .crisis import crisis_notification
 from .encryption import encrypt_text as encrypt_legal_only
 from .emotion_analysis import (
-    compute_sentiment_from_profile,
+    compute_sentiment_from_valence_arousal,
     analyze_emotions_async,
     normalize_emotion_profile
 )

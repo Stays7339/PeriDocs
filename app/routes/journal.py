@@ -42,6 +42,8 @@ from fastapi.templating import Jinja2Templates
 import json
 from pathlib import Path
 from datetime import datetime
+import numpy as np
+from glob import glob
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
@@ -63,51 +65,77 @@ window = now.hour // 6  # 0: 00-05, 1: 06-11, 2: 12-17, 3: 18-23
 BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
 JOURNALS_EMBED_FILE = f"data/journals_embeddings_dump{BACKUP_TIMESTAMP}.json"
 
-# Load embeddings cache
-backup_path = Path(JOURNALS_EMBED_FILE)
-if backup_path.exists():
-    with open(backup_path, "r", encoding="utf-8") as f:
-        embeddings_index = json.load(f)
-else:
-    embeddings_index = {}
-    backup_path.write_text(json.dumps({}))
+
+
+# ------------------------------
+# Load all embeddings files with the common prefix
+# ------------------------------
+embeddings_index = {}
+for path_str in sorted(glob("data/journals_embeddings_dump*.json")):
+    path = Path(path_str)
+    if path.exists():
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                embeddings_index.update(data)  # merge previous entries
+        except Exception as e:
+            print(f"Warning: failed to load {path}: {e}")
 
 # ---------- Submit Journal ----------
 @app.post("/submit", response_class=HTMLResponse)
 async def submit_journal(request: Request, entry_text: str = Form(...)):
     client_host = request.client.host if request.client else "127.0.0.1"
 
-    # -------------------------------
-    # REDACT PII (with name redaction disabled for testing)
-    # -------------------------------
+    # REDACT PII
     entry_text_safe = redact_pii(entry_text, redact_names=False)
 
-    # -------------------------------
     # NLP PROCESSING
-    # -------------------------------
     nlp_result = await process_entry_async(entry_text_safe, user_ip=client_host)
 
-    # Normalize emotions if present
+    # --- Normalize emotions ---
     if "emotions" in nlp_result:
-        nlp_result["emotions"] = normalize_emotion_profile(nlp_result["emotions"])
+        emotions = nlp_result["emotions"]
+        if isinstance(emotions, dict) and "weighted" in emotions:
+            emotions["weighted"] = normalize_emotion_profile(emotions["weighted"])
+        else:
+            nlp_result["emotions"] = normalize_emotion_profile(emotions)
 
-    # Fill emotions from weighted_emotion_distribution if empty
+    # --- Fallback if no 'emotions' key ---
     if not nlp_result.get("emotions") and nlp_result.get("weighted_emotion_distribution"):
         nlp_result["emotions"] = nlp_result["weighted_emotion_distribution"]
 
+    # --- Ensure JSON-safe weighted_emotion_distribution and dominant_emotion ---
+    if nlp_result.get("weighted_emotion_distribution"):
+        # Convert np.float64 → float
+        nlp_result["weighted_emotion_distribution"] = {
+            k: float(v) for k, v in nlp_result["weighted_emotion_distribution"].items()
+        }
+        # Compute dominant emotion
+        nlp_result["dominant_emotion"] = max(
+            nlp_result["weighted_emotion_distribution"],
+            key=nlp_result["weighted_emotion_distribution"].get
+        )
+
+    # Also make sure 'emotions' is JSON-safe if it exists
+    if nlp_result.get("emotions"):
+        nlp_result["emotions"] = {
+            k: float(v) if isinstance(v, (np.floating, float)) else v
+            for k, v in nlp_result["emotions"].items()
+        }
+
+    # Preserve entities (ensure JSON-safe)
+    if nlp_result.get("entities"):
+        nlp_result["entities"] = [str(e) for e in nlp_result["entities"]]
+
     nlp_result["text"] = entry_text_safe
 
-    # -------------------------------
-    # PRUNE ENTRY: embeddings removed, indicate storage path
-    # -------------------------------
+    # PRUNE ENTRY: embeddings removed
     pruned_entry = prune_entry(nlp_result, keep_embeddings=False)
     pruned_entry["embedding"] = f"stored in {JOURNALS_EMBED_FILE}"
 
     append_entry(pruned_entry, JOURNALS_FILE)
 
-    # -------------------------------
     # HANDLE EMBEDDINGS SEPARATELY
-    # -------------------------------
     embedding_vec = nlp_result.get("embedding")
     norm_vec = safe_normalize_embedding(embedding_vec)
     if norm_vec is not None:
@@ -138,7 +166,9 @@ async def submit_success(request: Request, id: str):
                 continue
             match_entry = next((e for e in all_entries if isinstance(e, dict) and e.get("id") == eid), None)
             if match_entry:
-                similarity_pct = round(sim * 100, 1)
+                # --- CLIP SIMILARITY TO [0,1] RANGE ---
+                sim_clipped = min(max(sim, 0.0), 1.0)
+                similarity_pct = round(sim_clipped * 100, 1)
                 total_sim += similarity_pct
                 top_matches.append({
                     "entry_id": eid,
@@ -154,8 +184,16 @@ async def submit_success(request: Request, id: str):
     # -------------------------------
     # EMOTION FORMATTING FOR DISPLAY
     # -------------------------------
-    raw_emotions = entry["nlp"].get("emotions") or entry["nlp"].get("weighted_emotion_distribution") or {}
-    # Convert to percentages, capitalize keys, remove braces/quotes
+    # Extract weighted emotions safely for display
+    emotions_data = entry["nlp"].get("emotions")
+    if isinstance(emotions_data, dict) and "weighted" in emotions_data:
+        raw_emotions = emotions_data["weighted"]
+    elif emotions_data:
+        raw_emotions = emotions_data
+    else:
+        raw_emotions = entry["nlp"].get("weighted_emotion_distribution", {})
+
+    # Convert to percentages, capitalize keys
     emotion_summary_display = ", ".join(
         f"{k.capitalize()}: {v*100:.1f}%" for k, v in raw_emotions.items()
     )
@@ -168,7 +206,7 @@ async def submit_success(request: Request, id: str):
         "request": request,
         "entry_id": entry["id"],
         "safe_text": entry.get("safe_text"),
-        "sentiment_label": sentiment_label(sentiment_score),
+        "sentiment_label": sentiment_label(sentiment_score.get("polarity", 0.0) if isinstance(sentiment_score, dict) else sentiment_score),
         "dominant_emotion": dominant_emotion_display,
         "emotion_summary": emotion_summary_display,
         "entities": entry["nlp"].get("entities", []),

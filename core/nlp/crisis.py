@@ -22,6 +22,5 @@ def crisis_notification(text: str) -> str:
     if not matches:
         return ""
     return (
-        "⚠️ Warning: Your entry contains language that may indicate a mental health crisis. "
-        "Please reach out to trained professionals or emergency services if needed."
+        "⚠️ Your writing suggests the possibility of emotional or mental health strain. There are professionals and services outside of PeriDocs equipped to provide guidance."
     )

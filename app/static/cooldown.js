@@ -53,12 +53,14 @@ function attachCooldownHandlers() {
 
       // Journal form uses native submission after brief toast
       if (type === 'journal') {
+        e.preventDefault(); // stop default submission immediately
         showToast('Journal submitted!', 'success');
         setTimeout(() => {
-          form.submit(); // native form submission triggers backend redirect
-        }, 800); // 0.8s delay
+          form.submit(); // native submission after toast is visible
+        }, 1500); // 1.5s delay to ensure toast is seen
         return;
       }
+
 
       // Feedback/report forms: keep async fetch logic
       const formData = new FormData(form);
@@ -77,8 +79,37 @@ function attachCooldownHandlers() {
     });
   };
 
-  // Journal form
-  handleForm('#journal-form', 'journal', null);
+  // Journal form: async fetch with toast + optional redirect
+  handleForm('#journal-form', 'journal', async (form) => {
+    const formData = new FormData(form);
+    const payload = Object.fromEntries(formData.entries());
+
+    try {
+      const res = await fetch(form.action, {
+        method: form.method || 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Network response was not ok');
+
+      const data = await res.json();
+      if (data.status === "ok") {
+        showToast(data.message || 'Journal submitted and analysis started!', 'success');
+        form.reset();
+
+        // Redirect with entry_id
+        setTimeout(() => {
+          window.location.href = `/submit-success?id=${data.entry_id}`;
+        }, 1000);
+      } else {
+        showToast(data.message || 'Submission failed. Please try again.', 'error');
+      }
+    } catch (err) {
+      showToast('Submission failed. Please try again.', 'error');
+      console.error(err);
+    }
+  });
 
   // Feedback/report form
   handleForm('#report-form', 'report', async (form) => {

@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 22 November 2025 (202511221924)
+## Canonical Project Directory as of 29 November 2025 (202511291721)
 
 ```
 PeriDocs-code/                         # Root project folder
@@ -230,7 +230,7 @@ PeriDocs-code/                         # Root project folder
 │   ├─ bin/                            # Executables (python, pip, etc.)
 │   ├─ include/                        # Headers for building packages
 │   ├─ lib/                            # Installed Python packages
-│   ├─ share/                          # Shared resources for the virtual environment
+│   ├─ share/                           # Shared resources for the virtual environment
 │   └─ pyvenv.cfg                      # Virtual environment configuration
 │
 ├─ app/                                # Backend + frontend application code
@@ -272,9 +272,9 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
 │  │  ├─ peridocs-logo-v1.png
 │  │  ├─ peridocs-logo-v1-white.png
-│  │  ├─ favicon.png
-│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
-│  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
+│  │ ├─ favicon.png
+│  │ ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
+│  │ └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
@@ -293,9 +293,7 @@ PeriDocs-code/                         # Root project folder
 │      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting. early returns for crises skip embeddings, sentiment, and emotion calculation, which is intentional for security and performance.
 │      ├─ repetition_echo.py              # Detects and weighs phrase repetition to reduce redundancy bias.
 │      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
-│      ├─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │      └─ text_processing.py              # Text normalization, tokenization, basic linguistic preprocessing, and orchestrates lower-level modules.
-│
 │
 ├─ data/                                  # Local data storage
 │  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
@@ -317,13 +315,18 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
-├─ debug_embeddings.py       # Debugging for running emebeddings only, not the full suite
 ├─ embeddings_explainer.md   # Overview created by GPT-5, who also drafted the particular wording of the code.
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
 ├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
-├─ test_dsmx.py              # testing for deterministic softmax-like scaling for emotion distributions.
-└─ test_mps.py               # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
+│
+├─ test-and-debug/                     
+    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
+    ├─ test_dsmx.py                    # testing for deterministic softmax-like scaling for emotion distributions.
+    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
+    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
+    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
+
 ```
 
 ---

@@ -29,6 +29,7 @@ import numpy as np
 from core.nlp.embeddings import get_embedding, batch_embeddings_async
 from core.nlp.anchors import get_emotion_anchor
 from core.nlp.fuzzy_utils import get_combined_lexicons
+from datetime import datetime
 
 # -------------------------------
 # INTENSIFIERS & DEINTENSIFIERS
@@ -348,17 +349,59 @@ def emotion_profile(raw_text: str) -> Dict[str, Dict[str, float]]:
 # -------------------------------
 # SENTIMENT
 # -------------------------------
-def compute_sentiment_from_profile(emotion_summary: Dict[str, float]) -> Dict[str, float]:
-    valence = emotion_summary.get("valence", 0.0)
-    arousal = emotion_summary.get("arousal", 1.0)
-    polarity = tanh(valence / max(1e-6, arousal))
+def compute_sentiment_from_valence_arousal(valence: float, arousal: float) -> Dict[str, float]:
+    """
+    Compute polarity and sentiment label from valence and arousal.
+
+    Parameters
+    ----------
+    valence : float
+        Measures how pleasant/unpleasant the emotion is.
+        Positive valence = pleasant (joy, trust), negative valence = unpleasant (anger, sadness, disgust).
+    arousal : float
+        Measures intensity of the emotion.
+        High arousal = strong/excited, low arousal = calm/relaxed.
+        Avoids division by zero by defaulting to 1.0 if None.
+
+    Returns
+    -------
+    dict
+        {
+            'polarity': float,  # normalized in [-1,1]; derived from valence/arousal
+            'label': str,       # human-readable sentiment: 'positive', 'neutral', 'negative'
+            'valence': float,   # retained raw valence
+            'arousal': float    # retained raw arousal
+        }
+
+    Notes
+    -----
+    Polarity is a single numeric summary of sentiment, computed as:
+        polarity = tanh(valence / arousal)
+
+    Sentiment label is derived from polarity:
+        polarity >= 0.05 -> 'positive'
+        polarity <= -0.05 -> 'negative'
+        otherwise -> 'neutral'
+
+    This standardizes downstream storage and ensures consistency with PeriDocs' valence/arousal-based NLP pipeline.
+    """
+    arousal_safe = arousal if arousal is not None and arousal != 0 else 1.0
+    polarity = float(np.tanh(valence / arousal_safe))
+
     if polarity >= 0.05:
         label = "positive"
     elif polarity <= -0.05:
         label = "negative"
     else:
         label = "neutral"
-    return {"polarity": float(polarity), "label": label, "source": "emotion-profile"}
+
+    return {
+        "polarity": polarity,
+        "label": label,
+        "valence": valence,
+        "arousal": arousal_safe
+    }
+
 
 # -------------------------------
 # PUBLIC ACCESSORS

@@ -1,4 +1,4 @@
-<!-- about page for PeriDocs.org -->
+<!-- about page for PeriDocs.org - Updated 20251129-->
 {% extends "base.html" %}
 {% block title %}About PeriDocs - PeriDocs{% endblock %}
 
@@ -7,9 +7,16 @@
   <div class="card">
     <div class="card-content">
       <h1>About PeriDocs</h1>
-
+      <h2>Ethical and design philosophy</h2>
       <p>
-        PeriDocs is an educational mental health platform designed to help users reflect on their personal writing by connecting it to a curated library of reviewed materials, lived experiences, and community insights. 
+        PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. 
+        PeriDocs bridges algorithmic detection and nuanced understanding without pretending to replace human judgment.
+        PeriDocs itself is intended to serve as a safe, accessible, and easily navigable space for users to explore our database and find credible, actionable, <strong>AND</strong> personally relevant information 
+        which effectively applies to their unique struggles and experiences. At PeriDocs, we recognize and deeply admire the collective effort 
+        put in by the multitude of individuals and groups aiming to foster wellbeing regardless of personal affiliation. It is our mission to uplift their hard work by matching the right people with the right projects.  
+        PeriDocs prioritizes transparency, accountability, and ethical reflection. 
+        Algorithms, repetition detection, paraphrase mirrors, and crisis flags respect user privacy while providing meaningful educational insights. 
+        The interface avoids addictive engagement patterns and encourages careful exploration, reflection, and depth.
         The platform does <strong>not</strong> generate therapeutic advice or diagnoses. Instead, it analyzes submitted text and finds relevant, previously verified material to help users interpret or contextualize their own writing.
       </p>
 
@@ -26,7 +33,7 @@
           The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
           <ul>
             <li><strong>Entities & tokens:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions. Detected tokens may be highlighted on the submit-success page for transparency.</li>
-            <li><strong>Sentiment and emotion anchors:</strong> emotional tone is calculated using a lexicon of words and phrases for positive and negative feelings, intensifiers, deintensifiers, and repeated words. Users receive a JSON-visible breakdown across six basic emotions with normalized intensity scores.</li>
+            <li><strong>Sentiment and emotion anchors:</strong> emotional tone is calculated using lexicons of words and phrases for positive and negative feelings, intensifiers, deintensifiers, and repeated words. Users receive a JSON-visible breakdown across six basic emotions with normalized intensity scores.</li>
             <li><strong>Semantic similarity:</strong> compares your text with prior entries using embeddings (all-MiniLM / RoBERTa) to detect repeated ideas, related concepts, or phrasing patterns. Cosine similarity captures synonyms, typos, and paraphrases. Fuzzy or edit-distance highlights are optionally used to show recognized proper nouns, slang, or colloquial terms to the user for transparency.</li>
           </ul>
       </p>
@@ -43,15 +50,11 @@
       </p>
 
       <p>
-        <strong>Repetition Multiplier:</strong> Measures similarity to previous entries based on sentence embedding comparisons. Values start at 1.0 and increase with repeated ideas or similar phrasing, highlighting patterns in your writing history.
+        <strong>Repetition Multiplier:</strong> Measures the amount of repetition within the entry you just submitted.
       </p>
 
       <p>
         <strong>Matched Excerpt & Source ID:</strong> Displays the most similar prior entry to your current text with its unique ID. Matches are calculated using embeddings and paraphrased to preserve privacy.
-      </p>
-
-      <p>
-        <strong>Average Sentence Length & Count:</strong> Provides information about the structure of your writing and helps users reflect on style, pacing, or complexity.
       </p>
 
       <p>
@@ -60,27 +63,22 @@
 
       <h2>Emotion and sentiment features</h2>
       <p>
-        PeriDocs detects nuanced emotional tone using a large lexicon of words and phrases for positive and negative feelings, intensifiers, deintensifiers, fillers, and colloquial expressions. 
+        PeriDocs detects nuanced emotional tone using large lexicons of words and phrases for positive and negative feelings, intensifiers, deintensifiers, fillers, and colloquial expressions. 
         The system accounts for context, repeated words, and negations to provide a balanced and normalized emotion profile. You receive a breakdown across six basic emotions and a sentiment polarity score, which is mapped to negative, neutral, or positive labels with transparent weighting, allowing users to understand how the system derived each score. 
         This helps users understand patterns in their emotional expression over time.
       </p>
 
       <h2>Privacy and safety</h2>
       <p>
-        PeriDocs adheres to strict privacy protocols. Each submission receives a public 8-character hash ID for general browsing and a pseudonymized back-end identifier derived from your IP using HMAC for analytics and rate-limiting. The server sees your IP on each request, but human staff do not. Raw IPs are encrypted and stored <strong>only</strong> if a submission triggers a verified safety or legal escalation. 
-        Decrypted records are accessible only to authorized personnel, and all actions are logged. Users may request content removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with the entry ID. Aggregated anonymized data may persist for internal analytics.
+        PeriDocs adheres to strict privacy protocols. Each submission receives a public 8-character hash ID for general browsing and a pseudonymized back-end identifier derived from your IP using HMAC for analytics and rate-limiting. 
+        The server sees your IP on each request, but human staff do not. Raw IPs are encrypted and stored <strong>only</strong> for the sake of retroactive retreival of user entries in the event of cooperation with law enforcement. 
+        Decrypted records are accessible only to authorized personnel, and all access actions are logged. Users may request content removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> 
+        with the entry ID. Aggregated anonymized data may persist for internal analytics.
       </p>
 
       <h2>Crisis detection</h2>
       <p>
         Submissions indicating risk of harm to self or others are flagged immediately. Users see a safety notification directing them to professional help rather than saving the entry. In the U.S., dial <strong>911</strong> for emergencies or <strong>988</strong> for the Suicide & Crisis Lifeline. Outside the U.S., users are referred to local emergency services.
-      </p>
-
-      <h2>Ethical and design philosophy</h2>
-      <p>
-        PeriDocs prioritizes transparency, accountability, and ethical reflection. Algorithms, repetition detection, paraphrase mirrors, and crisis flags respect user privacy while providing meaningful educational insights. 
-        The interface avoids addictive engagement patterns and encourages careful exploration, reflection, and depth. 
-        PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. The system bridges algorithmic detection and nuanced understanding without pretending to replace human judgment.
       </p>
 
       <h2>Contact</h2>
