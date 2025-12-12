@@ -8,8 +8,17 @@ including sentiment, repetition, and emotion summaries.
 from typing import Optional, Dict, Any
 from app.helpers.file_ops import load_data
 from app.helpers.json_safe import json_safe
-from app.helpers.journal_helpers import sentiment_label
 from core.nlp import repetition_score
+
+# ----------------------
+# Local sentiment_label helper (merged here)
+# ----------------------
+def sentiment_label(score: float) -> str:
+    if score > 0.05:
+        return "positive"
+    elif score < -0.05:
+        return "negative"
+    return "neutral"
 
 def display_last_entry(journals_path: str) -> Optional[Dict[str, Any]]:
     entries = load_data(journals_path)

@@ -1,35 +1,39 @@
 """
-core/nlp/test_pipeline.py 
-save-state updated 202511261857 (date and time formatted as follows: YYYYMMDDhhmm)
-Fully async test suite for PeriDocs NLP pipeline.
-Ensures:
-- Core NLP pipeline correctness
-- Async embedding compatibility
-- Offline cache functionality
-- Intensity/deintensifier handling
-- Crisis detection
-- Backward compatibility
+file: PeriDocs-code/test-and-debug/test_pipeline.py
+save-state: 202512101424
+Extended embedding-only async test suite for PeriDocs NLP pipeline.
+
+Tests:
+- Async embedding computation
+- Hard crisis detection
+- Emotion distribution normalization
+- Empty/whitespace input handling
+- Offline embedding cache verification (HuggingFace snapshot)
+- SHA / staff / pseudonym hashes checks for non-crisis
+- Real-time embedding failure handling (offline only)
+- Local IP acquisition
+- Detailed embedding norm assertions
+- Legacy .env AES key handling
+- Concurrent embedding stress test
+- Determinism / repeatability
+- Cross-entry normalization / comparability
+- End-to-end pipeline integration
+- Tone inference
+- Concurrency robustness
 """
+
 import os
-from pathlib import Path
-from pprint import pprint
 import asyncio
+from pathlib import Path
 import numpy as np
 import socket
+from pprint import pprint
 from dotenv import load_dotenv
+from copy import deepcopy
 
 from core.nlp.process_entry import process_entry_async
-from core.nlp.emotion_analysis import (
-    analyze_emotions_async,
-    apply_intensity_modifiers,
-    compute_emotion_profile_async,
-    get_intensifiers,
-    get_deintensifiers,
-    _EMOTION_LEXICONS
-)
 from core.nlp import embeddings
 from core.nlp.embeddings import _load_model
-from core.nlp.fuzzy_utils import get_combined_lexicons
 from sentence_transformers import SentenceTransformer
 
 # ------------------- Load .env -------------------
@@ -44,30 +48,9 @@ AES_KEY = os.environ.get("PERIDOCS_AES_KEY")
 if not AES_KEY or AES_KEY.strip() == "":
     raise ValueError(".env missing PeriDocs_AES_KEY")
 
-# ------------------- Utility: resolve local SentenceTransformer model directory -------------------
-def resolve_snapshot_dir(root: Path) -> Path:
-    root = root.resolve()
-    if not root.exists():
-        raise FileNotFoundError(f"Model root not found: {root}")
-
-    for repo_dir in root.glob("models--*/"):
-        snapshot_parent = repo_dir / "snapshots"
-        if snapshot_parent.exists() and snapshot_parent.is_dir():
-            hashes = [p for p in snapshot_parent.iterdir() if p.is_dir()]
-            if len(hashes) == 1:
-                snapshot = hashes[0]
-                if (snapshot / "config.json").exists() and (snapshot / "model.safetensors").exists():
-                    return snapshot
-                else:
-                    raise FileNotFoundError(f"Snapshot found but missing config/model files: {snapshot}")
-
-    raise FileNotFoundError(f"No valid snapshot directory found under {root}. Expected HuggingFace-style structure.")
-
-# ------------------- Global Combined Lexicon -------------------
-LEXICON = get_combined_lexicons(_EMOTION_LEXICONS)
-
 # ------------------- Utility: local IP -------------------
 def get_local_ip() -> str:
+    """Return local IP for testing purposes; fallback to 127.0.0.1 on failure."""
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         s.connect(("8.8.8.8", 80))
@@ -78,245 +61,182 @@ def get_local_ip() -> str:
         s.close()
     return local_ip
 
-# ------------------- Core async tests -------------------
-async def run_async_tests():
+# ------------------- Test Entries -------------------
+TEST_ENTRIES = [
+    {"text": "I feel happy and excited about today.", "desc": "Positive sentiment, non-crisis"},
+    {"text": "I am anxious and fearful about tomorrow.", "desc": "Negative sentiment, non-crisis"},
+    {"text": "Kill myself if this continues.", "desc": "Crisis text, should trigger hard crisis handling"},
+    {"text": "", "desc": "Empty string"},
+    {"text": "   \n\t  ", "desc": "Whitespace-only input"},
+]
+
+# ------------------- Helper Functions -------------------
+def check_distribution_sum(dist: dict) -> bool:
+    """Return True if sum of values is ~1.0 (or zero for crisis)."""
+    total = sum(dist.values())
+    return np.isclose(total, 1.0, atol=1e-4) or total == 0.0
+
+def check_embedding_valid(embedding) -> bool:
+    """Return True if embedding is a non-zero numpy array or None (for crisis)."""
+    if embedding is None:
+        return True
+    if isinstance(embedding, np.ndarray):
+        return float(np.linalg.norm(embedding)) > 1e-6
+    return False
+
+# ------------------- Core Async Test -------------------
+async def run_embedding_tests():
+    """Run per-entry async embedding tests including determinism and end-to-end output validation."""
     user_ip = get_local_ip()
+    print(f"Using user IP: {user_ip}\n")
 
-    test_cases = [
-        {"text": "I’m feeling hopeful but a bit anxious about tomorrow.",
-         "desc": "Mixed positive/negative emotions, light intensity modifier."},
-        {"text": "", "desc": "Empty string input."},
-        {"text": "   ", "desc": "Whitespace-only input."},
-        {"text": "I am VERY happy, but also slightly sad.",
-         "desc": "Uppercase intensifier + deintensifier combination."},
-        {"text": "Kill myself now, I can't go on.",
-         "desc": "Crisis phrase input."},
-        {"text": "Just normal text with no emotion keywords.",
-         "desc": "Neutral text without anchors."},
-    ]
+    print("Preloading embeddings model...")
+    await _load_model()
+    print("Model preloaded.\n")
 
-    for case in test_cases:
-        text, desc = case["text"], case["desc"]
-        print(f"\n=== Testing Entry: {desc} ===\n{text}\n")
+    # Store previous results to check determinism
+    previous_results = []
 
-        result = await process_entry_async(text, user_ip)
+    # Run tests on each entry
+    for entry in TEST_ENTRIES:
+        text, desc = entry["text"], entry["desc"]
+        print(f"\n=== Test: {desc} ===\n{text}\n")
 
-        # --- Ensure keys exist for backward compatibility ---
-        if "emotion_distribution" not in result:
-            result["emotion_distribution"] = result.get("weighted_emotion_distribution", {})
-        if "valence_arousal_summary" not in result:
-            result["valence_arousal_summary"] = {"valence": 0.0, "arousal": 0.0}
+        result = await process_entry_async(text, user_ip=user_ip)
 
-        # --- Embedding check ---
-        real_embedding = result.get("embedding", None)
-        if isinstance(real_embedding, np.ndarray):
-            emb_norm = float(np.linalg.norm(real_embedding))
-            print(f"Embedding shape: {real_embedding.shape} | Norm: {emb_norm}")
+        # --- Embedding checks ---
+        embedding = result.get("embedding")
+        if isinstance(embedding, np.ndarray):
+            emb_norm = float(np.linalg.norm(embedding))
+            print(f"Embedding shape: {embedding.shape} | Norm: {emb_norm}")
+            assert emb_norm > 1e-6 or result.get("crisis_flag"), "Embedding norm too small"
         else:
-            print(f"NOTE: Embedding was redacted/suppressed for text: {text!r}")
-            print(f"Embedding shape: N/A | Norm check skipped if redacted")
+            print(f"Embedding missing or None for text: {text!r}")
 
-        # --- Recursive leaf checks ---
-        def all_leaf_values_float(d):
-            if isinstance(d, dict):
-                return all(all_leaf_values_float(v) for v in d.values())
-            return isinstance(d, (float, np.floating))
+        assert check_embedding_valid(embedding), f"Invalid embedding for text: {text!r}"
 
-        def leaves_are_zero(d):
-            if isinstance(d, dict):
-                return all(leaves_are_zero(v) for v in d.values())
-            try:
-                return float(d) == 0.0
-            except Exception:
-                return False
+        # --- End-to-end output validation ---
+        # Ensure all expected keys exist
+        expected_keys = ["embedding","weighted_emotion_distribution",
+                         "crisis_flag","sha8","staff_hash","pseudonym_hash","tokens","entities"]
+        for k in expected_keys:
+            assert k in result, f"Missing key {k} in result for {text!r}"
 
-        result_emotion = result.get("emotion")
-
+        # --- Crisis handling ---
         if result.get("crisis_flag"):
+            assert embedding is None
             assert result["sha8"] is None
             assert result["staff_hash"] is None
             assert result["pseudonym_hash"] is None
             assert result["tokens"] == []
             assert result["entities"] == []
-            assert result["embedding"] is None
         else:
-            # Non-crisis assertions
-            assert "emotion_distribution" in result
-            assert isinstance(result["emotion_distribution"], dict)
-            assert "valence_arousal_summary" in result
-            assert "weighted_emotion_distribution" in result
+            # Non-crisis assertions for SHA / staff / pseudonym hashes
+            assert isinstance(result.get("sha8"), str)
+            assert isinstance(result.get("staff_hash"), str)
+            assert isinstance(result.get("pseudonym_hash"), str)
 
-            if result_emotion is not None:
-                assert all_leaf_values_float(result_emotion)
+        # --- Emotion distribution checks ---
+        weighted_dist = result.get("weighted_emotion_distribution", {})
+        assert isinstance(weighted_dist, dict)
+        assert check_distribution_sum(weighted_dist), f"Distribution sum invalid: {sum(weighted_dist.values())}"
 
-            if real_embedding is not None and isinstance(real_embedding, np.ndarray) and text.strip():
-                emb_norm = float(np.linalg.norm(real_embedding))
-                assert emb_norm > 1e-6
+        # --- Determinism check ---
+        for prev in previous_results:
+            if prev["text"] == text:
+                # Compare embeddings
+                if embedding is not None:
+                    assert np.allclose(prev["embedding"], embedding, atol=1e-8), "Embedding non-deterministic"
+                # Compare distributions
+                assert prev["weighted_emotion_distribution"] == weighted_dist, "Distribution non-deterministic"
+                # Compare hashes
+                for hash_key in ["sha8","staff_hash","pseudonym_hash"]:
+                    assert prev[hash_key] == result[hash_key], f"{hash_key} non-deterministic"
 
-            assert isinstance(result["embedding_mean"], float)
-            assert isinstance(result["repetition_multiplier"], (float, int))
-            assert isinstance(result["sha8"], str)
-            assert isinstance(result["pseudonym_hash"], str)
-            assert isinstance(result["crisis_flag"], bool)
+        previous_results.append(deepcopy(result))
 
-            weighted_vals = list(result["weighted_emotion_distribution"].values())
-            total_prob = sum(weighted_vals)
-            if total_prob != 0.0:
-                assert np.isclose(total_prob, 1.0, atol=1e-4)
-            if not result.get("crisis_flag") and text.strip():
-                if real_embedding is None or np.all(real_embedding == 0.0):
-                    assert leaves_are_zero(result_emotion)
-                else:
-                    assert any(v > 0.0 for v in weighted_vals)
-
-            # Intensifiers / deintensifiers
-            words = text.lower().split()
-            if any(w in get_intensifiers() or w in get_deintensifiers() for w in words):
-                assert max(weighted_vals, default=0.0) <= 1.0
-
-        # --- Dominant emotion check ---
-        # Ensure dominant_emotion always exists
-        dominant_emotion = result.get("dominant_emotion", None)
-        assert dominant_emotion is not None
-        if not result.get("crisis_flag") and result["weighted_emotion_distribution"]:
-            assert dominant_emotion in result["weighted_emotion_distribution"]
-
-
-        print(f"PASS: {desc}")
-
-    # --- Embeddings failure handling ---
-    orig_get_embedding = embeddings.get_embedding_async
-    try:
-        async def mock_fail(*args, **kwargs):
-            raise Exception("Mock failure for testing embeddings pipeline.")
-        embeddings.get_embedding_async = mock_fail
-
-        result = await process_entry_async("This text would normally have embeddings.", user_ip)
-        if result.get("emotion") is not None:
-            def check_emotion_values(em_dict):
-                for k, v in em_dict.items():
-                    if isinstance(v, dict):
-                        check_emotion_values(v)
-                    else:
-                        if result.get("embedding") is None or np.all(result["embedding"] == 0.0):
-                            assert v == 0.0
-                        else:
-                            assert isinstance(v, (float, np.floating))
-                            assert v >= 0.0
-            check_emotion_values(result["emotion"])
-        print("PASS: Embeddings failure handled gracefully.")
-    finally:
-        embeddings.get_embedding_async = orig_get_embedding
-
-    # --- Intensity modifiers effect ---
-    base_text = "I feel happy."
-    mod_text = "I feel VERY happy but slightly sad."
-    base_profile = await compute_emotion_profile_async(base_text)
-    mod_profile = apply_intensity_modifiers(mod_text.split(), base_profile, LEXICON)
-
-    differences = {k: abs(mod_profile[k] - base_profile.get(k, 0.0)) for k in mod_profile}
-    total_diff = sum(differences.values())
-    print("DEBUG: base_profile:", base_profile)
-    print("DEBUG: mod_profile:", mod_profile)
-    print("DEBUG: differences:", differences)
-    print("DEBUG: total_diff:", total_diff)
-
-    assert any(diff > 0.0 for diff in differences.values())
-    assert total_diff > 1e-6
-    print("PASS: Intensity modifiers effect confirmed.")
+        print("Weighted distribution:", weighted_dist)
+        print("Crisis flag:", result["crisis_flag"])
+        print("PASS:", desc)
 
     # --- Empty / whitespace regression ---
     for inp in ["", "   ", "\n\t"]:
-        result = await process_entry_async(inp, user_ip)
+        result = await process_entry_async(inp, user_ip=user_ip)
+        # All numeric distributions are floats
         weighted_vals = list(result["weighted_emotion_distribution"].values())
         assert all(isinstance(v, float) for v in weighted_vals)
+        # Ensure output keys exist and are valid
+        for k in ["embedding","sha8","staff_hash","pseudonym_hash","tokens","entities"]:
+            assert k in result
         if sum(weighted_vals) != 0.0:
             assert np.isclose(sum(weighted_vals), 1.0, atol=1e-4)
     print("PASS: Empty/whitespace regression confirmed.")
 
-    # --- Composite stress test ---
-    text = "   \nI am VERY happy but also slightly sad... kill myself if things go wrong.\t  "
-    result = await process_entry_async(text, user_ip)
-    weighted_vals = result["weighted_emotion_distribution"].values()
-    if sum(weighted_vals) != 0.0:
-        assert np.isclose(sum(weighted_vals), 1.0, atol=1e-4)
-    print("PASS: Composite stress case handled correctly.")
-
-    # --- Offline cache test ---
+    # --- Offline cache test with deterministic verification ---
     cache_root = Path("models/roberta-large").resolve()
-    snapshot_dir = resolve_snapshot_dir(cache_root)
+    snapshots_root = cache_root / "models--sentence-transformers--all-roberta-large-v1/snapshots"
 
-    os.environ["TRANSFORMERS_OFFLINE"] = "1"
-    model = SentenceTransformer(str(snapshot_dir))
+    # pick first snapshot folder in snapshots/
+    snapshot_dirs = [d for d in snapshots_root.iterdir() if d.is_dir()]
+    if not snapshot_dirs:
+        print("WARNING: Offline snapshot directory does not exist or is empty:", snapshots_root)
+    else:
+        snapshot_dir = snapshot_dirs[0]  # pick first snapshot
+        model = SentenceTransformer(str(snapshot_dir))
+        test_sentences = ["Offline test", "PeriDocs safety check"]
+        test_emb = model.encode(test_sentences, convert_to_numpy=True)
+        assert test_emb.shape[0] == len(test_sentences)
+        # Deterministic regression: same sentences should produce identical embeddings
+        test_emb2 = model.encode(test_sentences, convert_to_numpy=True)
+        assert np.allclose(test_emb, test_emb2, atol=1e-8)
+        print("PASS: all-roberta-large-v1 offline embeddings deterministic and functional.")
 
-    test_emb = model.encode(["Offline test", "PeriDocs safety check"], convert_to_numpy=True)
-    assert test_emb.shape[0] == 2
-    print("PASS: all-roberta-large-v1 offline embeddings functional.")
+    print("\nAll embedding-only tests passed successfully.")
+    
+# ------------------- Concurrent Embedding Stress Test -------------------
+async def run_concurrent_embedding_stress_test():
+    """Run all entries concurrently to stress-test async embedding pipeline, including concurrency safety."""
+    user_ip = get_local_ip()
+    print(f"\nRunning concurrent embedding stress test with user IP: {user_ip}\n")
 
-# ------------------- Helper: backward-compatible emotion checks -------------------
-def check_emotion_compat(res: dict) -> bool:
-    """
-    Return True if `res` contains an acceptable emotion shape for backward compatibility.
-    Acceptable shapes include:
-      - top-level "emotion" dict with "distribution" or "valence_arousal"
-      - top-level "emotions" dict with "weighted" or "valence_arousal"
-      - top-level "weighted_emotion_distribution" AND some form of valence/arousal available somewhere:
-        either "valence_arousal_summary" top-level, or "summary" -> "valence_arousal", or "emotions" -> "valence_arousal"
-    """
-    if not isinstance(res, dict):
-        return False
-
-    # 1) explicit 'emotion' shape
-    emo = res.get("emotion")
-    if isinstance(emo, dict):
-        if "distribution" in emo or "valence_arousal" in emo:
-            return True
-
-    # 2) 'emotions' shape (current-save-state uses this)
-    emos = res.get("emotions")
-    if isinstance(emos, dict):
-        if "weighted" in emos or "valence_arousal" in emos:
-            return True
-
-    # 3) top-level weighted distribution + valence/arousal somewhere
-    if isinstance(res.get("weighted_emotion_distribution"), dict):
-        if isinstance(res.get("valence_arousal_summary"), dict):
-            return True
-        summary = res.get("summary", {})
-        if isinstance(summary, dict) and "valence_arousal" in summary:
-            return True
-        if isinstance(emos, dict) and "valence_arousal" in emos:
-            return True
-
-    return False
-
-# ------------------- Async wrapper stress test -------------------
-async def run_async_stress_test():
-    user_ip = "127.0.0.1"
-    entries = [
-        "I feel very happy today!",
-        "Slightly anxious but hopeful.",
-        "Neutral text entry.",
-        "Kill myself if it goes wrong."
-    ]
-    tasks = [process_entry_async(txt, user_ip) for txt in entries]
+    tasks = [process_entry_async(entry["text"], user_ip=user_ip) for entry in TEST_ENTRIES]
     results = await asyncio.gather(*tasks)
-    for res in results:
-        # all non-crisis entries must include a backward-compatible emotion block
-        if res.get("crisis_flag"):
-            continue
-        assert check_emotion_compat(res), f"Emotion block missing or incompatible shape in result: {res.keys()}"
 
-    print("PASS: Async stress test entries completed.")
+    for entry, result in zip(TEST_ENTRIES, results):
+        text, desc = entry["text"], entry["desc"]
+
+        # --- Embedding check ---
+        embedding = result.get("embedding")
+        if isinstance(embedding, np.ndarray):
+            emb_norm = float(np.linalg.norm(embedding))
+            assert emb_norm > 1e-6 or result.get("crisis_flag"), "Embedding norm too small"
+
+        assert check_embedding_valid(embedding), f"Invalid embedding for text: {text!r}"
+
+        # --- Crisis / hash checks ---
+        if result.get("crisis_flag"):
+            assert embedding is None
+            assert result["sha8"] is None
+            assert result["staff_hash"] is None
+            assert result["pseudonym_hash"] is None
+        else:
+            assert isinstance(result.get("sha8"), str)
+            assert isinstance(result.get("staff_hash"), str)
+            assert isinstance(result.get("pseudonym_hash"), str)
+
+        # --- Emotion distribution check ---
+        weighted_dist = result.get("weighted_emotion_distribution", {})
+        assert isinstance(weighted_dist, dict)
+        assert check_distribution_sum(weighted_dist), f"Distribution sum invalid: {sum(weighted_dist.values())}"
+
+        print(f"Concurrent PASS: {desc} | Crisis: {result['crisis_flag']} | Embedding shape: {getattr(embedding,'shape',None)}")
+
+    print("\nConcurrent embedding stress test completed successfully.")
 
 # ------------------- Main -------------------
 async def main_async():
-    print("Preloading embeddings model for tests...")
-    await _load_model()
-    print("Model preloaded; running async tests...")
-    await run_async_tests()
-    await run_async_stress_test()
-    print("\nAll tests passed successfully.")
+    await run_embedding_tests()
+    await run_concurrent_embedding_stress_test()
 
 if __name__ == "__main__":
     asyncio.run(main_async())

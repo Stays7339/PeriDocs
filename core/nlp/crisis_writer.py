@@ -1,54 +1,53 @@
 """
-file: core/nlp/crisis_writer.py
-save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
-Atomic crisis record writer.
+core/nlp/crisis_writer.py
+save-state updated 202512111420
 
-Appends AES-encrypted crisis records to data/recorded_crises.json in an atomic and safe way.
-Creates file if it does not exist.
+Async crisis record writer for PeriDocs.
+- Appends AES-encrypted crisis records to data/recorded_crises.json atomically.
+- Fully async, non-blocking, safe for single-process event loops.
 """
 
 from __future__ import annotations
 import json
-import os
 from pathlib import Path
-from threading import Lock
 from typing import Dict, Any
+import aiofiles
+import aiofiles.os
+import asyncio
 
-DATA_DIR = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data")))
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 CRISIS_FILE = DATA_DIR / "recorded_crises.json"
-_lock = Lock()
+_FILE_LOCK = asyncio.Lock()
 
-def append_crisis_record(record: Dict[str, Any]) -> None:
+
+async def append_crisis_record(record: Dict[str, Any]) -> None:
     """
     Append a single crisis record (dictionary) to recorded_crises.json.
-    Uses a simple list container in the file. The writer is safe for concurrent processes
-    in the same Python process (thread lock). If you need multi-process safety, replace with file-based lock.
+    Fully async. Ensures atomic updates with asyncio lock.
     """
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    await aiofiles.os.makedirs(DATA_DIR, exist_ok=True)
 
-    with _lock:
-        if not CRISIS_FILE.exists():
-            # create file with initial list
-            with CRISIS_FILE.open("w", encoding="utf-8") as fh:
-                json.dump([record], fh, ensure_ascii=False, indent=2)
-            return
-
-        try:
-            with CRISIS_FILE.open("r+", encoding="utf-8") as fh:
-                # load existing list
-                try:
-                    fh.seek(0)
-                    data = json.load(fh)
+    async with _FILE_LOCK:
+        # Load existing data
+        data: list[Dict[str, Any]] = []
+        if await aiofiles.os.path.exists(CRISIS_FILE):
+            try:
+                async with aiofiles.open(CRISIS_FILE, "r", encoding="utf-8") as f:
+                    content = await f.read()
+                    data = json.loads(content) if content.strip() else []
                     if not isinstance(data, list):
                         data = []
-                except Exception:
-                    data = []
-                data.append(record)
-                # write back
-                fh.seek(0)
-                fh.truncate(0)
-                json.dump(data, fh, ensure_ascii=False, indent=2)
-        except Exception:
-            # Fallback: write new file
-            with CRISIS_FILE.open("w", encoding="utf-8") as fh:
-                json.dump([record], fh, ensure_ascii=False, indent=2)
+            except Exception:
+                data = []
+
+        # Append new record
+        data.append(record)
+
+        # Write back atomically
+        try:
+            async with aiofiles.open(CRISIS_FILE, "w", encoding="utf-8") as f:
+                await f.write(json.dumps(data, ensure_ascii=False, indent=2))
+        except Exception as e:
+            # Final fallback: overwrite with just the new record
+            async with aiofiles.open(CRISIS_FILE, "w", encoding="utf-8") as f:
+                await f.write(json.dumps([record], ensure_ascii=False, indent=2))

@@ -1,5 +1,4 @@
 // cooldown.js — persistent across pages
-
 const COOLDOWN_DURATION = 30; // seconds
 const COOLDOWN_KEY = 'peridocs_cooldown_timestamps';
 
@@ -16,16 +15,19 @@ function setCooldownData(data) {
   localStorage.setItem(COOLDOWN_KEY, JSON.stringify(data));
 }
 
-// Toast helper
-function showToast(message, type = 'info') {
-  const toast = document.createElement('div');
-  toast.textContent = message;
-  toast.className = `toast toast-${type}`;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), 3000);
+function showToast(message, type = 'info', duration = 3000) {
+  return new Promise(resolve => {
+    const toast = document.createElement('div');
+    toast.textContent = message;
+    toast.className = `toast toast-${type}`;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+      toast.remove();
+      resolve();
+    }, duration);
+  });
 }
 
-// Cooldown check
 function canSubmit(formType) {
   const data = getCooldownData();
   const now = Date.now();
@@ -43,100 +45,94 @@ function canSubmit(formType) {
 
 // ---------------------- Attach to forms ---------------------- //
 function attachCooldownHandlers() {
-  const handleForm = (formSelector, type, successCallback) => {
+  const handleForm = (formSelector, type, submitCallback) => {
     const form = document.querySelector(formSelector);
     if (!form) return;
 
-    form.addEventListener('submit', e => {
+    form.addEventListener('submit', async e => {
       e.preventDefault();
       if (!canSubmit(type)) return;
 
-      // Journal form uses native submission after brief toast
       if (type === 'journal') {
-        e.preventDefault(); // stop default submission immediately
-        showToast('Journal submitted!', 'success');
-        setTimeout(() => {
-          form.submit(); // native submission after toast is visible
-        }, 1500); // 1.5s delay to ensure toast is seen
+        const formData = new FormData(form);
+        const payload = Object.fromEntries(formData.entries());
+        const resultsDiv = document.getElementById('nlp-results');
+
+        // Only update resultsDiv if it exists
+        if (resultsDiv) resultsDiv.innerHTML = `<p>Analyzing...</p>`;
+
+        try {
+          const res = await fetch(form.action, {
+            method: form.method || 'POST',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) throw new Error('Network response was not ok');
+
+          const data = await res.json();
+          const nlp = data.nlp_result;
+
+          if (resultsDiv) {
+            const emotions = nlp.emotions || {};
+            const dominant = Object.keys(emotions).reduce((a, b) => emotions[a] > emotions[b] ? a : b, 'neutral');
+            const emotionHtml = Object.entries(emotions)
+              .map(([k, v]) => `<li>${k}: ${(v*100).toFixed(1)}%</li>`)
+              .join('');
+
+            resultsDiv.innerHTML = `
+              <h3>Analysis Results</h3>
+              <p><strong>Dominant Emotion:</strong> ${dominant}</p>
+              <ul>${emotionHtml}</ul>
+              <p><strong>Repetition Multiplier:</strong> ${nlp.repetition_multiplier.toFixed(2)}</p>
+            `;
+          }
+
+          await showToast(data.message || 'Analysis complete!', 'success', 1500);
+          form.reset();
+        } catch (err) {
+          console.error(err);
+          if (resultsDiv) resultsDiv.innerHTML = `<p style="color:red;">Error analyzing text.</p>`;
+          await showToast('Submission failed. Please try again.', 'error', 3000);
+        }
         return;
       }
 
-
-      // Feedback/report forms: keep async fetch logic
-      const formData = new FormData(form);
-      fetch(form.action, {
-        method: form.method || 'POST',
-        body: formData,
-      })
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        successCallback(form);
-      })
-      .catch(err => {
-        showToast('Submission failed. Please try again.', 'error');
-        console.error(err);
-      });
+      if (submitCallback) submitCallback(form);
     });
   };
 
-  // Journal form: async fetch with toast + optional redirect
-  handleForm('#journal-form', 'journal', async (form) => {
-    const formData = new FormData(form);
-    const payload = Object.fromEntries(formData.entries());
-
-    try {
-      const res = await fetch(form.action, {
-        method: form.method || 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) throw new Error('Network response was not ok');
-
-      const data = await res.json();
-      if (data.status === "ok") {
-        showToast(data.message || 'Journal submitted and analysis started!', 'success');
-        form.reset();
-
-        // Redirect with entry_id
-        setTimeout(() => {
-          window.location.href = `/submit-success?id=${data.entry_id}`;
-        }, 1000);
-      } else {
-        showToast(data.message || 'Submission failed. Please try again.', 'error');
-      }
-    } catch (err) {
-      showToast('Submission failed. Please try again.', 'error');
-      console.error(err);
-    }
-  });
-
-  // Feedback/report form
-  handleForm('#report-form', 'report', async (form) => {
+  const reportSubmitCallback = async form => {
     const payload = {
       feedback_text: form.querySelector('textarea')?.value.trim() || "",
       type: "report",
       ip_hash: "unknown"
     };
+
     try {
       const res = await fetch(form.action, {
         method: form.method || 'POST',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
+
       if (!res.ok) throw new Error('Network response was not ok');
+
       const data = await res.json();
       if (data.status === "ok") {
-        showToast('Report submitted!', 'success');
         form.reset();
+        await showToast('Report submitted!', 'success', 1500);
       } else {
-        showToast(data.message || 'Submission failed. Please try again.', 'error');
+        await showToast(data.message || 'Submission failed. Please try again.', 'error', 3000);
       }
     } catch (err) {
-      showToast('Submission failed. Please try again.', 'error');
+      await showToast('Submission failed. Please try again.', 'error', 3000);
       console.error(err);
     }
-  });
+  };
+
+  handleForm('#journal-form', 'journal');
+  handleForm('#report-form', 'report', reportSubmitCallback);
 }
 
 document.addEventListener('DOMContentLoaded', attachCooldownHandlers);

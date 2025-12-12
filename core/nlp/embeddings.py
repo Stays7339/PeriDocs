@@ -199,8 +199,8 @@ async def batch_embeddings_async(
     # quick empty case
     if not texts:
         if _embedding_dim is None:
-            # if dimension unknown, fallback to common size 768 as safe default
-            dim = 768
+            # if dimension unknown, fallback to common size 1024 as safe default
+            dim = 1024
         else:
             dim = _embedding_dim
         return np.zeros((0, dim), dtype=np.float32)
@@ -239,7 +239,7 @@ async def batch_embeddings_async(
                 logger.warning("Received empty embedding for text: %s", text[:80])
                 if _embedding_dim is None:
                     # when dimension unknown, force a safe default
-                    arr = np.zeros((768,), dtype=np.float32)
+                    arr = np.zeros((1024,), dtype=np.float32)
                 else:
                     arr = np.zeros((_embedding_dim,), dtype=np.float32)
             _embedding_cache[text] = arr
@@ -265,7 +265,7 @@ async def get_embedding_async(text: str, allow_fallback: bool = False) -> np.nda
 
     if not text or not text.strip():
         if _embedding_dim is None:
-            dim = 768
+            dim = 1024
         else:
             dim = _embedding_dim
         return np.zeros((dim,), dtype=np.float32)
@@ -289,7 +289,7 @@ def get_embedding(text: str, allow_fallback: bool = False) -> np.ndarray:
     Safe inside a running asyncio loop by using synchronous _embed_sync.
     """
     if not text or not text.strip():
-        dim = _embedding_dim or 768
+        dim = _embedding_dim or 1024
         return np.zeros((dim,), dtype=np.float32)
 
     try:
@@ -317,7 +317,7 @@ def batch_embeddings(texts: list[str], batch_size: int = 8, allow_fallback: bool
     Safe inside a running asyncio loop by using synchronous _embed_sync per text.
     """
     if not texts:
-        dim = _embedding_dim or 768
+        dim = _embedding_dim or 1024
         return np.zeros((0, dim), dtype=np.float32)
 
     try:
@@ -342,7 +342,7 @@ def batch_embeddings(texts: list[str], batch_size: int = 8, allow_fallback: bool
 def _deterministic_fallback_vec(text: str) -> np.ndarray:
     if text in _deterministic_fallback_cache:
         return _deterministic_fallback_cache[text]
-    dim = _embedding_dim or 768
+    dim = _embedding_dim or 1024
     h = hashlib.sha256(text.encode("utf-8")).digest()
     rng = np.frombuffer(h * ((dim // len(h)) + 1), dtype=np.uint8)[:dim].astype(np.float32)
     rng = rng - np.mean(rng)

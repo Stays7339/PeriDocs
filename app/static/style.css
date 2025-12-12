@@ -1,4 +1,4 @@
-/* ----------------------    start of style.css      ---------------------- */
+/* ----------------------    start of PeriDocs-code/app/static/style.css    ---------------------- */
 /* ---------------------- Cabinet Grotesk Font Faces ---------------------- */
 @font-face {
   font-family: 'Cabinet Grotesk';
@@ -524,4 +524,33 @@ html[data-theme='dark'] .similarity-badge {
     width: 60px;
     height: 60px;
   }
+}
+
+/* ---------------------- Pending Candidate Emotions Highlight ---------------------- */
+.pending-candidates {
+margin-top: 0.75rem;
+padding: 0.75rem 1rem;
+border-left: 4px solid #d21f1e;
+background-color: #fff4f4;
+border-radius: 6px;
+font-size: 0.875rem;
+color: #d21f1e;
+}
+
+.pending-candidates ul {
+margin-top: 0.5rem;
+margin-left: 1rem;
+padding-left: 0;
+list-style-type: disc;
+}
+
+.pending-candidates li {
+margin-bottom: 0.25rem;
+}
+
+/* dark mode highlight for pending candidates */
+html[data-theme='dark'] .pending-candidates {
+background-color: #4a1a1a;
+border-left-color: #ff4c4c;
+color: #ff9999;
 }

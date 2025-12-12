@@ -14,24 +14,11 @@ from .process_entry import process_entry  # sync wrapper
 from .text_processing import tokenize_text, clean_text
 from .pii import redact_pii, COMMON_NAMES
 from .encryption import encrypt_text, decrypt_text
-from .crisis import check_crisis_phrases, crisis_notification
+from .crisis_detector import crisis_notification
 from .embeddings import get_embedding, TOKEN_EMBED_PRECOMPUTE
-from .sentiment_analysis import compute_sentiment
 from .repetition_echo import repetition_score
-from .emotion_analysis import (
-    emotion_profile,
-    compute_sentiment_from_valence_arousal,
-    analyze_emotions,
-    get_emotion_anchors,
-    get_intensifiers,
-    get_deintensifiers,
-)
 from .hash_utils import sha8_hash
 
-# -------------------------------
-# Backward-compatible alias
-# -------------------------------
-compute_sentiment = compute_sentiment_from_valence_arousal
 
 # -------------------------------
 # Wrapper for full NLP features

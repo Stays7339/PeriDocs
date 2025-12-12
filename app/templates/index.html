@@ -1,4 +1,3 @@
-<!--index page which serves as the homepage for the PeriDocs.org domain and the page where users will journal their thoughts for glass-box meta-analysis and content recommendations -->
 {# index.html - homepage, extends base.html #}
 {% extends "base.html" %}
 
@@ -9,31 +8,43 @@
   <div class="card">
     <div class="card-content">
       <h1>Welcome to PeriDocs :)</h1>
-      <h3>We are a safe, transparent way for you to explore what your writing reveals. <br> See our <a href="/about">elaborated philosophy</a> for more.</h3>
+      <h3>
+        We are a safe, transparent way for you to explore what your writing reveals. <br>
+        See our <a href="/about">elaborated philosophy</a> for more.
+      </h3>
 
-    <form id="journal-form" action="/submit" method="post">
-      <textarea name="entry_text" rows="10" placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."></textarea>
-      <div class="meta" style="margin-top:12px;">
-        <button type="submit" class="btn primary">Analyze &amp; Search</button>
-      </div>
-    </form>
+      <form id="journal-form" action="/submit" method="post">
+        <textarea name="entry_text" rows="10" placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."></textarea>
+        <div class="meta" style="margin-top:12px;">
+          <button type="submit" class="btn primary">Analyze &amp; Search</button>
+        </div>
+      </form>
 
-
-      {# Toast notification container (cooldown.js will manage colors) #}
-      <div id="feedback-notification" style="
-        position: fixed;
-        bottom: 1.5rem;
-        right: 1.5rem;
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        font-size: 0.9rem;
-        z-index: 1001;
-        display: none;
-        transition: opacity 0.3s ease;
-      "></div>
+      {% include 'includes/footer.html' %}
     </div>
-    {% include 'includes/footer.html' %}
   </div>
 </div>
+
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="/static/js/cooldown.js"></script>
+
+  <script>
+  // Display backend-triggered toast from cookie
+  document.addEventListener('DOMContentLoaded', () => {
+    const getCookie = (name) => {
+      const matches = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return matches ? decodeURIComponent(matches[1]) : undefined;
+    };
+
+    const toastMessage = getCookie('toast_message');
+    if (toastMessage) {
+      showToast(toastMessage, 'success', 3000);
+      // Remove the cookie after showing the toast
+      document.cookie = 'toast_message=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    }
+  });
+  </script>
 {% endblock %}

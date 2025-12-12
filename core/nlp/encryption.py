@@ -1,14 +1,11 @@
 """
 core.nlp.encryption.py
-save-state updated 202511231610 (date and time formatted as follows: YYYYMMDDhhmm)
-
-Encryption and decryption functions using Fernet symmetric encryption.
-Merged from app/helpers/security.py
+save-state updated 202512111404
 """
-
 import os
-from cryptography.fernet import Fernet
+from cryptography.fernet import Fernet, InvalidToken
 from dotenv import load_dotenv
+import asyncio
 
 load_dotenv()
 
@@ -18,24 +15,31 @@ if not PERIDOCS_AES_KEY:
 
 fernet = Fernet(PERIDOCS_AES_KEY.encode())
 
+# -------------------------------
+# ASYNC ENCRYPTION / DECRYPTION
+# -------------------------------
 
-def encrypt_text(text: str) -> str:
+async def encrypt_text(text: str) -> str:
     """
-    Encrypts a string using Fernet symmetric encryption.
+    Asynchronously encrypt a string using Fernet.
     Returns the encrypted token as a UTF-8 string.
     """
     if not text:
         return text
-    token = fernet.encrypt(text.encode("utf-8"))
+    token = await asyncio.to_thread(fernet.encrypt, text.encode("utf-8"))
     return token.decode("utf-8")
 
 
-def decrypt_text(ciphertext: str) -> str:
+async def decrypt_text(ciphertext: str) -> str:
     """
-    Decrypts a Fernet-encrypted string.
+    Asynchronously decrypt a Fernet-encrypted string.
     Returns the original plaintext.
+    Handles invalid tokens gracefully.
     """
     if not ciphertext:
         return ciphertext
-    plain = fernet.decrypt(ciphertext.encode("utf-8"))
-    return plain.decode("utf-8")
+    try:
+        plain = await asyncio.to_thread(fernet.decrypt, ciphertext.encode("utf-8"))
+        return plain.decode("utf-8")
+    except InvalidToken:
+        return ""  # or log, depending on your error handling policy

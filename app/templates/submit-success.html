@@ -1,86 +1,102 @@
-<!-- submit-success is the page that the user is redirected to so they can see the analysis on their journal entry along with content curated by PeriDocs staff and recommended by the PeriDocs algorithm -->
-{# submit-success.html — updated with emotion summary #}
+{# index.html - homepage, extends base.html #}
 {% extends "base.html" %}
-{% block title %}Entry saved — PeriDocs{% endblock %}
+
+{% block title %}PeriDocs Prototype{% endblock %}
 
 {% block content %}
 <div class="wrap">
   <div class="card">
     <div class="card-content">
+      <h1>Welcome to PeriDocs :)</h1>
+      <h3>
+        We are a safe, transparent way for you to explore what your writing reveals. <br>
+        See our <a href="/about">elaborated philosophy</a> for more.
+      </h3>
 
-      <!-- Entry ID and confirmation -->
-      <div class="id">Saved • Entry <strong>{{ entry_id }}</strong></div>
-      <h1>Your entry has been saved successfully.</h1>
+      <form id="journal-form">
+        <textarea name="entry_text" rows="10" placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."></textarea>
+        <div class="meta" style="margin-top:12px;">
+          <button type="submit" class="btn primary">Analyze &amp; Search</button>
+        </div>
+      </form>
 
-      <!-- Privacy note -->
-      <p class="privacy-summary">
-        Your submission is stored securely and visible only to authorized PeriDocs staff for moderation and safety review.
-        See our <a href="/privacy-policy">privacy and data policy</a>.
-      </p>
+      <!-- Placeholder for dynamic NLP results -->
+      <div id="nlp-results" style="margin-top:20px;"></div>
 
-      <!-- Full text submission, PII-redacted -->
-      <div class="excerpt">{{ safe_text }}</div>
-
-      <!-- Metrics summary -->
-      <ul class="metrics">
-        <li><strong>Dominant Emotion:</strong> {{ dominant_emotion }}</li>
-        <li><strong>Emotion Distribution:</strong> {{ emotion_summary }}</li>
-        <li><strong>Entities:</strong>
-          {% if entities %}
-            {% for entity in entities %}
-              {{ entity.text.capitalize() }} ({{ entity.label.capitalize() }}){% if not loop.last %}, {% endif %}
-            {% endfor %}
-          {% else %}
-            None
-          {% endif %}
-        </li>
-        <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>
-      </ul>
-
-      <!-- Top 20 matched entries -->
-      {% if top_matches %}
-      <blockquote class="matched-snippet">
-        <strong>Closest match(es) found:</strong><br>
-        {% for match in top_matches %}
-          <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-            <span>{{ match.excerpt }}</span>
-            <span class="similarity-badge">{{ match.similarity_pct }}%</span>
-          </div>
-          <small>(Source ID: {{ match.entry_id }})</small><br>
-        {% endfor %}
-      </blockquote>
-      {% endif %}
-
-      <!-- Parse feedback button -->
-      <blockquote class="parse-feedback-bar">
-        <span>Not parsed correctly?</span>
-        <button type="button" class="report-parse-btn" onclick="openFeedbackModal('report')">Report Issue</button>
-      </blockquote>
-
-      <!-- Action buttons -->
-      <div class="meta" style="margin-top:12px;">
-        <a class="btn primary" href="/save/{{ entry_id }}">Save this entry privately</a>
-        <a class="btn ghost" href="/">Return</a>
-      </div>
-
-      <!-- Notification container for feedback toast -->
-      <div id="feedback-notification" style="
-        position: fixed;
-        bottom: 1.5rem;
-        right: 1.5rem;
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        font-size: 0.9rem;
-        z-index: 1001;
-        display: none;
-        transition: opacity 0.3s ease;
-        background-color: #F5E8A3;
-        color: #000;
-      "></div>
-
+      {% include 'includes/footer.html' %}
     </div>
-    {% include 'includes/footer.html' %}
   </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="/static/js/cooldown.js"></script>
+
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const form = document.getElementById('journal-form');
+    const resultsDiv = document.getElementById('nlp-results');
+
+    // Display backend-triggered toast from cookie
+    const getCookie = (name) => {
+      const matches = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+      return matches ? decodeURIComponent(matches[1]) : undefined;
+    };
+    const toastMessage = getCookie('toast_message');
+    if (toastMessage) {
+      showToast(toastMessage, 'success', 3000);
+      document.cookie = 'toast_message=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+    }
+
+    // Intercept form submit and send JSON
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      resultsDiv.innerHTML = `<p>Analyzing...</p>`;
+      const textarea = form.querySelector('textarea[name="entry_text"]');
+      const text = textarea.value;
+
+      if (!text.trim()) {
+        showToast('Please enter some text to analyze.', 'error', 3000);
+        resultsDiv.innerHTML = '';
+        return;
+      }
+
+      try {
+        const response = await fetch('/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ entry_text: text })
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        const data = await response.json();
+        const nlp = data.nlp_result;
+
+        // Build a simple results HTML
+        const emotions = nlp.emotions || {};
+        const dominant = Object.keys(emotions).reduce((a, b) => emotions[a] > emotions[b] ? a : b, 'neutral');
+        const emotionHtml = Object.entries(emotions)
+          .map(([k, v]) => `<li>${k}: ${(v*100).toFixed(1)}%</li>`)
+          .join('');
+
+        resultsDiv.innerHTML = `
+          <h3>Analysis Results</h3>
+          <p><strong>Dominant Emotion:</strong> ${dominant}</p>
+          <ul>${emotionHtml}</ul>
+          <p><strong>Repetition Multiplier:</strong> ${nlp.repetition_multiplier.toFixed(2)}</p>
+        `;
+
+        showToast('Analysis complete!', 'success', 2000);
+      } catch (err) {
+        console.error(err);
+        resultsDiv.innerHTML = `<p style="color:red;">Error analyzing text.</p>`;
+        showToast('Failed to analyze entry.', 'error', 3000);
+      }
+    });
+  });
+  </script>
 {% endblock %}

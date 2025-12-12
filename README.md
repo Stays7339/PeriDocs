@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 29 November 2025 (202511291721)
+## Canonical Project Directory as of 12 December 2025 (202512121335)
 
 ```
 PeriDocs-code/                         # Root project folder
@@ -243,12 +243,10 @@ PeriDocs-code/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ helpers/
-│  │  ├─ __init__.py
+│  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ display_last_entry.py         # GET: display last entry, sentiment, emotion, repetition
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
-│  │  ├─ journal_helpers.py            # sentiment, pruning, embedding utilities
 │  │  ├─ json_safe.py                  # JSON secure operations (NumPy-safe)
-│  │  ├─ security.py                   # optional: encryption/decryption, hashing helpers
 │  │  ├─ similarity.py                 # raw similarity computations
 │  │  └─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │
@@ -266,51 +264,47 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  ├─ static/                            # Frontend static files
 │  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
-│  │  ├─ style.css                       # Main stylesheet 
-│  │  ├─ theme-toggle.js                 # Dark Mode toggle
 │  │  ├─ feedback.js                     # Feedback modal JS
 │  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
+│  │  ├─ style.css                       # Main stylesheet 
+│  │  ├─ theme-toggle.js                 # Dark Mode toggle
 │  │  ├─ peridocs-logo-v1.png
 │  │  ├─ peridocs-logo-v1-white.png
-│  │ ├─ favicon.png
-│  │ ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
-│  │ └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
+│  │  ├─ favicon.png
+│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
+│  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
-├─ core/
+├─ core/                                  # code drafted specifically for PeriDocs as it runs, not as it looks.
 │   └─ nlp/
-│      ├─ __init__.py                     # Exposes document_features; acts as import hub for NLP modules.
-│      ├─ anchors.py                      # Defines anchor word lists for emotion/semantic weighting.
-│      ├─ crisis_writer.py                # Pending description.
-│      ├─ crisis.py                       # Detects crisis indicators and escalation flags.
-│      ├─ embeddings.py                   # Handles SentenceTransformer model, embedding caching, and vector ops.
-│      ├─ emotion_analysis.py             # Computes emotion lexicon match, valence/arousal summary, and embedding-weighted emotion distribution.
-│      ├─ encryption.py                   # encrypt_text / decrypt_text functions for sensitive fields.
-│      ├─ fuzzy_utils.py                  # Fuzzy string matching + dynamic lexicon loader.
-│      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
-│      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting. early returns for crises skip embeddings, sentiment, and emotion calculation, which is intentional for security and performance.
-│      ├─ repetition_echo.py              # Detects and weighs phrase repetition to reduce redundancy bias.
-│      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
-│      └─ text_processing.py              # Text normalization, tokenization, basic linguistic preprocessing, and orchestrates lower-level modules.
+│      ├─ __init__.py                     
+│      ├─ crisis_detectors.py             
+│      ├─ crisis_writer.py                
+│      ├─ embeddings.py                   
+│      ├─ emotion_analysis.py             
+│      ├─ emotion_model.py                
+│      ├─ encryption.py                   
+│      ├─ hash_utils.py                   
+│      ├─ pii.py                          
+│      ├─ process_entry.py                
+│      ├─ repetition_echo.py              
+│      └─ text_processing.py              
 │
 ├─ data/                                  # Local data storage
-│  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
-│  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
 │  ├─ journals.json                       # Stored journal entries
 │  ├─ suggest_lexicon.py                  # Scan journal entries for tokens not matched by the current combined lexicons.
-│  ├─ names_au.json
-│  ├─ names_ca.json
-│  ├─ names_ie.json
-│  ├─ names_in.json
-│  ├─ names_nz.json
-│  ├─ names_sg.json
-│  ├─ names_uk.json
-│  ├─ names_us.json
-│  ├─ names_za.json
-│  ├─ recorded_crises.json
+│  ├─ names_au.json                       # common first and last names from Australia
+│  ├─ names_ca.json                       # common first and last names from Canada
+│  ├─ names_ie.json                       # common first and last names from Ireland
+│  ├─ names_in.json                       # common first and last names from India
+│  ├─ names_nz.json                       # common first and last names from New Zealand
+│  ├─ names_sg.json                       # common first and last names from Singapore
+│  ├─ names_uk.json                       # common first and last names from United Kingdom
+│  ├─ names_us.json                       # common first and last names from United States
+│  ├─ names_za.json                       # common first and last names from South Africa
+│  ├─ recorded_crises.json                # Contents of what crisis entries said, encrypted text
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 ├─ .env                      # Private, proprietary data (never commit)
