@@ -1,4 +1,4 @@
-#========= requirements.txt ========
+#========= requirements.txt save-state 202512151258 (format: YYYYMMDDhhmm) ========
 # Core ML / NLP
 torch==2.9.1
 transformers==4.46.2
@@ -6,7 +6,6 @@ sentence-transformers==2.6.1
 tokenizers>=0.20,<0.21
 numpy>=2.3.4
 rapidfuzz>=3.0.0,<4.0.0
-
 
 # Sentence-Transformers dependencies
 scikit-learn>=1.7.2
@@ -18,10 +17,11 @@ threadpoolctl>=3.6.0
 # python environments
 python-dotenv>=1.0.0,<2.0.0
 
-#Encryption dependencies
+# Encryption dependencies
 cryptography>=43.0.0,<44.0.0
 
-# Web server
+# Web server / async I/O
 fastapi>=0.111.1,<0.112.0
 uvicorn>=0.27.1,<0.28.0
 python-multipart>=0.0.0
+aiofiles>=25.1.0

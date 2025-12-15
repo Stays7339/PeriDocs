@@ -1,8 +1,13 @@
+# ==========================================
+# app/helpers/file_ops.py
+# save-state updated 202512151521
+# ==========================================
+
 import json
 import os
 from typing import Any, Dict, List
-import numpy as np
 from datetime import datetime
+from app.helpers.json_safe import json_safe  # updated import
 
 DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/journals.json')
 
@@ -21,14 +26,15 @@ def load_data(file_path: str = DATA_FILE) -> List[Dict[str, Any]]:
         return []
 
 def save_data(entries: List[Dict[str, Any]], file_path: str = DATA_FILE) -> None:
-    """Safely save JSON list; converts np.ndarray → list automatically"""
-    def default_serializer(obj):
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        raise TypeError(f"Cannot serialize type: {type(obj)}")
+    """Safely save JSON list; normalizes non-JSON types"""
     try:
         with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(entries, f, ensure_ascii=False, indent=2, default=default_serializer)
+            json.dump(
+                json_safe(entries),
+                f,
+                ensure_ascii=False,
+                indent=2
+            )
     except IOError as e:
         raise RuntimeError(f"Failed to save data to {file_path}: {e}")
 
@@ -54,7 +60,7 @@ def get_feedback_file() -> str:
     os.makedirs(os.path.dirname(path_obj), exist_ok=True)
     if not os.path.exists(path_obj):
         # Initialize empty JSON array
-        with open(path_obj, 'w', encoding='utf-8') as f:
+        with open(path_obj, "w", encoding="utf-8") as f:
             json.dump([], f, ensure_ascii=False, indent=2)
     return path_obj
 

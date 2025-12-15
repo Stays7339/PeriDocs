@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 29 November 2025 (202511291721)
+## Canonical Project Directory as of 15 December 2025 (202512151632)
 
 ```
 PeriDocs-code/                         # Root project folder
@@ -234,23 +234,37 @@ PeriDocs-code/                         # Root project folder
 │   └─ pyvenv.cfg                      # Virtual environment configuration
 │
 ├─ app/                                # Backend + frontend application code
-│  ├─ routes/
-│  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
-│  │  ├─ feedback.py                   # "/feedback"
-│  │  ├─ journal.py                    # "/submit", "/submit-success"
-│  │  ├─ lexicon_admin.py              # Hidden admin route for lexicon moderation. Requires ADMIN_TOKEN in .env (string). Not linked from navigation.
-│  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
-│  │  └─ __pycache__/                
 │  │
 │  ├─ helpers/
 │  │  ├─ __init__.py
 │  │  ├─ display_last_entry.py         # GET: display last entry, sentiment, emotion, repetition
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
-│  │  ├─ journal_helpers.py            # sentiment, pruning, embedding utilities
-│  │  ├─ json_safe.py                  # JSON secure operations (NumPy-safe)
-│  │  ├─ security.py                   # optional: encryption/decryption, hashing helpers
+│  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
 │  │  ├─ similarity.py                 # raw similarity computations
-│  │  └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  └─ vector_ops.py                 # normalizes embeddings / vectors
+│  │
+│  │
+│  │
+├─ routes/
+│  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
+│  │  ├─ feedback.py                   # "/feedback"
+│  │  ├─ journal.py                    # "/submit", "/submit-success"
+│  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  └─ __pycache__/                
+│  │
+│  ├─ static/                            # Frontend static files
+│  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
+│  │  ├─ feedback.js                     # Feedback modal JS
+│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.theme-toggle.
+│  │  ├─ style.css                       # Main stylesheet
+│  │  ├─ theme-toggle.js                 # Dark Mode toggle
+│  │  ├─ peridocs-logo-v1.png
+│  │  ├─ peridocs-logo-v1-white.png
+│  │  ├─ favicon.png
+│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
+│  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
+│  │
 │  │
 │  ├─ templates/                        # Jinja2 HTML templates
 │  │  ├─ about.html                     # About page template
@@ -264,17 +278,6 @@ PeriDocs-code/                         # Root project folder
 │  │      ├─ footer.html
 │  │      └─ modal-feedback.html
 │  │
-│  ├─ static/                            # Frontend static files
-│  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
-│  │  ├─ style.css                       # Main stylesheet 
-│  │  ├─ theme-toggle.js                 # Dark Mode toggle
-│  │  ├─ feedback.js                     # Feedback modal JS
-│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
-│  │  ├─ peridocs-logo-v1.png
-│  │  ├─ peridocs-logo-v1-white.png
-│  │ ├─ favicon.png
-│  │ ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
-│  │ └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
@@ -291,16 +294,17 @@ PeriDocs-code/                         # Root project folder
 │      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
 │      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting. early returns for crises skip embeddings, sentiment, and emotion calculation, which is intentional for security and performance.
-│      ├─ repetition_echo.py              # Detects and weighs phrase repetition to reduce redundancy bias.
 │      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
 │      └─ text_processing.py              # Text normalization, tokenization, basic linguistic preprocessing, and orchestrates lower-level modules.
 │
 ├─ data/                                  # Local data storage
+│  ├─ approved_embeddings.json            # Pending comment
+│  ├─ candidate_emotions_202512.json      # Pending comment
 │  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
+│  ├─ journals_embeddings_dump.json       # Storage for embeddings to keep the main entries much more readable by humans.
 │  ├─ journals.json                       # Stored journal entries
-│  ├─ suggest_lexicon.py                  # Scan journal entries for tokens not matched by the current combined lexicons.
 │  ├─ names_au.json
 │  ├─ names_ca.json
 │  ├─ names_ie.json
@@ -313,19 +317,21 @@ PeriDocs-code/                         # Root project folder
 │  ├─ recorded_crises.json
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
+├─ test-and-debug/                     
+│    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
+│    ├─ test_dsmx.py                    # testing for deterministic softmax-like scaling for emotion distributions.
+│    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
+│    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
+│    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
+│
+│
+│
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ embeddings_explainer.md   # Overview created by GPT-5, who also drafted the particular wording of the code.
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
-├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
-│
-├─ test-and-debug/                     
-    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
-    ├─ test_dsmx.py                    # testing for deterministic softmax-like scaling for emotion distributions.
-    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
-    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
-    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
+└─setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 
 ```
 

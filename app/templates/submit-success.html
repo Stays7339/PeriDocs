@@ -23,17 +23,8 @@
 
       <!-- Metrics summary -->
       <ul class="metrics">
-        <li><strong>Dominant Emotion:</strong> {{ dominant_emotion }}</li>
-        <li><strong>Emotion Distribution:</strong> {{ emotion_summary }}</li>
-        <li><strong>Entities:</strong>
-          {% if entities %}
-            {% for entity in entities %}
-              {{ entity.text.capitalize() }} ({{ entity.label.capitalize() }}){% if not loop.last %}, {% endif %}
-            {% endfor %}
-          {% else %}
-            None
-          {% endif %}
-        </li>
+        <li><strong>Dominant Emotion:</strong> None</li>
+        <li><strong>Emotion Distribution:</strong> {}</li>
         <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>
       </ul>
 
