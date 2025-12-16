@@ -14,4 +14,4 @@ async def preload_embedding_model():
 
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-from app.routes import main, journal, feedback  # noqa: F401
+from app.routes import main, journal, feedback, admin  # noqa: F401

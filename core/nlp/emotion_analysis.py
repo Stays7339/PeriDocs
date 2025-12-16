@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/emotion_analysis.py
-# save-state updated 202512151237
+# save-state updated 2025121516
 # ==========================================
 
 import asyncio
@@ -16,7 +16,7 @@ def _split_sentences(text: str) -> list[str]:
     return [s.strip() for s in re.findall(_SENTENCE_RE, text) if s.strip()]
 
 # ---------------- Embedding-based placeholder ----------------
-async def compute_emotion_profile_async(raw_text: str, dim: int = 768) -> Dict[str, float]:
+async def compute_emotion_profile_async(raw_text: str, dim: int = 1024) -> Dict[str, float]:
     from core.nlp.embeddings import get_embedding_async
 
     if not raw_text.strip():

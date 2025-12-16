@@ -186,7 +186,8 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 15 December 2025 (202512151632)
+## Canonical Project Directory as of 16 December 2025 (202512161806)
+**Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
 PeriDocs-code/                         # Root project folder
@@ -237,17 +238,16 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  ├─ helpers/
 │  │  ├─ __init__.py
-│  │  ├─ display_last_entry.py         # GET: display last entry, sentiment, emotion, repetition
+│  │  ├─ entry_similarity.py           # raw similarity computations for entry-to-entry
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  ├─ similarity.py                 # raw similarity computations
-│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
-│  │  └─ vector_ops.py                 # normalizes embeddings / vectors
+│  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │
 │  │
 │  │
 ├─ routes/
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
+│  │  ├─ admin.py                      # "/admin-review"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ journal.py                    # "/submit", "/submit-success"
 │  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
@@ -256,7 +256,7 @@ PeriDocs-code/                         # Root project folder
 │  ├─ static/                            # Frontend static files
 │  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
 │  │  ├─ feedback.js                     # Feedback modal JS
-│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.theme-toggle.
+│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
 │  │  ├─ style.css                       # Main stylesheet
 │  │  ├─ theme-toggle.js                 # Dark Mode toggle
 │  │  ├─ peridocs-logo-v1.png
@@ -268,9 +268,9 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  ├─ templates/                        # Jinja2 HTML templates
 │  │  ├─ about.html                     # About page template
+│  │  ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
 │  │  ├─ base.html                      # Layout template
 │  │  ├─ index.html                     # Main homepage template
-│  │  ├─ lexicon_admin.html             # Front-end UI for staff only, planned to be hidden before public release
 │  │  ├─ privacy.html                   # Privacy policy page template
 │  │  ├─ submit-success.html            # Submission success page template
 │  │  ├─ terms-of-service.html          # Terms of Service page template
@@ -282,44 +282,49 @@ PeriDocs-code/                         # Root project folder
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
 ├─ core/
+│   ├─ map/
+│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
+│   │
+│   │
+│   │
+│   │
+│   │
+│   │
 │   └─ nlp/
-│      ├─ __init__.py                     # Exposes document_features; acts as import hub for NLP modules.
-│      ├─ anchors.py                      # Defines anchor word lists for emotion/semantic weighting.
-│      ├─ crisis_writer.py                # Pending description.
+│      ├─ __init__.py                     # Pending succinct-yet-accurate description.
+│      ├─ anchors.py                      # PHASING OUT - Defines anchor word lists for emotion/semantic weighting.
+│      ├─ crisis_writer.py                # Pending succinct-yet-accurate description.
 │      ├─ crisis.py                       # Detects crisis indicators and escalation flags.
 │      ├─ embeddings.py                   # Handles SentenceTransformer model, embedding caching, and vector ops.
-│      ├─ emotion_analysis.py             # Computes emotion lexicon match, valence/arousal summary, and embedding-weighted emotion distribution.
+│      ├─ emotion_analysis.py             # Pending succinct-yet-accurate description.
 │      ├─ encryption.py                   # encrypt_text / decrypt_text functions for sensitive fields.
 │      ├─ fuzzy_utils.py                  # Fuzzy string matching + dynamic lexicon loader.
 │      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      ├─ process_entry.py                # Main pipeline orchestrator: calls preprocessing, PII redaction, emotion, embeddings, sentiment, and echo weighting. early returns for crises skip embeddings, sentiment, and emotion calculation, which is intentional for security and performance.
+│      ├─ process_entry.py                # Pending succinct-yet-accurate description. 
 │      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
-│      └─ text_processing.py              # Text normalization, tokenization, basic linguistic preprocessing, and orchestrates lower-level modules.
+│      └─ text_processing.py              # Pending succinct-yet-accurate description. 
 │
 ├─ data/                                  # Local data storage
-│  ├─ approved_embeddings.json            # Pending comment
-│  ├─ candidate_emotions_202512.json      # Pending comment
-│  ├─ dynamic_lexicon.json                # Lexicons obtained from users of service
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
-│  ├─ journals_embeddings_dump.json       # Storage for embeddings to keep the main entries much more readable by humans.
+│  ├─ journals_embeddings_dump20251216_3.json       # Storage for embeddings to keep the main entries much more readable by humans.
 │  ├─ journals.json                       # Stored journal entries
-│  ├─ names_au.json
-│  ├─ names_ca.json
-│  ├─ names_ie.json
-│  ├─ names_in.json
-│  ├─ names_nz.json
-│  ├─ names_sg.json
-│  ├─ names_uk.json
-│  ├─ names_us.json
-│  ├─ names_za.json
-│  ├─ recorded_crises.json
+│  ├─ names_au.json                       # Common-enough first names and last names from Australia.
+│  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
+│  ├─ names_ie.json                       # Common-enough first names and last names from Ireland.
+│  ├─ names_in.json                       # Common-enough first names and last names from India.
+│  ├─ names_nz.json                       # Common-enough first names and last names from New Zealand.
+│  ├─ names_sg.json                       # Common-enough first names and last names from Singapore.
+│  ├─ names_uk.json                       # Common-enough first names and last names from United Kingdom.
+│  ├─ names_us.json                       # Common-enough first names and last names from United States.
+│  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
+│  ├─ recorded_crises.json                # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 ├─ test-and-debug/                     
 │    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
-│    ├─ test_dsmx.py                    # testing for deterministic softmax-like scaling for emotion distributions.
+│    ├─ test_dsmx.py                    # OBSOLETE
 │    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
 │    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
@@ -328,10 +333,9 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
-├─ embeddings_explainer.md   # Overview created by GPT-5, who also drafted the particular wording of the code.
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
-└─setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+└─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 
 ```
 

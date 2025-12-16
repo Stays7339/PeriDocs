@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/journal.py
-# save-state updated 202512151619
+# save-state updated 202512161345
 # ==========================================
 from fastapi import Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,12 +14,11 @@ import aiofiles
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
-from app.helpers.similarity import compute_similarity
+from app.helpers.entry_similarity import compute_similarity_to_other_entries
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 from core.nlp.embeddings import get_embedding_async
 from core.nlp.pii import redact_pii
-from app.helpers.vector_ops import normalize_vector 
 
 templates = Jinja2Templates(directory="app/templates")
 JOURNALS_FILE = "data/journals.json"
@@ -70,42 +69,39 @@ async def submit_journal(request: Request, entry_text: str = Form(...)):
 @app.get("/submit-success", response_class=HTMLResponse)
 async def submit_success(request: Request, id: str):
     all_entries = load_data(JOURNALS_FILE)
-    entry = next((e for e in all_entries if isinstance(e, dict) and e.get("id") == id), None)
+    entry = next((e for e in all_entries if e.get("id") == id), None)
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
         )
 
-    # Compute top matches
-    entry_vec = normalize_vector(embeddings_index[id])  # normalize here
+    entry_vec = np.array(embeddings_index[id])
     scored_entries = []
 
     for eid, vec in embeddings_index.items():
         if eid == id:
             continue
-        sim = compute_similarity(entry_vec, normalize_vector(vec))  # normalize comparison vector
+        sim = compute_similarity_to_other_entries(entry_vec, np.array(vec))
         match_entry = next((e for e in all_entries if e["id"] == eid), None)
         if match_entry:
-            scored_entries.append({
-                "entry": match_entry,
-                "score": sim
-            })
+            scored_entries.append({"entry": match_entry, "score": sim})
 
-    # Sort by similarity and take top 20
     top_matches_formatted = [
         {
-            "entry_id": json_safe(e['entry'].get('id')),
-            "excerpt": json_safe(e['entry'].get('safe_text', ''))[:200],
-            "similarity_pct": round(max(min(e['score'], 1.0), 0.0) * 100, 1)
+            "entry_id": json_safe(e["entry"]["id"]),
+            "excerpt": json_safe(e["entry"].get("safe_text", ""))[:200],
+            "similarity_pct": round(max(min(e["score"], 1.0), 0.0) * 100, 1),
         }
-        for e in sorted(scored_entries, key=lambda x: x['score'], reverse=True)[:20]
+        for e in sorted(scored_entries, key=lambda x: x["score"], reverse=True)[:20]
     ]
 
-    context = {
-        "request": request,
-        "entry_id": id,
-        "safe_text": entry.get("safe_text"),
-        "top_matches": top_matches_formatted
-    }
+    return templates.TemplateResponse(
+        "submit-success.html",
+        {
+            "request": request,
+            "entry_id": id,
+            "safe_text": entry.get("safe_text"),
+            "top_matches": top_matches_formatted,
+        },
+    )
 
-    return templates.TemplateResponse("submit-success.html", context)

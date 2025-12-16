@@ -112,7 +112,7 @@ async def process_text(text: str):
     token_strings = [t["text"] for t in token_dicts]
 
     if not cleaned_text:
-        embedding_vector = np.zeros((768,), dtype=np.float32)
+        embedding_vector = np.zeros((1024,), dtype=np.float32)
         features = {
             "embedding_vector": embedding_vector,
             "embedding_emotion_distribution": {},

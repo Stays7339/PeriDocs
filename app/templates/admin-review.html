@@ -1,0 +1,127 @@
+<!-- admin-review.html save-state 202512161750-->
+{% extends "base.html" %}
+{% block title %}Admin Review · PeriDocs{% endblock %}
+
+{% block content %}
+
+<div class="card admin-review-card">
+  <div class="card-content">
+
+    <h1>Centroid Review Queue</h1>
+
+    {% if flash %}
+    <div class="flash-message">{{ flash }}</div>
+    {% endif %}
+
+    {% if suggestions|length == 0 %}
+      <p class="empty-state">No review suggestions.</p>
+    {% else %}
+
+    <table class="review-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>Type</th>
+          <th>Centroid</th>
+          <th>Metrics</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+
+      <tbody>
+      {% for s in suggestions %}
+        <tr>
+          <td>
+            <details>
+              <summary>▸</summary>
+              <div class="expanded">
+
+                {% if s.centroid_id not in centroids.CENTROIDS %}
+                  <p class="pre-centroid-message">
+                    Centroid does not exist yet. Review these sample entries to decide on creation.
+                  </p>
+                {% endif %}
+
+                <h4>Sample entries</h4>
+                <ul class="samples">
+                  {% for sample in s.samples %}
+                    <li>{{ sample }}</li>
+                  {% endfor %}
+                </ul>
+
+                <h4>Status</h4>
+                <form method="post" action="/admin-review/update-status">
+                  <input type="hidden" name="suggestion_id" value="{{ s.suggestion_id }}">
+                  <select name="status">
+                    <option {{ "selected" if s.status=="pending" }}>pending</option>
+                    <option {{ "selected" if s.status=="accepted" }}>accepted</option>
+                    <option {{ "selected" if s.status=="rejected" }}>rejected</option>
+                  </select>
+                  <input
+                    type="text"
+                    name="human_note"
+                    placeholder="optional note"
+                    value="{{ s.human_note or '' }}"
+                  >
+                  <button type="submit">Update</button>
+                </form>
+
+                <h4>Human labels</h4>
+                <form method="post" action="/admin-review/update-labels">
+                  <input type="hidden" name="suggestion_id" value="{{ s.suggestion_id }}">
+                  <input
+                    type="text"
+                    name="labels"
+                    placeholder="comma-separated"
+                    value="{{ s.human_labels | join(', ') }}"
+                  >
+                  <button type="submit">Save labels</button>
+                </form>
+
+              </div>
+            </details>
+          </td>
+
+          <td>{{ s.suggestion_type }}</td>
+          <td class="mono">{{ s.centroid_id }}</td>
+          <td>
+            {% for k,v in s.metrics.items() %}
+              <div>{{ k }}: {{ v }}</div>
+            {% endfor %}
+          </td>
+          <td>{{ s.status }}</td>
+          <td>{{ s.created_at }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.admin-review-card { max-width: 1100px; }
+details summary { cursor: pointer; }
+.expanded { padding: 0.5rem 0 1rem 0; }
+.samples { font-size: 0.85rem; }
+.mono { font-family: monospace; }
+
+.flash-message {
+  background-color: #fff4e5;
+  border: 1px solid #ffcc80;
+  color: #663c00;
+  padding: 0.75rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+}
+
+.pre-centroid-message {
+  font-weight: bold;
+  color: #b71c1c;
+  margin-bottom: 0.5rem;
+}
+</style>
+
+{% endblock %}

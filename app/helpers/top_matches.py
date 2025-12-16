@@ -6,7 +6,7 @@ repetition, and sentiment adjustments.
 """
 
 from typing import List, Dict, Any
-from app.helpers.similarity import compute_similarity
+from app.helpers.entry_similarity import compute_similarity_to_other_entries
 from app.helpers.json_safe import json_safe
 
 def find_top_matches(
@@ -20,7 +20,7 @@ def find_top_matches(
         vec = e.get('nlp', {}).get('embedding')
         if vec is None:
             continue
-        similarity = compute_similarity(entry_vec, vec)
+        similarity = compute_similarity_to_other_entries(entry_vec, vec)
         scored_entries.append({"entry": e, "score": similarity})
 
     scored_entries.sort(key=lambda x: x['score'], reverse=True)

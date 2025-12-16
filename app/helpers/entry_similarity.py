@@ -1,17 +1,15 @@
-"""
-app/helpers/similarity.py
-
-Provides raw similarity computations for vector embeddings.
-"""
+# ==========================================
+# app/helpers/entry_similarity.py
+# Save-state: 202512161356
+# Provides raw similarity computations for vector embeddings.
+# ==========================================
 
 import numpy as np
 from typing import Optional
 
-def compute_similarity(vec1: Optional[np.ndarray], vec2: Optional[np.ndarray]) -> float:
+def compute_similarity_to_other_entries(vec1: Optional[np.ndarray], vec2: Optional[np.ndarray]) -> float:
     """
-    Compute cosine similarity between two vectors safely.
-    
-    Returns 0.0 if either vector is None, empty, or has zero norm.
+    Compute cosine similarity between two embeddings (which is filled with several vectors (float numbers) per emebedding) safely.
     """
     if vec1 is None or vec2 is None:
         return 0.0
