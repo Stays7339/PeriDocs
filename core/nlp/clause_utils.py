@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/clause_utils.py
-# save-state: 202512171251
+# save-state: 202512172107
 # ==========================================
 
 import re
@@ -10,7 +10,7 @@ CLAUSE_RE = r"[^.!?]+[.!?]?"  # basic clause/sentence split; can be refined
 
 def split_into_clauses(text: str) -> List[str]:
     """
-    Splits text into clauses (sentence-level granularity).
+    Splits text into clauses (sentence-level granularity), due to token limits for all-roberta-large-v1
     """
     import re
     return [cl.strip() for cl in re.findall(CLAUSE_RE, text) if cl.strip()]

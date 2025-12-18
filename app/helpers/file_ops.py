@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/file_ops.py
-# save-state updated 202512151521
+# save-state updated 202512172036
 # ==========================================
 
 import json
@@ -39,10 +39,18 @@ def save_data(entries: List[Dict[str, Any]], file_path: str = DATA_FILE) -> None
         raise RuntimeError(f"Failed to save data to {file_path}: {e}")
 
 def append_entry(entry: Dict[str, Any], file_path: str = DATA_FILE) -> None:
-    """Append single entry safely, flattening if needed"""
+    # Hard stop: never journal crisis entries
+    # IMPORTANT:
+    # Crisis-flagged entries must never be written to journals.json.
+    # They are recorded exclusively via crisis_recorder.py.
+
+    if entry.get("nlp", {}).get("crisis_flag") is True:
+        return
+
     data = load_data(file_path)
     data.append(entry)
     save_data(data, file_path)
+
 
 # ------------------ Feedback helpers ------------------ #
 

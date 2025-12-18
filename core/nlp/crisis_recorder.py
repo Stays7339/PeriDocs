@@ -1,95 +1,98 @@
 # ==========================================
 # core/nlp/crisis_recorder.py
-# save-state updated 202512171453
+# save-state 202512172036
 # Atomic, multi-process safe AES-encrypted crisis record writer.
-# Appends encrypted records to data/recorded_crises.json using atomic writes.
+# Stores sensitive fields (text, user_ip_hash) encrypted in data/recorded_crises.npz.
+# All other metadata remains visible.
 # ==========================================
 
 from __future__ import annotations
-import json
 import os
 from pathlib import Path
 from typing import Dict, Any
 from filelock import FileLock
 import tempfile
+import numpy as np
+import json
 
 from core.nlp.embeddings import fernet  # your AES Fernet instance
 
 DATA_DIR = Path(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "data")))
-CRISIS_FILE = DATA_DIR / "recorded_crises.json"
+CRISIS_FILE = DATA_DIR / "recorded_crises.npz"
 LOCK_FILE = CRISIS_FILE.with_suffix(".lock")
 
 
 def append_crisis_record(record: Dict[str, Any]) -> None:
     """
-    Append a single crisis record (dictionary) to recorded_crises.json.
-
-    Each record is AES-encrypted at the top level.
-    Features:
-    - Multi-process safe via file lock.
-    - Atomic writes via temp file + os.replace().
-    - Creates file and directory if they do not exist.
+    Append a single crisis record to recorded_crises.npz.
+    Sensitive fields (text, user_ip_hash) are AES-encrypted.
+    Metadata remains visible.
     """
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-    # Convert record to JSON string and encrypt
-    json_text = json.dumps(record, ensure_ascii=False)
-    encrypted_text = fernet.encrypt(json_text.encode("utf-8")).decode("utf-8")
+    # Split sensitive fields from metadata
+    sensitive_fields = {}
+    for key in ("text", "user_ip_hash"):
+        if key in record:
+            sensitive_fields[key] = record.pop(key)
+
+    # Encrypt sensitive fields
+    if sensitive_fields:
+        encrypted_sensitive = fernet.encrypt(json.dumps(sensitive_fields, ensure_ascii=False).encode("utf-8"))
+        record["encrypted_sensitive"] = encrypted_sensitive
 
     with FileLock(str(LOCK_FILE)):
-        # Load existing data
+        # Load existing records
         if CRISIS_FILE.exists():
             try:
-                with CRISIS_FILE.open("r", encoding="utf-8") as fh:
-                    data = json.load(fh)
-                    if not isinstance(data, list):
-                        data = []
+                with np.load(CRISIS_FILE, allow_pickle=True) as data:
+                    existing = data["records"].tolist()
             except Exception:
-                data = []
+                existing = []
         else:
-            data = []
+            existing = []
 
-        # Append encrypted record
-        data.append(encrypted_text)
+        # Append new record
+        existing.append(record)
 
         # Write atomically
         with tempfile.NamedTemporaryFile(
-            "w",
             delete=False,
             dir=DATA_DIR,
-            encoding="utf-8",
             prefix="recorded_crises_",
-            suffix=".json.tmp",
+            suffix=".npz.tmp",
         ) as tmp:
-            json.dump(data, tmp, ensure_ascii=False, indent=2)
             tmp_path = Path(tmp.name)
+            np.savez_compressed(tmp_path, records=np.array(existing, dtype=object))
 
         os.replace(tmp_path, CRISIS_FILE)
 
 
-def load_crisis_records() -> list[Dict[str, Any]]:
+def load_crisis_records(decrypt_sensitive: bool = True) -> list[Dict[str, Any]]:
     """
-    Load and decrypt all crisis records.
-    Returns a list of dictionaries.
+    Load all crisis records.
+    By default, decrypts sensitive fields (text, user_ip_hash).
+    Set decrypt_sensitive=False to leave them encrypted.
     """
     if not CRISIS_FILE.exists():
         return []
 
     try:
-        with CRISIS_FILE.open("r", encoding="utf-8") as fh:
-            data = json.load(fh)
-            if not isinstance(data, list):
-                return []
+        with np.load(CRISIS_FILE, allow_pickle=True) as data:
+            records = data["records"].tolist()
     except Exception:
         return []
 
-    records = []
-    for enc in data:
-        try:
-            decrypted = fernet.decrypt(enc.encode("utf-8")).decode("utf-8")
-            record = json.loads(decrypted)
-            records.append(record)
-        except Exception:
-            continue  # skip corrupted entries
+    result = []
+    for record in records:
+        rec_copy = record.copy()
+        if decrypt_sensitive and "encrypted_sensitive" in rec_copy:
+            try:
+                decrypted = fernet.decrypt(rec_copy.pop("encrypted_sensitive")).decode("utf-8")
+                sensitive = json.loads(decrypted)
+                rec_copy.update(sensitive)
+            except Exception:
+                pass  # leave encrypted if decryption fails
+        result.append(rec_copy)
 
-    return records
+    return result

@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 17 December 2025 (202512171740)
+## Canonical Project Directory as of 17 December 2025 (202512172045)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -324,6 +324,8 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ test-and-debug/                     
 │    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
+│    ├─ test_crisis_flag_detection.py   # 
+│    ├─ test_crisis_flag_safety.py      # 
 │    ├─ test_dsmx.py                    # OBSOLETE
 │    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.

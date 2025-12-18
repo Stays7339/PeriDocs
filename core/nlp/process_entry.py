@@ -76,7 +76,7 @@ async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 1
     doc_embedding = np.mean(clause_embeddings, axis=0)  # document-level centroid
 
     # ---------------- CENTROID ASSIGNMENT ----------------
-    centroid_id, centroid_distance = assign_vector_to_existing_centroid(doc_embedding)
+    centroid_id, centroid_distance = assign_vector_to_existing_centroids(doc_embedding)
 
     # ---------------- HASHES ----------------
     sha8 = sha8_hash(safe_text)
