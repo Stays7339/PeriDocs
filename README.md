@@ -186,53 +186,11 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 16 December 2025 (202512161806)
+## Canonical Project Directory as of 17 December 2025 (202512171740)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
 PeriDocs-code/                         # Root project folder
-│
-├─ models/                             # Where open source pre-trained context-understanding models lives
-│   ├─ roberta-large/                  # Sentence-understanding model
-│   │   ├─.locks/
-│   │   │   └─ models--sentence-transformers--all-roberta-large-v1/
-│   │   │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831.lock
-│   │   │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7.lock
-│   │   │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6.lock
-│   │   │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx].lock # Nine more files just like that
-│   │   └─ models--sentence-transformers--all-roberta-large-v1/ # yes the same name
-│   │               ├─ .no_exist/
-│   │               │       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
-│   │               │                 └─ added_tokens.json
-│   │               ├─ blobs/
-│   │               │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
-│   │               │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
-│   │               ├─ refs/
-│   │               │           ├─ main # no . or "dot" extension nor / or "slash" extension
-│   │               └─ snapshots/
-│   │                       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
-│   │                                  ├─ 1_Pooling/
-│   │                                  ├─ config_sentence_transformers.json
-│   │                                  ├─ config.json
-│   │                                  ├─ merges.txt
-│   │                                  ├─ model.safetensors
-│   │                                  ├─ modules.json
-│   │                                  ├─ README.md
-│   │                                  ├─ sentence_bert_config.json
-│   │                                  ├─ special_tokens_map.json
-│   │                                  ├─ tokenizer_config.json
-│   │                                  ├─ tokenizer.json
-│   │                                  └─ vocab.json
-│   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
-│
-├─ venv/                               # Python virtual environment (ignored by Git)
-│   ├─ bin/                            # Executables (python, pip, etc.)
-│   ├─ include/                        # Headers for building packages
-│   ├─ lib/                            # Installed Python packages
-│   ├─ share/                           # Shared resources for the virtual environment
-│   └─ pyvenv.cfg                      # Virtual environment configuration
 │
 ├─ app/                                # Backend + frontend application code
 │  │
@@ -281,29 +239,30 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
+│
+│
 ├─ core/
 │   ├─ map/
-│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
-│   │
-│   │
-│   │
+│   │   ├─ admin_review_helpers.py        # logic for creating a dashboard for human administrators at PeriDocs.
+│   │   └─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
 │   │
 │   │
 │   │
 │   └─ nlp/
-│      ├─ __init__.py                     # Pending succinct-yet-accurate description.
-│      ├─ anchors.py                      # PHASING OUT - Defines anchor word lists for emotion/semantic weighting.
-│      ├─ crisis_writer.py                # Pending succinct-yet-accurate description.
-│      ├─ crisis.py                       # Detects crisis indicators and escalation flags.
-│      ├─ embeddings.py                   # Handles SentenceTransformer model, embedding caching, and vector ops.
-│      ├─ emotion_analysis.py             # Pending succinct-yet-accurate description.
-│      ├─ encryption.py                   # encrypt_text / decrypt_text functions for sensitive fields.
-│      ├─ fuzzy_utils.py                  # Fuzzy string matching + dynamic lexicon loader.
-│      ├─ hash_utils.py                   # Generates SHA8 hashes for unique IDs and text integrity tracking.
+│      ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
+│      ├─ anchors.py                      # Canonical word/phrase lists for crisis detection anchors.
+│      ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
+│      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
+│      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
+│      ├─ embeddings.py                   # Manages SentenceTransformer model, embedding computation, caching, and encryption.
+│      ├─ encryption.py                   # Fernet-based encryption/decryption for sensitive textual data.
+│      ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
+│      ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      ├─ process_entry.py                # Pending succinct-yet-accurate description. 
-│      ├─ sentiment_analysis.py           # Calculates polarity, subjectivity, and maps sentiment into categorical buckets.
-│      └─ text_processing.py              # Pending succinct-yet-accurate description. 
+│      └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
+│
+│
+│
 │
 ├─ data/                                  # Local data storage
 │  ├─ feedback.json                       # Stored feedback and report inquiries
@@ -322,6 +281,47 @@ PeriDocs-code/                         # Root project folder
 │  ├─ recorded_crises.json                # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
+│
+│
+│
+├─ models/                             # Where open source pre-trained context-understanding models lives
+│   ├─ roberta-large/                  # Sentence-understanding model
+│   │   ├─.locks/
+│   │   │   └─ models--sentence-transformers--all-roberta-large-v1/
+│   │   │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831.lock
+│   │   │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7.lock
+│   │   │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6.lock
+│   │   │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx].lock # Nine more files just like that
+│   │   └─ models--sentence-transformers--all-roberta-large-v1/ # yes the same name
+│   │               ├─ .no_exist/
+│   │               │       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │               │                 └─ added_tokens.json
+│   │               ├─ blobs/
+│   │               │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
+│   │               │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
+│   │               │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
+│   │               │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
+│   │               ├─ refs/
+│   │               │           ├─ main # no . or "dot" extension nor / or "slash" extension
+│   │               └─ snapshots/
+│   │                       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │                                  ├─ 1_Pooling/
+│   │                                  ├─ config_sentence_transformers.json
+│   │                                  ├─ config.json
+│   │                                  ├─ merges.txt
+│   │                                  ├─ model.safetensors
+│   │                                  ├─ modules.json
+│   │                                  ├─ README.md
+│   │                                  ├─ sentence_bert_config.json
+│   │                                  ├─ special_tokens_map.json
+│   │                                  ├─ tokenizer_config.json
+│   │                                  ├─ tokenizer.json
+│   │                                  └─ vocab.json
+│   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
+│
+│
+│
+│
 ├─ test-and-debug/                     
 │    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
 │    ├─ test_dsmx.py                    # OBSOLETE
@@ -329,7 +329,12 @@ PeriDocs-code/                         # Root project folder
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
 │    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │
-│
+├─ venv/                               # Python virtual environment (ignored by Git)
+│   ├─ bin/                            # Executables (python, pip, etc.)
+│   ├─ include/                        # Headers for building packages
+│   ├─ lib/                            # Installed Python packages
+│   ├─ share/                           # Shared resources for the virtual environment
+│   └─ pyvenv.cfg                      # Virtual environment configuration
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git

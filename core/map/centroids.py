@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# save-state updated 202512161750
+# save-state updated 202512171815
 # ==========================================
 
 """
@@ -25,6 +25,13 @@ Terminology (locked for this module):
     Per-dimension spread of vectors assigned to a centroid.
     Used as a weak signal for drift and over-broad clusters.
 
+- Precentroid:
+    A proposed centroid ID for which human review is required before creation.
+
+- Candidate Journal Entry:
+    A journal entry that is unassigned or marked as "suggest_new_centroid" and
+    therefore eligible for human review and precentroid formation.
+
 Design principles:
 
 - No silent ontology formation.
@@ -38,7 +45,7 @@ Features:
 - Tracks per-centroid mean, count, variance, and density.
 - Density is relative to global average (human-scaled).
 - Drift and split are flagged, never auto-executed.
-- First-centroid creation is suggested, not automatic.
+- Precentroid creation is suggested, not automatic.
 - Windowed persistence: centroids_YYYYMM.npz with carry-over.
 - REPL-friendly inspection helpers.
 """
@@ -47,7 +54,9 @@ import numpy as np
 from typing import Dict, Tuple, Optional, Any, List
 import logging
 import os
+import json
 from datetime import datetime
+import random
 
 # ---------------- Logging Setup ----------------
 logger = logging.getLogger("peridocs.centroids")
@@ -139,10 +148,10 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b) / denom) if denom != 0 else 0.0
 
 
-def compute_density(centroid: np.ndarray, vectors: List[np.ndarray]) -> float:
-    if not vectors:
+def compute_density(centroid_vec: np.ndarray, member_vectors: List[np.ndarray]) -> float:
+    if not member_vectors:
         return 0.0
-    sims = [cosine_similarity(v, centroid) for v in vectors]
+    sims = [cosine_similarity(v, centroid_vec) for v in member_vectors]
     return float(np.mean(sims))
 
 
@@ -170,13 +179,13 @@ def list_centroids() -> List[Dict[str, Any]]:
 
 
 def print_centroids():
-    centroids = list_centroids()
-    if not centroids:
+    centroids_list = list_centroids()
+    if not centroids_list:
         print("No centroids loaded.")
         return
 
-    print(f"Total centroids: {len(centroids)}\n")
-    for c in centroids:
+    print(f"Total centroids: {len(centroids_list)}\n")
+    for c in centroids_list:
         print(
             f"{c['centroid_id']} | "
             f"count={c['count']} | "
@@ -200,10 +209,6 @@ def centroid_drift_score(centroid_id: str) -> Optional[float]:
 def suggest_split_candidates(
     watch_threshold: float = 0.85
 ) -> List[Dict[str, Any]]:
-    """
-    Flags centroids that appear under-dense relative to the global average.
-    This function NEVER performs a split.
-    """
     suggestions = []
     for cid in CENTROIDS.keys():
         score = centroid_drift_score(cid)
@@ -234,27 +239,16 @@ def print_split_suggestions():
 
 
 # ---------------- Manual Split Execution ----------------
-def split_centroid(
+def split_centroid_with_vectors(
     centroid_id: str,
-    vectors: List[np.ndarray]
+    member_vectors: List[np.ndarray]
 ) -> List[str]:
-    """
-    MANUAL OPERATION ONLY.
-
-    Split a centroid into two using k-means over the provided vectors.
-
-    This function is NEVER called automatically.
-    It must be invoked explicitly by a human-reviewed workflow.
-
-    Returns:
-        List of new centroid IDs.
-    """
     from sklearn.cluster import KMeans
 
-    if len(vectors) < 2:
+    if len(member_vectors) < 2:
         return [centroid_id]
 
-    X = np.stack(vectors)
+    X = np.stack(member_vectors)
     kmeans = KMeans(n_clusters=2, random_state=42).fit(X)
 
     new_ids = []
@@ -286,28 +280,12 @@ def split_centroid(
 
 
 # ---------------- Main Assignment Logic ----------------
-def assign_to_centroid(
+def assign_vector_to_existing_centroids(
     vec: np.ndarray,
     similarity_threshold: float = 0.78,
     semantic_score: Optional[float] = None,
-    journal_entry: Optional[dict] = None,  # NEW optional param
+    journal_entry: Optional[dict] = None,
 ) -> Tuple[str, float]:
-    """
-    Assign a vector to the nearest centroid.
-
-    Behavior:
-    - If no centroids exist:
-        → returns ("suggest_new_centroid", semantic_score)
-        → NO centroid is created automatically.
-
-    - If centroids exist:
-        → assigns if similarity is strong
-        → otherwise suggests new centroid (no auto-create)
-
-    Returns:
-        (label, score)
-    """
-
     if not CENTROIDS:
         label = "suggest_new_centroid"
         score = float(semantic_score) if semantic_score is not None else 0.0
@@ -318,8 +296,8 @@ def assign_to_centroid(
     best_id = None
     best_sim = -1.0
 
-    for cid, centroid in CENTROIDS.items():
-        sim = cosine_similarity(vec, centroid)
+    for cid, centroid_vec in CENTROIDS.items():
+        sim = cosine_similarity(vec, centroid_vec)
         if sim > best_sim:
             best_sim = sim
             best_id = cid
@@ -352,106 +330,79 @@ def assign_to_centroid(
 
     return label, float(semantic_score) if semantic_score is not None else 1.0 - best_sim
 
-# ---------------- REPL Convenience ----------------
-def print_centroid_assignment(
-    vec: np.ndarray,
-    similarity_threshold: float = 0.78,
-    semantic_score: Optional[float] = None,
-):
-    label, score = assign_to_centroid(
-        vec,
-        similarity_threshold=similarity_threshold,
-        semantic_score=semantic_score,
-    )
 
-    print(f"Result: {label} | score={round(score, 3)}")
-
-
-# ---------------- Optional Review Queue Helpers (passive) ----------------
-# These are only *accessed by review_helpers.py*
-# No import from review_helpers.py to centroids.py
-def enqueue_split_suggestions_for_review(
-    watch_threshold: float = 0.85,
-    add_review_suggestion_fn=None
-) -> List[str]:
+# ---------------- Candidate / Precentroid Logic ----------------
+def load_candidate_journal_entries_for_precentroid(precentroid_id: str) -> List[str]:
     """
-    Helper for external review queue. 
-    `add_review_suggestion_fn` must be passed in (from review_helpers.py)
+    Returns all candidate journal entries for a given precentroid.
+    Candidate entries are unassigned or marked 'suggest_new_centroid'.
     """
-    if add_review_suggestion_fn is None:
-        raise ValueError("Must pass in add_review_suggestion_fn from review_helpers")
-
-    created = []
-
-    for s in suggest_split_candidates(watch_threshold):
-        sid = add_review_suggestion_fn(
-            centroid_id=s["centroid_id"],
-            suggestion_type="split",
-            metrics={
-                "drift_score": s["drift_score"],
-                "count": s["count"],
-                "avg_variance": s["avg_variance"],
-                "density": CENTROID_DENSITIES.get(s["centroid_id"]),
-            },
-        )
-        created.append(sid)
-
-    return created
-
-def get_candidate_entries_for_centroid(centroid_id: str) -> List[str]:
-    """
-    Returns a list of candidate journal entries for a centroid that does not yet exist.
-    Must be implemented to allow human approval of new centroid creation.
-    """
-    # For demonstration, this returns dummy data; replace with real journal entries retrieval
-    return [f"Candidate entry {i+1}" for i in range(5)]
-
-
-def create_centroid_from_samples(centroid_id: str):
-    """
-    Initialize a new centroid using the candidate entries attached to this centroid_id.
-    For simplicity, each candidate entry is converted to a random vector.
-    """
-    import numpy as np
-
-    candidates = get_candidate_entries_for_centroid(centroid_id)
-    if not candidates:
-        return
-
-    # convert candidate entries to vectors (here just random placeholders)
-    vectors = [np.random.rand(1024) for _ in candidates]
-
-    # create centroid
-    centroid_vec = np.mean(vectors, axis=0)
-    centroids.CENTROIDS[centroid_id] = centroid_vec
-    centroids.CENTROID_COUNTS[centroid_id] = len(vectors)
-    centroids.CENTROID_VARS[centroid_id] = np.var(np.stack(vectors), axis=0)
-    centroids.CENTROID_DENSITIES[centroid_id] = centroids.compute_density(
-        centroid_vec, vectors
-    )
-
-    centroids.save_centroids()
-    logger.info(f"Created new centroid {centroid_id} from candidate entries")
-
-def get_centroid_samples(centroid_id: str, max_samples: int = 5) -> List[str]:
-    """
-    Return actual journal entries currently assigned to this centroid.
-    You can pull from JOURNALS_FILE or from a database.
-    """
-    import json, os
-    JOURNALS_FILE = os.path.join("data", "journals.json")
+    JOURNALS_FILE = os.path.join(CENTROID_DIR, "journals.json")
     if not os.path.exists(JOURNALS_FILE):
         return []
 
-    with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-        entries = json.load(f)
+    try:
+        with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
+            all_entries = json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load journals.json: {e}")
+        return []
+
+    candidate_entries = []
+    for entry in all_entries:
+        assigned_id = entry.get("nlp", {}).get("assigned_centroid_id")
+        if assigned_id is None or assigned_id == "suggest_new_centroid":
+            candidate_entries.append(entry.get("safe_text", ""))
+    return candidate_entries
+
+
+def create_centroid_from_precentroid(precentroid_id: str, embedding_fn=None):
+    """
+    Creates a real centroid from the candidate entries associated with a precentroid.
+    """
+    candidate_entries = load_candidate_journal_entries_for_precentroid(precentroid_id)
+    if not candidate_entries:
+        logger.warning(f"No candidate entries found for precentroid {precentroid_id}")
+        return
+
+    if embedding_fn is None:
+        logger.warning(f"Embedding function not provided; cannot generate semantic centroid for {precentroid_id}.")
+        return
+
+    candidate_vectors = [embedding_fn(text) for text in candidate_entries]
+
+    centroid_vec = np.mean(candidate_vectors, axis=0)
+    CENTROIDS[precentroid_id] = centroid_vec
+    CENTROID_COUNTS[precentroid_id] = len(candidate_vectors)
+    CENTROID_VARS[precentroid_id] = np.var(np.stack(candidate_vectors), axis=0)
+    CENTROID_DENSITIES[precentroid_id] = compute_density(centroid_vec, candidate_vectors)
+
+    save_centroids()
+    logger.info(f"Created centroid {precentroid_id} from {len(candidate_vectors)} candidate entries.")
+
+
+def get_journal_entry_samples_for_centroid(centroid_id: str) -> List[str]:
+    """
+    Returns all journal entries assigned to a centroid.
+    For precentroids, returns candidate entries eligible for human review.
+    """
+    JOURNALS_FILE = os.path.join(CENTROID_DIR, "journals.json")
+    if not os.path.exists(JOURNALS_FILE):
+        return []
+
+    try:
+        with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
+            all_entries = json.load(f)
+    except Exception as e:
+        logger.warning(f"Failed to load journals.json: {e}")
+        return []
 
     samples = []
-    for e in entries:
-        if e.get("nlp", {}).get("assigned_centroid_id") == centroid_id:
-            text = e.get("safe_text", "")
+    for entry in all_entries:
+        assigned_id = entry.get("nlp", {}).get("assigned_centroid_id")
+        if assigned_id == centroid_id or (centroid_id.startswith("precentroid_") and (assigned_id is None or assigned_id == "suggest_new_centroid")):
+            text = entry.get("safe_text", "")
             if text:
                 samples.append(text)
-        if len(samples) >= max_samples:
-            break
+
     return samples

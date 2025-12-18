@@ -1,15 +1,17 @@
 # ==========================================
 # app/routes/admin.py
-# save-state updated 202512161750
+# save-state updated 202512171936
 # ==========================================
 
 from fastapi import Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from urllib.parse import urlencode
-from app.routes import app  # FastAPI instance
-from core.map import review_helpers
 
+from app.routes import app  # FastAPI instance
+from core.map import admin_review_helpers
+
+admin_review_helpers.initialize_review_queue()
 templates = Jinja2Templates(directory="app/templates")
 
 
@@ -20,17 +22,7 @@ async def admin_review_dashboard(
     status: str = None, 
     flash: str = None
 ):
-    """
-    Render the centroid review queue dashboard.
-    Optional query param `status` filters by suggestion status.
-    Flash message shows errors from updates.
-    """
-    suggestions = review_helpers.list_review_queue(status=status)
-
-    # Attach sample entries for UI
-    for s in suggestions:
-        s["samples"] = review_helpers.get_centroid_samples(s["centroid_id"])
-
+    suggestions = admin_review_helpers.list_review_queue(status=status)
     return templates.TemplateResponse(
         "admin-review.html",
         {
@@ -48,13 +40,9 @@ async def admin_review_update_status(
     status: str = Form(...),
     human_note: str = Form(None),
 ):
-    """
-    Update the status and optional human note of a suggestion.
-    Shows flash if suggestion_id not found.
-    """
     flash = None
     try:
-        review_helpers.update_review_status(
+        flash = admin_review_helpers.update_review_status(
             suggestion_id,
             status=status,
             note=human_note if human_note else None,
@@ -69,20 +57,15 @@ async def admin_review_update_status(
     return RedirectResponse(redirect_url, status_code=303)
 
 
-# ---------------- POST: Update Labels ----------------
 @app.post("/admin-review/update-labels", response_class=RedirectResponse)
 async def admin_review_update_labels(
     suggestion_id: str = Form(...),
-    labels: str = Form(...),  # comma-separated
+    labels: str = Form(...),
 ):
-    """
-    Update human labels for a suggestion.
-    Shows flash if suggestion_id not found.
-    """
     label_list = [l.strip() for l in labels.split(",") if l.strip()]
     flash = None
     try:
-        review_helpers.update_review_labels(
+        flash = admin_review_helpers.update_review_labels(
             suggestion_id,
             labels=label_list,
         )

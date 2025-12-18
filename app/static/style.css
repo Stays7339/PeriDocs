@@ -1,4 +1,4 @@
-/* ----------------------    start of style.css      ---------------------- */
+/* ----------------------    start of style.css   save-state 202512171607   ---------------------- */
 /* ---------------------- Cabinet Grotesk Font Faces ---------------------- */
 @font-face {
   font-family: 'Cabinet Grotesk';
@@ -524,4 +524,67 @@ html[data-theme='dark'] .similarity-badge {
     width: 60px;
     height: 60px;
   }
+}
+
+/* ---------------------- Admin Review Table ---------------------- */
+.review-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.95rem;
+}
+
+.review-table th, .review-table td {
+  border: 1px solid var(--muted);
+  padding: 0.5rem;
+  vertical-align: top;
+}
+
+.review-table th {
+  background-color: var(--card);
+  text-align: left;
+}
+
+/* Alternating row colors for light and dark mode */
+.review-table tbody tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+}
+
+html[data-theme='dark'] .review-table tbody tr:nth-child(even) {
+  background-color: color-mix(in srgb, var(--card) 85%, var(--bg) 15%);
+}
+
+/* Hover effect for better row readability */
+.review-table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--accent) 10%, var(--card) 90%);
+}
+
+.expanded {
+  padding: 0.5rem 0 1rem 1rem;
+  background-color: color-mix(in srgb, var(--card) 90%, var(--bg) 10%);
+  border-left: 3px solid var(--muted);
+}
+
+html[data-theme='dark'] .expanded {
+  background-color: color-mix(in srgb, var(--card) 80%, var(--bg) 20%);
+  border-left-color: var(--muted);
+}
+
+/* Monospace for centroid ID */
+.mono { font-family: monospace; }
+
+/* Center the page title */
+.admin-review-card h1 {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+
+.review-table th {
+  background-color: var(--card);
+  color: var(--text);
+}
+
+/* Dark mode header */
+html[data-theme='dark'] .review-table th {
+  background-color: color-mix(in srgb, var(--card) 80%, var(--bg) 20%);
+  color: var(--text);
 }

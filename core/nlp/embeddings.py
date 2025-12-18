@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 202512161433
+# save-state updated 202512171302
 # ------------------------------------------
 
 from __future__ import annotations
@@ -56,32 +56,49 @@ def _find_snapshot_folder(base_path: Path) -> Path:
     raise RuntimeError(f"No valid model snapshot found under {base_path}")
 
 # ---------------- Embedding ----------------
-async def get_embedding_async(text: str) -> np.ndarray:
+async def get_embedding_async(text_or_texts: str | list[str]) -> np.ndarray | list[np.ndarray]:
     """
-    Returns the raw embedding from the model. Does NOT normalize.
-    Downstream code should normalize if desired (for cosine similarity, centroids, etc.)
+    Compute embedding(s) for input text or list of texts.
+    - If a single string is provided, returns np.ndarray.
+    - If a list of strings is provided, returns a list of np.ndarray.
+    
+    Does NOT normalize; downstream code should normalize for cosine similarity, centroids, etc.
+    Uses caching if TOKEN_EMBED_PRECOMPUTE=True.
     """
-    if not text.strip():
-        raise ValueError("Cannot compute embedding for empty text")
-
-    if TOKEN_EMBED_PRECOMPUTE and text in _embedding_cache:
-        return _embedding_cache[text]
+    if isinstance(text_or_texts, str):
+        texts = [text_or_texts]
+        single_input = True
+    elif isinstance(text_or_texts, list):
+        if not text_or_texts:
+            raise ValueError("Cannot compute embedding for empty list")
+        texts = text_or_texts
+        single_input = False
+    else:
+        raise TypeError("Input must be a string or list of strings")
 
     model = await _load_model()
     loop = asyncio.get_running_loop()
 
-    emb = await loop.run_in_executor(
-        _executor,
-        lambda: model.encode(text, convert_to_numpy=True)
-    )
+    results: list[np.ndarray] = []
 
-    if not isinstance(emb, np.ndarray):
-        raise RuntimeError("Embedding computation failed")
+    for t in texts:
+        if not t.strip():
+            raise ValueError("Cannot compute embedding for empty string")
+        if TOKEN_EMBED_PRECOMPUTE and t in _embedding_cache:
+            results.append(_embedding_cache[t])
+            continue
 
-    if TOKEN_EMBED_PRECOMPUTE:
-        _embedding_cache[text] = emb
+        emb = await loop.run_in_executor(
+            _executor,
+            lambda text=t: model.encode(text, convert_to_numpy=True)
+        )
+        if not isinstance(emb, np.ndarray):
+            raise RuntimeError("Embedding computation failed")
+        if TOKEN_EMBED_PRECOMPUTE:
+            _embedding_cache[t] = emb
+        results.append(emb)
 
-    return emb
+    return results[0] if single_input else results
 
 # ---------------- Encryption ----------------
 def encrypt_text(text: str) -> str:
