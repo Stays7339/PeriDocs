@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state updated 202512171943
+# save-state updated 202512201824
 # ==========================================
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from .embeddings import encrypt_text, get_embedding_async
 from .pii import redact_pii
 from .hash_utils import sha8_hash, staff_hash
-from .crisis_detector import crisis_notification
+from .crisis_detector import crisis_notification_async
 from .crisis_recorder import append_crisis_record
 from core.map.centroids import assign_vector_to_existing_centroids
 from .clause_utils import split_into_clauses, sliding_window_clauses
@@ -28,7 +28,7 @@ async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 1
     ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()[:8]
 
     # ---------------- CRISIS CHECK ----------------
-    crisis_msg = crisis_notification(text)
+    crisis_msg = await crisis_notification_async(text)
     if crisis_msg:
         sha8 = sha8_hash(text)
 

@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 17 December 2025 (202512172045)
+## Canonical Project Directory as of 20 December 2025 (202512201835)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -212,11 +212,8 @@ PeriDocs-code/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
-│  │  ├─ cooldown.js                     # Handles global cooldowns for submission forms
-│  │  ├─ feedback.js                     # Feedback modal JS
-│  │  ├─ localStorage.js                 # What the general public commonly refer to as cookies.
 │  │  ├─ style.css                       # Main stylesheet
-│  │  ├─ theme-toggle.js                 # Dark Mode toggle
+│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/journal 
 │  │  ├─ peridocs-logo-v1.png
 │  │  ├─ peridocs-logo-v1-white.png
 │  │  ├─ favicon.png
@@ -250,7 +247,6 @@ PeriDocs-code/                         # Root project folder
 │   │
 │   └─ nlp/
 │      ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
-│      ├─ anchors.py                      # Canonical word/phrase lists for crisis detection anchors.
 │      ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
 │      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
 │      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
@@ -324,8 +320,7 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ test-and-debug/                     
 │    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
-│    ├─ test_crisis_flag_detection.py   # 
-│    ├─ test_crisis_flag_safety.py      # 
+│    ├─ test_crisis_flag_detection.py   # Testing benchmarks for crisis detection
 │    ├─ test_dsmx.py                    # OBSOLETE
 │    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.

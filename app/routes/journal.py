@@ -1,9 +1,9 @@
 # ==========================================
 # app/routes/journal.py
-# save-state updated 202512161345
+# save-state updated 202512201708
 # ==========================================
 from fastapi import Request, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from datetime import datetime
@@ -37,7 +37,18 @@ for path_str in sorted(glob("data/journals_embeddings_dump*.json")):
 
 # ---------- Submit Journal ----------
 @app.post("/submit", response_class=HTMLResponse)
-async def submit_journal(request: Request, entry_text: str = Form(...)):
+async def submit_journal(
+    request: Request,
+    entry_text: str | None = Form(None)  # allow None for JSON payload
+):
+    # Detect JSON
+    if request.headers.get("content-type") == "application/json":
+        data = await request.json()
+        entry_text = data.get("entry_text", "")
+
+    if not entry_text:
+        return JSONResponse({"status": "error", "message": "No journal entry provided"}, status_code=400)
+
     client_host = request.client.host if request.client else "127.0.0.1"
     safe_text = redact_pii(entry_text, redact_names=False)
     nlp_result = await process_entry_async(safe_text, user_ip=client_host)
@@ -50,6 +61,7 @@ async def submit_journal(request: Request, entry_text: str = Form(...)):
         "nlp": {
             "embedding": f"stored in {JOURNALS_EMBED_FILE}",
             "emotions": nlp_result.get("emotions", {}),
+            "dominant_emotion": nlp_result.get("dominant_emotion", "None"),
             "crisis_flag": nlp_result.get("crisis_flag", False),
             "summary": None
         }
@@ -62,8 +74,16 @@ async def submit_journal(request: Request, entry_text: str = Form(...)):
     async with aiofiles.open(JOURNALS_EMBED_FILE, "w", encoding="utf-8") as f:
         await f.write(json.dumps(embeddings_index, ensure_ascii=False, indent=2))
 
-
-    return RedirectResponse(f"/submit-success?id={sha8}", status_code=303)
+    # Return JSON if requested
+    if request.headers.get("accept") == "application/json" or request.headers.get("content-type") == "application/json":
+        return JSONResponse({
+            "status": "ok",
+            "entry_id": sha8,
+            "dominant_emotion": nlp_result.get("dominant_emotion", "None"),
+            "emotion_distribution": nlp_result.get("emotions", {})
+        })
+    else:
+        return RedirectResponse(f"/submit-success?id={sha8}", status_code=303)
 
 # ---------- Submit Success ----------
 @app.get("/submit-success", response_class=HTMLResponse)
@@ -74,6 +94,10 @@ async def submit_success(request: Request, id: str):
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
         )
+
+    nlp_data = entry.get("nlp", {})
+    dominant_emotion = nlp_data.get("dominant_emotion", "None")  # UPDATED
+    emotion_distribution = nlp_data.get("emotions", {})           # UPDATED
 
     entry_vec = np.array(embeddings_index[id])
     scored_entries = []
@@ -101,7 +125,8 @@ async def submit_success(request: Request, id: str):
             "request": request,
             "entry_id": id,
             "safe_text": entry.get("safe_text"),
+            "dominant_emotion": dominant_emotion,          # PASSED TO TEMPLATE
+            "emotion_distribution": emotion_distribution, # PASSED TO TEMPLATE
             "top_matches": top_matches_formatted,
         },
     )
-

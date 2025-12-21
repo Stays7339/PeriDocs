@@ -1,4 +1,4 @@
-<!-- base html file to keep layout consistent across webpages on PeriDocs.org-->
+<!-- base.html save-state 202512201732 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -9,6 +9,7 @@
 
   <link rel="stylesheet" href="/static/style.css">
 
+  <!-- Inline tweaks for header and floating buttons -->
   <style>
     html, body {
       height: 100%;
@@ -68,10 +69,7 @@
       transition: background 0.16s ease;
     }
 
-    #feedback-btn:hover, #theme-toggle-btn:hover {
-      background: #6b708f;
-    }
-
+    #feedback-btn:hover, #theme-toggle-btn:hover { background: #6b708f; }
     #feedback-btn { right: 1.5rem; }
     #theme-toggle-btn { left: 1.5rem; }
   </style>
@@ -94,13 +92,26 @@
 
   {% include 'includes/modal-feedback.html' %}
 
-  <!-- Toast container for cookie/privacy notice -->
+  <!-- Centralized Toast for feedback / notifications -->
+  <div id="feedback-notification" style="
+    position: fixed;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    padding: 0.75rem 1rem;
+    border-radius: 6px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    font-size: 0.9rem;
+    z-index: 1001;
+    display: none;
+    transition: opacity 0.3s ease;
+    background-color: #F5E8A3;
+    color: #000;
+  "></div>
+
+  <!-- Toast for cookie/privacy notice -->
   <div id="privacy-toast" style="display:none; position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);"></div>
 
   <!-- Scripts -->
-  <script src="/static/feedback.js" defer></script>
-  <script src="/static/theme-toggle.js" defer></script>
-  <script src="/static/localStorage.js" defer></script>
-  <script src="/static/cooldown.js" defer></script>
+  <script src="/static/peridocs-ui.js" defer></script>
 </body>
 </html>
