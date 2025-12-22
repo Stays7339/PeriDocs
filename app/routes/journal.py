@@ -1,33 +1,25 @@
 # ==========================================
 # app/routes/journal.py
-# save-state updated 202512201708
+# save-state 202512221512 (YYYYMMDDhhmm)
 # ==========================================
 from fastapi import Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
-from datetime import datetime
 from glob import glob
 import json
 import numpy as np
-import aiofiles
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
 from app.helpers.entry_similarity import compute_similarity_to_other_entries
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
-from core.nlp.embeddings import get_embedding_async
-from core.nlp.pii import redact_pii
 
 templates = Jinja2Templates(directory="app/templates")
 JOURNALS_FILE = "data/journals.json"
 
-now = datetime.now()
-window = now.hour // 6
-BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
-JOURNALS_EMBED_FILE = f"data/journals_embeddings_dump{BACKUP_TIMESTAMP}.json"
-
+# ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
 for path_str in sorted(glob("data/journals_embeddings_dump*.json")):
     path = Path(path_str)
@@ -39,7 +31,7 @@ for path_str in sorted(glob("data/journals_embeddings_dump*.json")):
 @app.post("/submit", response_class=HTMLResponse)
 async def submit_journal(
     request: Request,
-    entry_text: str | None = Form(None)  # allow None for JSON payload
+    entry_text: str | None = Form(None)
 ):
     # Detect JSON
     if request.headers.get("content-type") == "application/json":
@@ -50,69 +42,61 @@ async def submit_journal(
         return JSONResponse({"status": "error", "message": "No journal entry provided"}, status_code=400)
 
     client_host = request.client.host if request.client else "127.0.0.1"
-    safe_text = redact_pii(entry_text, redact_names=False)
-    nlp_result = await process_entry_async(safe_text, user_ip=client_host)
 
-    sha8 = nlp_result["sha8"]
-    pruned_entry = {
-        "id": sha8,
-        "safe_text": safe_text,
-        "timestamp": datetime.utcnow().isoformat(),
-        "nlp": {
-            "embedding": f"stored in {JOURNALS_EMBED_FILE}",
-            "emotions": nlp_result.get("emotions", {}),
-            "dominant_emotion": nlp_result.get("dominant_emotion", "None"),
-            "crisis_flag": nlp_result.get("crisis_flag", False),
-            "summary": None
-        }
-    }
-    append_entry(pruned_entry, JOURNALS_FILE)
+    # ---------------- Fully delegated to process_entry ----------------
+    example_variable = await process_entry_async(entry_text, user_ip=client_host)
 
-    embedding_vec = np.array(nlp_result["embedding"])
-    embeddings_index[sha8] = embedding_vec.tolist()
+    # ---------------- Store journal entry (strip embeddings) ----------------
+    entry_for_journal = example_variable.copy()
+    entry_for_journal.pop("embedding", None)
+    entry_for_journal.pop("clause_embeddings", None)
+    append_entry(entry_for_journal, JOURNALS_FILE)
 
-    async with aiofiles.open(JOURNALS_EMBED_FILE, "w", encoding="utf-8") as f:
-        await f.write(json.dumps(embeddings_index, ensure_ascii=False, indent=2))
+    # ---------------- Update embeddings_index in journal.py ----------------
+    if example_variable.get("embedding"):
+        embeddings_index[example_variable["sha8"]] = example_variable["embedding"]
+        # persist immediately
+        embed_path = example_variable.get("embedding_file")
+        if embed_path:
+            Path(embed_path).parent.mkdir(parents=True, exist_ok=True)
+            with open(embed_path, "w", encoding="utf-8") as f:
+                json.dump(embeddings_index, f, ensure_ascii=False, indent=2)
 
     # Return JSON if requested
     if request.headers.get("accept") == "application/json" or request.headers.get("content-type") == "application/json":
         return JSONResponse({
             "status": "ok",
-            "entry_id": sha8,
-            "dominant_emotion": nlp_result.get("dominant_emotion", "None"),
-            "emotion_distribution": nlp_result.get("emotions", {})
+            "entry_id": example_variable["sha8"],
         })
     else:
-        return RedirectResponse(f"/submit-success?id={sha8}", status_code=303)
+        return RedirectResponse(f"/submit-success?id={example_variable['sha8']}", status_code=303)
+
 
 # ---------- Submit Success ----------
 @app.get("/submit-success", response_class=HTMLResponse)
 async def submit_success(request: Request, id: str):
     all_entries = load_data(JOURNALS_FILE)
-    entry = next((e for e in all_entries if e.get("id") == id), None)
+    entry = next((e for e in all_entries if e.get("sha8") == id or e.get("id") == id), None)
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
         )
 
-    nlp_data = entry.get("nlp", {})
-    dominant_emotion = nlp_data.get("dominant_emotion", "None")  # UPDATED
-    emotion_distribution = nlp_data.get("emotions", {})           # UPDATED
-
-    entry_vec = np.array(embeddings_index[id])
+    # Similarity search
+    entry_vec = np.array(embeddings_index.get(id, np.zeros(1024)))
     scored_entries = []
 
     for eid, vec in embeddings_index.items():
         if eid == id:
             continue
         sim = compute_similarity_to_other_entries(entry_vec, np.array(vec))
-        match_entry = next((e for e in all_entries if e["id"] == eid), None)
+        match_entry = next((e for e in all_entries if e.get("sha8") == eid or e.get("id") == eid), None)
         if match_entry:
             scored_entries.append({"entry": match_entry, "score": sim})
 
     top_matches_formatted = [
         {
-            "entry_id": json_safe(e["entry"]["id"]),
+            "entry_id": json_safe(e["entry"].get("sha8", e["entry"].get("id"))),
             "excerpt": json_safe(e["entry"].get("safe_text", ""))[:200],
             "similarity_pct": round(max(min(e["score"], 1.0), 0.0) * 100, 1),
         }
@@ -123,10 +107,8 @@ async def submit_success(request: Request, id: str):
         "submit-success.html",
         {
             "request": request,
-            "entry_id": id,
+            "entry_id": entry.get("sha8", entry.get("id")),
             "safe_text": entry.get("safe_text"),
-            "dominant_emotion": dominant_emotion,          # PASSED TO TEMPLATE
-            "emotion_distribution": emotion_distribution, # PASSED TO TEMPLATE
             "top_matches": top_matches_formatted,
         },
     )

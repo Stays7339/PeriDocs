@@ -1,4 +1,4 @@
-<!-- about page for PeriDocs.org - Updated 20251129-->
+  <!-- about page for PeriDocs.org - Updated 202512221420-->
 {% extends "base.html" %}
 {% block title %}About PeriDocs - PeriDocs{% endblock %}
 
@@ -30,11 +30,10 @@
       <h2>How analysis works</h2>
       <p>
           When you submit text, <code>embeddings.py</code> processes it using MiniLM and RoBERTa sentence embeddings (<code>all-MiniLM-L6-v2</code>) and internal helpers like NumPy and FastAPI. 
-          The system breaks text into <em>tokens</em> (words, numbers, symbols) and identifies:
+          The system breaks text into <em>thousands of vectors</em> (mathematical siblings of words and phrases) and identifies:
           <ul>
-            <li><strong>Entities & tokens:</strong> names, places, organizations, or colloquial markers such as “idk”, “bruh”, or other casual expressions. Detected tokens may be highlighted on the submit-success page for transparency.</li>
             <li><strong>Sentiment and emotion anchors:</strong> emotional tone is calculated using lexicons of words and phrases for positive and negative feelings, intensifiers, deintensifiers, and repeated words. Users receive a JSON-visible breakdown across six basic emotions with normalized intensity scores.</li>
-            <li><strong>Semantic similarity:</strong> compares your text with prior entries using embeddings (all-MiniLM / RoBERTa) to detect repeated ideas, related concepts, or phrasing patterns. Cosine similarity captures synonyms, typos, and paraphrases. Fuzzy or edit-distance highlights are optionally used to show recognized proper nouns, slang, or colloquial terms to the user for transparency.</li>
+            <li><strong>Semantic similarity:</strong> compares your text with prior entries using embeddings (RoBERTa) to detect repeated ideas, related concepts, or phrasing patterns. Cosine similarity captures synonyms, typos, and paraphrases. Fuzzy or edit-distance highlights are optionally used to show recognized proper nouns, slang, or colloquial terms to the user for transparency.</li>
           </ul>
       </p>
 
@@ -43,14 +42,6 @@
         Each journal entry is assigned a unique SHA256-based 8-character ID (for example, <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
         Entries are stored securely and visible only to authorized PeriDocs staff for moderation, safety review, or research into system performance. 
         User text is <strong>never</strong> shared publicly.
-      </p>
-
-      <p>
-        <strong>Paraphrase Mirror:</strong> A simplified reflection of your text, often prefixed with <em>"You wrote: …"</em>. It removes filler words, repeated words, and extra punctuation while prioritizing sentences with stronger emotional content. This feature is meant as a reflective mirror rather than a precise summary.
-      </p>
-
-      <p>
-        <strong>Repetition Multiplier:</strong> Measures the amount of repetition within the entry you just submitted.
       </p>
 
       <p>
@@ -63,9 +54,8 @@
 
       <h2>Emotion and sentiment features</h2>
       <p>
-        PeriDocs detects nuanced emotional tone using large lexicons of words and phrases for positive and negative feelings, intensifiers, deintensifiers, fillers, and colloquial expressions. 
-        The system accounts for context, repeated words, and negations to provide a balanced and normalized emotion profile. You receive a breakdown across six basic emotions and a sentiment polarity score, which is mapped to negative, neutral, or positive labels with transparent weighting, allowing users to understand how the system derived each score. 
-        This helps users understand patterns in their emotional expression over time.
+        PeriDocs detects nuanced emotional tone using embeddings from open sourced models so that your expressions can remain vibrant and still be parsed with precision. 
+        The system accounts for context within your words to provide a balanced emotion profile without generating any text or links to other places on the internet that hasn't been approved by a living human being (also wondering about the world on their laptop or phone). These context associations link your post to centroids (more easily known as emotional roots) that helps users understand patterns in their emotional expression over time, all without any generative AI.
       </p>
 
       <h2>Privacy and safety</h2>

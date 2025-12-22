@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 20 December 2025 (202512201835)
+## Canonical Project Directory as of 22 December 2025 (202512221538 - YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -208,7 +208,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ admin.py                      # "/admin-review"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ journal.py                    # "/submit", "/submit-success"
-│  │  ├─ main.py                       # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  ├─ info-navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# save-state updated 202512171815
+# save-state 202512221549
 # ==========================================
 
 """
@@ -51,7 +51,7 @@ Features:
 """
 
 import numpy as np
-from typing import Dict, Tuple, Optional, Any, List
+from typing import Dict, Tuple, Optional, Any, List, Callable
 import logging
 import os
 import json
@@ -79,6 +79,18 @@ CENTROID_DENSITIES: Dict[str, float] = {}
 # ---------------- File Handling ----------------
 CENTROID_DIR = "data"
 CENTROID_FILE_TEMPLATE = "centroids_{yearmonth}.npz"
+
+# ---------------- Global Embedding Function ----------------
+_GLOBAL_EMBEDDING_FN: Optional[Callable[[str], np.ndarray]] = None
+
+def set_embedding_function(fn: Callable[[str], np.ndarray]):
+    global _GLOBAL_EMBEDDING_FN
+    _GLOBAL_EMBEDDING_FN = fn
+
+def get_embedding_function() -> Callable[[str], np.ndarray]:
+    if _GLOBAL_EMBEDDING_FN is None:
+        raise RuntimeError("Global embedding function not set. Call set_embedding_function() at startup.")
+    return _GLOBAL_EMBEDDING_FN
 
 
 def current_centroid_file() -> str:
@@ -356,7 +368,7 @@ def load_candidate_journal_entries_for_precentroid(precentroid_id: str) -> List[
     return candidate_entries
 
 
-def create_centroid_from_precentroid(precentroid_id: str, embedding_fn=None):
+def create_centroid_from_precentroid(precentroid_id: str):
     """
     Creates a real centroid from the candidate entries associated with a precentroid.
     """
@@ -365,10 +377,7 @@ def create_centroid_from_precentroid(precentroid_id: str, embedding_fn=None):
         logger.warning(f"No candidate entries found for precentroid {precentroid_id}")
         return
 
-    if embedding_fn is None:
-        logger.warning(f"Embedding function not provided; cannot generate semantic centroid for {precentroid_id}.")
-        return
-
+    embedding_fn = get_embedding_function()  # guaranteed to exist
     candidate_vectors = [embedding_fn(text) for text in candidate_entries]
 
     centroid_vec = np.mean(candidate_vectors, axis=0)

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/admin_review_helpers.py
-# save-state 202512171936
+# save-state updated 202512221551
 # ==========================================
 import os
 import uuid
@@ -20,17 +20,14 @@ REVIEW_QUEUE: Dict[str, Dict[str, Any]] = {}
 CENTROID_DIR = centroids.CENTROID_DIR
 REVIEW_FILE_TEMPLATE = "review_queue_{yearmonth}.npz"
 JOURNALS_FILE = os.path.join(CENTROID_DIR, "journals.json")
+LAST_REFRESH_FILE = os.path.join(CENTROID_DIR, "review_last_refresh.json")
 
-# ---------------- Cached journal entries ----------------
 _cached_journal_entries: Optional[List[Dict[str, Any]]] = None
-
-# ---------------- Character limits ----------------
 MAX_LABEL_CHARS = 100
 MAX_NOTE_CHARS = 1000
 
 def _now_iso() -> str:
     return datetime.utcnow().isoformat() + "Z"
-
 
 def current_review_file() -> str:
     ym = datetime.utcnow().strftime("%Y%m")
@@ -39,7 +36,7 @@ def current_review_file() -> str:
         REVIEW_FILE_TEMPLATE.format(yearmonth=ym)
     )
 
-
+# ---------------- Journal Loading ----------------
 def _load_journal_entries() -> List[Dict[str, Any]]:
     global _cached_journal_entries
     if _cached_journal_entries is not None:
@@ -56,16 +53,13 @@ def _load_journal_entries() -> List[Dict[str, Any]]:
         _cached_journal_entries = []
         return []
 
-
 # ---------------- Persistence ----------------
 def save_review_queue(file_path: Optional[str] = None):
     if file_path is None:
         file_path = current_review_file()
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
     np.savez(file_path, review_queue=REVIEW_QUEUE)
     logger.info(f"Review queue saved to {file_path}")
-
 
 def load_review_queue(file_path: Optional[str] = None):
     global REVIEW_QUEUE
@@ -92,8 +86,47 @@ def load_review_queue(file_path: Optional[str] = None):
         REVIEW_QUEUE = {}
         logger.info("No review queue found; starting empty.")
 
+# ---------------- Precentroid ID / Candidate Detection ----------------
+def _stable_precentroid_id(entry: Dict[str, Any]) -> str:
+    dom_emotion = entry.get("dominant_emotion", "None")
+    embedding_str = json.dumps(entry.get("embedding", ""))
+    cluster_string = dom_emotion + embedding_str
+    md5hash = hashlib.md5(cluster_string.encode()).hexdigest()
+    return f"precentroid_{md5hash}"
 
-# ---------------- Core Helpers ----------------
+def find_candidate_centroid_ids(since_timestamp: Optional[str] = None) -> List[str]:
+    entries = _load_journal_entries()
+    candidate_map: Dict[str, List[Dict[str, Any]]] = {}
+    for e in entries:
+        assigned = e.get("centroid_id")
+        entry_ts = e.get("timestamp")
+        if assigned is None or assigned == "suggest_new_centroid":
+            if since_timestamp is None or entry_ts > since_timestamp:
+                pre_id = _stable_precentroid_id(e)
+                candidate_map.setdefault(pre_id, []).append(e)
+
+    # Merge highly similar precentroids
+    merged_map: Dict[str, List[Dict[str, Any]]] = {}
+    keys = list(candidate_map.keys())
+    visited = set()
+    for i, k1 in enumerate(keys):
+        if k1 in visited:
+            continue
+        cluster_entries = candidate_map[k1]
+        visited.add(k1)
+        for k2 in keys[i+1:]:
+            if k2 in visited:
+                continue
+            vec1 = np.mean([np.array(e.get("embedding", [0]*768)) for e in cluster_entries], axis=0)
+            vec2 = np.mean([np.array(e.get("embedding", [0]*768)) for e in candidate_map[k2]], axis=0)
+            sim = np.dot(vec1, vec2) / (np.linalg.norm(vec1)*np.linalg.norm(vec2) + 1e-8)
+            if sim > 0.95:
+                cluster_entries.extend(candidate_map[k2])
+                visited.add(k2)
+        merged_map[k1] = cluster_entries
+    return list(merged_map.keys())
+
+# ---------------- Review Queue ----------------
 def add_review_suggestion(
     *,
     centroid_id: str,
@@ -101,11 +134,10 @@ def add_review_suggestion(
     metrics: Dict[str, Any],
     save: bool = True
 ) -> str:
-    # Avoid duplicate split suggestions
-    if suggestion_type == "split_centroid":
-        for existing in REVIEW_QUEUE.values():
-            if existing["centroid_id"] == centroid_id and existing["suggestion_type"] == "split_centroid":
-                return existing["suggestion_id"]
+    # Avoid duplicates
+    for existing in REVIEW_QUEUE.values():
+        if existing["centroid_id"] == centroid_id and existing["suggestion_type"] == suggestion_type:
+            return existing["suggestion_id"]
 
     suggestion_id = str(uuid.uuid4())
     REVIEW_QUEUE[suggestion_id] = {
@@ -117,30 +149,56 @@ def add_review_suggestion(
         "status": "pending",
         "human_note": None,
         "human_labels": [],
-        "human_labels_ledger": [],  # NEW: keeps all previous label sets
+        "human_labels_ledger": [],
     }
     if save:
         save_review_queue()
     return suggestion_id
 
+# ---------------- Explicit Human Mutations (verbatim) ----------------
+def update_review_status(
+    suggestion_id: str,
+    *,
+    status: str,
+    note: Optional[str] = None
+) -> Optional[str]:
+    if suggestion_id not in REVIEW_QUEUE:
+        raise KeyError("Unknown suggestion_id")
+    cid = REVIEW_QUEUE[suggestion_id]["centroid_id"]
 
-# ---------------- Candidate Detection ----------------
-def _stable_precentroid_id(entry_id: str) -> str:
-    md5hash = hashlib.md5(entry_id.encode()).hexdigest()
-    return f"precentroid_{md5hash}"
+    flash = None
+    if note and len(note) > MAX_NOTE_CHARS:
+        flash = f"Human note exceeds {MAX_NOTE_CHARS} characters and was not saved."
+        note = note[:MAX_NOTE_CHARS]
 
+    if status == "accepted" and cid not in centroids.CENTROIDS:
+        centroids.create_centroid_from_precentroid(cid)
 
-def find_candidate_centroid_ids() -> List[str]:
-    entries = _load_journal_entries()
-    candidate_ids = set()
-    for e in entries:
-        assigned = e.get("nlp", {}).get("assigned_centroid_id")
-        if assigned is None or assigned == "suggest_new_centroid":
-            candidate_ids.add(_stable_precentroid_id(e["id"]))
-    return list(candidate_ids)
+    REVIEW_QUEUE[suggestion_id]["status"] = status
+    if note is not None:
+        REVIEW_QUEUE[suggestion_id]["human_note"] = note
+    save_review_queue()
+    return flash
 
+def update_review_labels(suggestion_id: str, labels: List[str]) -> Optional[str]:
+    if suggestion_id not in REVIEW_QUEUE:
+        raise KeyError("Unknown suggestion_id")
 
-# ---------------- Review Queue Listing ----------------
+    flash = None
+    for idx, label in enumerate(labels):
+        if len(label) > MAX_LABEL_CHARS:
+            flash = f"One or more labels exceed {MAX_LABEL_CHARS} characters and were truncated."
+            labels[idx] = label[:MAX_LABEL_CHARS]
+
+    ledger = REVIEW_QUEUE[suggestion_id].get("human_labels_ledger", [])
+    ledger.append(labels)
+    REVIEW_QUEUE[suggestion_id]["human_labels_ledger"] = ledger
+    REVIEW_QUEUE[suggestion_id]["human_labels"] = labels
+
+    save_review_queue()
+    return flash
+
+# ---------------- Review Queue Listing (verbatim) ----------------
 def list_review_queue(status: Optional[str] = None) -> List[Dict[str, Any]]:
     items = list(REVIEW_QUEUE.values())
     if status:
@@ -152,7 +210,6 @@ def list_review_queue(status: Optional[str] = None) -> List[Dict[str, Any]]:
         i["centroid_exists"] = cid in centroids.CENTROIDS
 
     return sorted(items, key=lambda x: x["created_at"])
-
 
 def print_review_queue(status: Optional[str] = None):
     items = list_review_queue(status)
@@ -167,63 +224,8 @@ def print_review_queue(status: Optional[str] = None):
             f"status={i['status']}"
         )
 
-
-# ---------------- Explicit Human Mutations ----------------
-def update_review_status(
-    suggestion_id: str,
-    *,
-    status: str,
-    note: Optional[str] = None,
-    embedding_fn=None
-) -> Optional[str]:
-    """
-    Returns a flash message string if note too long, else None.
-    """
-    if suggestion_id not in REVIEW_QUEUE:
-        raise KeyError("Unknown suggestion_id")
-    cid = REVIEW_QUEUE[suggestion_id]["centroid_id"]
-
-    flash = None
-    if note and len(note) > MAX_NOTE_CHARS:
-        flash = f"Human note exceeds {MAX_NOTE_CHARS} characters and was not saved."
-        note = note[:MAX_NOTE_CHARS]
-
-    if status == "accepted" and cid not in centroids.CENTROIDS:
-        centroids.create_centroid_from_precentroid(cid, embedding_fn=embedding_fn)
-
-    REVIEW_QUEUE[suggestion_id]["status"] = status
-    if note is not None:
-        REVIEW_QUEUE[suggestion_id]["human_note"] = note
-    save_review_queue()
-    return flash
-
-
-def update_review_labels(suggestion_id: str, labels: List[str]) -> Optional[str]:
-    """
-    Update human_labels with char limit and maintain a ledger.
-    Returns a flash message string if rejected/trimmed.
-    """
-    if suggestion_id not in REVIEW_QUEUE:
-        raise KeyError("Unknown suggestion_id")
-
-    flash = None
-    for idx, label in enumerate(labels):
-        if len(label) > MAX_LABEL_CHARS:
-            flash = f"One or more labels exceed {MAX_LABEL_CHARS} characters and were truncated."
-            labels[idx] = label[:MAX_LABEL_CHARS]
-
-    # Update ledger
-    ledger = REVIEW_QUEUE[suggestion_id].get("human_labels_ledger", [])
-    ledger.append(labels)
-    REVIEW_QUEUE[suggestion_id]["human_labels_ledger"] = ledger
-    REVIEW_QUEUE[suggestion_id]["human_labels"] = labels
-
-    save_review_queue()
-    return flash
-
-
 # ---------------- Helpers for Enqueuing Centroid Suggestions ----------------
-def enqueue_split_suggestions(watch_threshold: float = 0.85) -> List[str]:
+def enqueue_split_suggestions(watch_threshold: float = 0.85, since_timestamp: Optional[str] = None) -> List[str]:
     out_ids = []
     suggestions = centroids.suggest_split_candidates(watch_threshold=watch_threshold)
     for s in suggestions:
@@ -237,21 +239,33 @@ def enqueue_split_suggestions(watch_threshold: float = 0.85) -> List[str]:
             },
             save=False
         ))
-    save_review_queue()
     return out_ids
 
-
-def initialize_review_queue():
+# ---------------- Initialize / Refresh Queue ----------------
+def refresh_review_queue():
     load_review_queue()
-    if REVIEW_QUEUE:
-        logger.info("Review queue loaded with existing suggestions.")
-        return
 
-    logger.info("Review queue empty; enqueuing new suggestions...")
-    enqueue_split_suggestions()
+    last_refresh_ts = None
+    if os.path.exists(LAST_REFRESH_FILE):
+        try:
+            with open(LAST_REFRESH_FILE, "r", encoding="utf-8") as f:
+                last_refresh_ts = json.load(f).get("last_refresh")
+        except Exception as e:
+            logger.warning(f"Failed to read last refresh timestamp: {e}")
 
-    candidate_ids = find_candidate_centroid_ids()
+    added = False
+
+    # ---------------- Split suggestions ----------------
+    split_ids = enqueue_split_suggestions(since_timestamp=last_refresh_ts)
+    if split_ids:
+        added = True
+
+    # ---------------- New centroid suggestions ----------------
+    candidate_ids = find_candidate_centroid_ids(since_timestamp=last_refresh_ts)
     for cid in candidate_ids:
+        if any(v["centroid_id"] == cid and v["suggestion_type"] == "new_centroid"
+               for v in REVIEW_QUEUE.values()):
+            continue
         add_review_suggestion(
             centroid_id=cid,
             suggestion_type="new_centroid",
@@ -260,6 +274,19 @@ def initialize_review_queue():
             },
             save=False
         )
+        added = True
 
-    save_review_queue()
-    logger.info("Review queue initialized with split and new centroid suggestions.")
+    if added:
+        save_review_queue()
+        logger.info("Review queue incrementally updated with new split or centroid suggestions.")
+
+    try:
+        with open(LAST_REFRESH_FILE, "w", encoding="utf-8") as f:
+            json.dump({"last_refresh": _now_iso()}, f)
+    except Exception as e:
+        logger.warning(f"Failed to update last refresh timestamp: {e}")
+
+def initialize_review_queue():
+    load_review_queue()
+    refresh_review_queue()
+    logger.info("Review queue initialized and refreshed on startup.")

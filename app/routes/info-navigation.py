@@ -1,8 +1,8 @@
-"""
-app/routes/main.py
-
-Handles top-level GET routes: "/", "/about", "/privacy-policy", "/terms-of-service".
-"""
+# ==========================================
+# app/routes/info-navigation.py
+# routes to /about , /privacy-policy , /terms-of-service and renders the homepage
+# save-state 202512221536 (YYYYMMDDhhmm)
+# ==========================================
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin.py
-# save-state updated 202512171936
+# save-state updated 2025122216
 # ==========================================
 
 from fastapi import Request, Form
@@ -11,8 +11,13 @@ from urllib.parse import urlencode
 from app.routes import app  # FastAPI instance
 from core.map import admin_review_helpers
 
-admin_review_helpers.initialize_review_queue()
 templates = Jinja2Templates(directory="app/templates")
+
+
+# ---------------- Startup Event ----------------
+@app.on_event("startup")
+async def load_review_queue_on_startup():
+    admin_review_helpers.initialize_review_queue()
 
 
 # ---------------- GET: Admin Review Dashboard ----------------
@@ -22,6 +27,8 @@ async def admin_review_dashboard(
     status: str = None, 
     flash: str = None
 ):
+    # Refresh queue to pick up any new journals since startup
+    admin_review_helpers.initialize_review_queue()
     suggestions = admin_review_helpers.list_review_queue(status=status)
     return templates.TemplateResponse(
         "admin-review.html",
