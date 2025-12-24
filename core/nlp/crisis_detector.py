@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_detector.py
-# Save-state updated 202512241617 (YYYYMMDDhhmm)
+# Save-state updated 202512241847 (YYYYMMDDhhmm)
 # ==========================================
 
 """
@@ -187,7 +187,22 @@ REAL_WORLD_ASSERTIONS = {"did", "done", "already", "actually", "was", "were", "h
 
 HUMAN_ABUSE_ANCHORS = {"trunk", "freezer", "skin", "head", "body", "corpse", "dismember", "stash"}
 CONTROL_ANCHORS = {"keep", "hold", "trap", "lock", "confine", "store", "store up"}
-SAFE_CONTEXT = {"photo shoot", "hanging in there", "hanging out", "hang in there", "hang out"}
+
+# ========================
+# Safe / risk bigrams for ambiguous verbs
+# ========================
+SAFE_HANG_BIGRAMS = {
+    ("hang", "out"),
+    ("hang", "there"),
+    ("hanging", "out"),
+    ("hanging", "there"),
+}
+
+RISK_HANG_BIGRAMS = {
+    ("hang", "myself"),
+    ("hanging", "myself"),
+}
+
 
 # Placeholder for chemical ingestion vocabulary
 CHEMICAL_INGESTION = {"bleach", "pills", "poison", "rat poison", "detergent"}
@@ -281,15 +296,44 @@ async def check_crisis_phrases_async(
     for i, tok in enumerate(tokens):
         if tok in RISK_INDICATOR_BASES:
             window = tokens[max(0, i - 7): min(len(tokens), i + 8)]
-            self_ref = any(t in SELF_REFERENT_ANCHORS for t in window) or implicit_self_from_infinitive(window)
+
+            # ------------------------
+            # Bigram disambiguation for "hang"
+            # ------------------------
+            next_tok = tokens[i + 1] if i + 1 < len(tokens) else None
+            bigram = (tok, next_tok)
+
+            # SAFE bigram → hard ignore
+            if tok == "hang" and bigram in SAFE_HANG_BIGRAMS:
+                if DEBUG:
+                    print(f"[CRISIS DEBUG] Safe hang bigram ignored: {bigram}")
+                continue
+
+            # RISK bigram → force elevation
+            force_risk = tok == "hang" and bigram in RISK_HANG_BIGRAMS
+
+            self_ref = (
+                any(t in SELF_REFERENT_ANCHORS for t in window)
+                or implicit_self_from_infinitive(window)
+            )
             third_person_ref = any(t in THIRD_PERSON_ANCHORS for t in window)
-            intent_or_real = any(t in COGNITIVE_INTENT_VERBS for t in window) or any(t in TEMPORAL_COMMITMENTS for t in window) or any(t in REAL_WORLD_ASSERTIONS for t in window)
-            if intent_or_real and (self_ref or third_person_ref):
+
+            intent_or_real = (
+                any(t in COGNITIVE_INTENT_VERBS for t in window)
+                or any(t in TEMPORAL_COMMITMENTS for t in window)
+                or any(t in REAL_WORLD_ASSERTIONS for t in window)
+            )
+
+            if force_risk or (intent_or_real and (self_ref or third_person_ref)):
                 label = "risk:self" if self_ref else "risk:other"
                 hits.append(f"{label}:{tok}")
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Risk indicator '{tok}' ({label}) with context {window}")
-
+                    print(
+                        f"[CRISIS DEBUG] Risk indicator '{tok}' ({label}) "
+                        f"via {'bigram' if force_risk else 'context'} "
+                        f"with window {window}"
+                    )
+                    
     # CHANNEL 5: informal / intent-based '<cognitive-verb> to <risk-action>'
     for i, tok in enumerate(tokens[:-2]):
         if tok in COGNITIVE_INTENT_VERBS and tokens[i+1] == "to":
