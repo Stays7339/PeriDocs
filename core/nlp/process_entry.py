@@ -1,12 +1,12 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202512232046 (YYYYMMDDhhmm)
+# save-state 202512241139 (YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
 import asyncio
 import hashlib
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from glob import glob
@@ -32,7 +32,12 @@ JOURNALS_CLAUSE_EMBED_FILE = f"data/journals_embeddings_dump{BACKUP_TIMESTAMP}_c
 existing_embed_files = sorted(glob("data/journals_embeddings_dump*.json"))
 existing_clause_embed_files = sorted(glob("data/journals_embeddings_dump*_clauses.json"))
 
-async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 100) -> Dict[str, Any]:
+async def process_entry_async(
+    text: str,
+    user_ip: str,
+    max_clause_words: int = 100,
+    progress_callback: Callable[[float], None] | None = None
+) -> Dict[str, Any]:
     if not text.strip():
         raise ValueError("Empty or whitespace-only entry.")
 
@@ -41,26 +46,41 @@ async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 1
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
 
+    # ---------------- DYNAMIC PROGRESS SETUP ----------------
+    steps = ["safe_text", "clause_split", "embeddings", "centroid", "crisis_check"]
+    total_steps = len(steps)
+    current_step = 0
+    def report_progress():
+        nonlocal current_step
+        current_step += 1
+        if progress_callback:
+            progress_callback(current_step / total_steps)
+
     # ---------------- SAFE TEXT ----------------
     safe_text = redact_pii(text)
     encrypted_safe_text = encrypt_text(safe_text)
+    report_progress()  # 1 / total_steps
 
     # ---------------- CLAUSE SPLIT ----------------
     clauses = split_into_clauses(safe_text)
     windows = sliding_window_clauses(clauses, max_words=max_clause_words)
+    report_progress()  # 2 / total_steps
 
     # ---------------- EMBEDDINGS ----------------
     clause_embeddings = await get_embedding_async(windows)
     doc_embedding = np.mean(clause_embeddings, axis=0)
+    report_progress()  # 3 / total_steps
 
     # ---------------- CENTROID ASSIGNMENT ----------------
     centroid_id, centroid_distance = await assign_vector_to_existing_centroids(doc_embedding)
+    report_progress()  # 4 / total_steps
 
     # ---------------- HASH ----------------
     sha8 = sha8_hash(safe_text)
 
     # ---------------- CRISIS CHECK ----------------
     crisis_msg = await crisis_notification_async(text)
+    report_progress()  # 5 / total_steps
 
     # ---------------- CONSTRUCT ENTRY ----------------
     entry: Dict[str, Any] = {

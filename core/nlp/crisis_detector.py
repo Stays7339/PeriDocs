@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_detector.py
-# Save-state updated 202512231515 (YYYYMMDDhhmm)
+# Save-state updated 202512241617 (YYYYMMDDhhmm)
 # ==========================================
 
 """
@@ -112,6 +112,32 @@ def compress_text(text: str) -> str:
     return normalize_text(text).replace(" ", "")
 
 # ========================
+# Contraction / colloquial normalizations
+# ========================
+_COLLOQUIAL_CONTRACTIONS = {
+    "wanna": "want to",
+    "gonna": "going to",
+    "gimme": "give me",
+    "lemme": "let me",
+    "finna": "fixing to",
+    "boutta": "about to",
+    "oughtta": "want to",
+    " otta ": "want to"
+
+}
+
+def normalize_colloquial_contractions(text: str) -> str:
+    """
+    Replace known contractions / colloquial terms with their canonical forms.
+    Done before tokenization and morphological normalization.
+    """
+    def replacer(match):
+        return _COLLOQUIAL_CONTRACTIONS[match.group(0)]
+    
+    pattern = re.compile(r'\b(' + '|'.join(map(re.escape, _COLLOQUIAL_CONTRACTIONS.keys())) + r')\b', flags=re.IGNORECASE)
+    return pattern.sub(replacer, text.lower())
+
+# ========================
 # Token similarity
 # ========================
 def token_similarity(a: str, b: str) -> float:
@@ -161,7 +187,7 @@ REAL_WORLD_ASSERTIONS = {"did", "done", "already", "actually", "was", "were", "h
 
 HUMAN_ABUSE_ANCHORS = {"trunk", "freezer", "skin", "head", "body", "corpse", "dismember", "stash"}
 CONTROL_ANCHORS = {"keep", "hold", "trap", "lock", "confine", "store", "store up"}
-SAFE_CONTEXT = {"photo shoot"}
+SAFE_CONTEXT = {"photo shoot", "hanging in there", "hanging out", "hang in there", "hang out"}
 
 # Placeholder for chemical ingestion vocabulary
 CHEMICAL_INGESTION = {"bleach", "pills", "poison", "rat poison", "detergent"}
@@ -196,8 +222,10 @@ async def check_crisis_phrases_async(
     if not text:
         return []
 
+    # Normalize text, then normalize contractions
     normalized = normalize_text(text)
-    compressed = compress_text(text)
+    normalized = normalize_colloquial_contractions(normalized)
+    compressed = compress_text(normalized)
 
     tokens = token_lemmas(normalized)
     tokens = [normalize_token_morphology(t) for t in tokens if t]
@@ -262,15 +290,15 @@ async def check_crisis_phrases_async(
                 if DEBUG:
                     print(f"[CRISIS DEBUG] Risk indicator '{tok}' ({label}) with context {window}")
 
-    # CHANNEL 5: informal 'gonna <verb> myself'
+    # CHANNEL 5: informal / intent-based '<cognitive-verb> to <risk-action>'
     for i, tok in enumerate(tokens[:-2]):
-        if tok in {"gonna", "going"} and tokens[i+1] == "to":
+        if tok in COGNITIVE_INTENT_VERBS and tokens[i+1] == "to":
             target_verb = tokens[i+2]
-            if normalize_token_morphology(target_verb) in SELF_HARM_ANCHORS:
+            if normalize_token_morphology(target_verb) in SELF_HARM_ANCHORS.union(RISK_INDICATOR_BASES):
                 self_ref_present = any(t in SELF_REFERENT_ANCHORS for t in tokens[max(0, i-3):i+5])
-                hits.append(f"informal:{target_verb}")
+                hits.append(f"intent:{target_verb}")
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Informal 'gonna' phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
+                    print(f"[CRISIS DEBUG] Intent phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
 
     # CHANNEL 6: chemical and pool ingestion
     if any(t in CHEMICAL_INGESTION for t in tokens) and any(t in SELF_REFERENT_ANCHORS for t in tokens):

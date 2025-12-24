@@ -1,4 +1,4 @@
-<!-- PeriDocs-code/app/templates/base.html save-state 202512232059 -->
+<!-- PeriDocs-code/app/templates/base.html save-state 202512241357 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -23,8 +23,10 @@
   <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
 
   {% include 'includes/modal-feedback.html' %}
+  {% include 'includes/modal-crisis.html' %}
 
-  <div id="general-toast-notification"></div>
+
+  <div id="general-toast-container"></div>
   <div id="privacy-toast"></div>
 
   <script src="/static/peridocs-ui.js" defer></script>

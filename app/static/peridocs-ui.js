@@ -1,5 +1,6 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/journal, privacy toast 
-// (save-state 202512232129 (YYYYMMDDhhmm)
+// save-state 202512241529 (YYYYMMDDhhmm)
+// ==========================================
 
 /* Notes:
   - Cooldowns are client-side and privacy-first.
@@ -10,16 +11,81 @@
 document.addEventListener("DOMContentLoaded", () => {
   // ---------------------- DOM Elements ---------------------- //
   const feedbackModal = document.querySelector(".feedback-modal");
-  const textarea = feedbackModal?.querySelector("textarea");
   const feedbackBtns = document.querySelectorAll("#feedback-btn, .feedback-btn");
   const reportBtns = document.querySelectorAll(".report-parse-btn");
   const cancelBtn = document.getElementById("cancel-feedback");
   const feedbackForm = document.querySelector("#feedback-form");
   const journalForm = document.querySelector('#journal-form');
-  const toastContainer = document.querySelector("#general-toast-notification");
+  const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
   const root = document.documentElement;
+
+  // ---------------------- Crisis Modal ---------------------- //
+  const crisisModal = document.getElementById("crisis-modal");
+  const crisisCloseBtn = document.getElementById("crisis-close-btn");
+
+  // ---------------------- Unified Modal ---------------------- //
+  function openModal(type="feedback") {
+    let modal;
+    if(type === "crisis") {
+      modal = crisisModal;
+    } else {
+      modal = feedbackModal;
+    }
+    if(!modal) return;
+
+    modal.style.display = "flex";
+    document.body.style.overflow = "hidden";
+
+    // Only focus textarea for feedback/report
+    if(type !== "crisis") {
+      const ta = modal.querySelector("textarea");
+      if(ta) { 
+        ta.value = ""; 
+        ta.dataset.type = type; 
+        ta.focus(); 
+      }
+    }
+  }
+
+  function closeModal(type="feedback") {
+    let modal;
+    if(type === "crisis") {
+      modal = crisisModal;
+    } else {
+      modal = feedbackModal;
+    }
+    if(!modal) return;
+
+    modal.style.display = "none";
+    document.body.style.overflow = "";
+  }
+
+  // ---------------------- Hook up modal buttons ---------------------- //
+  feedbackBtns.forEach(btn => btn.addEventListener("click", () => openModal("feedback")));
+  reportBtns.forEach(btn => btn.addEventListener("click", () => openModal("report")));
+  cancelBtn?.addEventListener("click", () => closeModal("feedback"));
+  crisisCloseBtn?.addEventListener("click", () => closeModal("crisis"));
+
+  // Close modal when clicking outside
+  window.addEventListener("click", e => {
+    if (e.target === feedbackModal) closeModal("feedback");
+    if (e.target === crisisModal) closeModal("crisis");
+  });
+
+  // Close modal on Escape key
+  document.addEventListener("keydown", e => {
+    if (e.key === "Escape") {
+      closeModal("feedback");
+      closeModal("crisis");
+    }
+  });
+
+  // Expose globally
+  window.openFeedbackModal = () => openModal("feedback");
+  window.openReportModal = () => openModal("report");
+  window.openCrisisModal = () => openModal("crisis");
 
   // ---------------------- Persistent State Helper ---------------------- //
   const State = {
@@ -70,45 +136,41 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ---------------------- Toast ---------------------- //
-  function showToast(message, type='info') {
-    if (!toastContainer) return;
-    toastContainer.textContent = message;
-    toastContainer.style.backgroundColor = type === 'success' ? '#A3F5B2' :
-                                       type === 'error' ? '#F5A3A3' : '#F5E8A3';
-    toastContainer.style.color = '#000';
-    toastContainer.style.display = 'block';
-    toastContainer.style.opacity = 1;
-    setTimeout(() => {
-      toastContainer.style.transition = 'opacity 0.5s';
-      toastContainer.style.opacity = 0;
-      setTimeout(() => toastContainer.style.display = 'none', 500);
-    }, 2500);
-  }
+  const activeToasts = [];
 
-  // ---------------------- Modal ---------------------- //
-  function openModal(type="feedback") {
-    if (!feedbackModal) return;
-    feedbackModal.style.display = "flex";
-    document.body.style.overflow = "hidden";
-    if (textarea) { textarea.value = ""; textarea.dataset.type = type; textarea.focus(); }
+
+  function showToast(message, type='info', duration=2500) {
+    if (!toastContainer) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'stacked-toast';
+    toast.style.backgroundColor = type === 'success' ? '#A3F5B2' :
+                              type === 'error' ? '#F5A3A3' : '#F5E8A3';
+    toast.textContent = message;
+
+    toastContainer.appendChild(toast);
+    activeToasts.push(toast);
+
+    // Trigger slide-in/fade-in
+    requestAnimationFrame(() => {
+      toast.classList.add('show');
+    });
+
+    setTimeout(() => {
+      toast.classList.remove('show');
+      toast.classList.add('hide');
+      setTimeout(() => {
+        toast.remove();
+        const idx = activeToasts.indexOf(toast);
+        if (idx > -1) activeToasts.splice(idx, 1);
+      }, 400);
+    }, duration);
   }
-  function closeModal() {
-    if (!feedbackModal) return;
-    feedbackModal.style.display = "none";
-    document.body.style.overflow = "";
-  }
-  feedbackBtns.forEach(btn => btn.addEventListener("click", () => openModal("feedback")));
-  reportBtns.forEach(btn => btn.addEventListener("click", () => openModal("report")));
-  cancelBtn?.addEventListener("click", closeModal);
-  window.addEventListener("click", e => { if (e.target === feedbackModal) closeModal(); });
-  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
-  window.openFeedbackModal = () => openModal("feedback");
-  window.openReportModal = () => openModal("report");
 
   // ---------------------- Feedback/Report Form Submission ---------------------- //
   if (feedbackForm) {
     feedbackForm.addEventListener("submit", async e => {
-      e.preventDefault();
+      const textarea = feedbackForm.querySelector('textarea'); // <-- Trying to prevent crisis entries from passing through
       const type = textarea?.dataset.type || 'feedback';
       if (!canSubmit(type)) return;
 
@@ -117,7 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const res = await fetch(feedbackForm.action, { method:'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
         if (!res.ok) throw new Error('Network response not ok');
         const data = await res.json();
-        if (data.status==="ok") { showToast(type==='feedback'?'Feedback submitted!':'Report submitted!', 'success'); feedbackForm.reset(); closeModal(); }
+        if (data.status==="ok") { showToast(type==='feedback'?'Feedback submitted!':'Report submitted!', 'success'); feedbackForm.reset(); closeModal(type); }
         else { showToast(data.message || 'Submission failed. Please try again.', 'error'); }
       } catch (err) { console.error(err); showToast('Submission failed. Please try again.', 'error'); }
     });
@@ -135,8 +197,69 @@ document.addEventListener("DOMContentLoaded", () => {
         const res = await fetch(journalForm.action, { method:journalForm.method||'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
         if (!res.ok) throw new Error('Network response not ok');
         const data = await res.json();
-        if (data.status==='ok') { showToast(data.message||'Journal submitted!', 'success'); journalForm.reset();
-          setTimeout(()=>{ window.location.href = `/submit-success?id=${data.entry_id}`; }, 1000);
+        if (data.status==='ok') { 
+          showToast(data.message||'Journal submitted!', 'success'); 
+          journalForm.reset();
+
+          // ---------------------- Progress toast using general-toast style ---------------------- //
+          const spinnerToast = document.createElement('div');
+          spinnerToast.className = 'stacked-toast';
+          spinnerToast.style.display = 'inline-flex';
+          spinnerToast.style.alignItems = 'center';
+          spinnerToast.style.gap = '10px';
+          spinnerToast.innerHTML = `
+            <span id="progress-text">Processing... 0%</span>
+            <div class="spinner" style="border: 3px solid #ccc; border-top: 3px solid #333; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
+          `;
+          toastContainer.appendChild(spinnerToast);
+          requestAnimationFrame(() => spinnerToast.classList.add('show'));
+
+          if (!document.getElementById('spinner-style')) {
+            const style = document.createElement('style');
+            style.id = 'spinner-style';
+            style.innerHTML = `
+              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            `;
+            document.head.appendChild(style);
+          }
+
+          // ---------------------- Connect WebSocket ---------------------- //
+          let crisisTriggered = false; // <-- ADDED FLAG
+
+          const ws = new WebSocket(`ws://${window.location.host}/ws/progress/${data.entry_id}`);
+          ws.onmessage = (event) => {
+            const msg = JSON.parse(event.data);
+            console.log("WS message received:", msg);
+
+            // ---------------------- Crisis check (Option A) ---------------------- //
+            if (msg.type === "crisis" && !crisisTriggered) {
+              crisisTriggered = true; // <-- SET FLAG
+              ws.close();
+              spinnerToast.classList.remove('show');
+              spinnerToast.classList.add('hide');
+              setTimeout(() => spinnerToast.remove(), 400);
+              openModal("crisis");
+              return; // stop further processing
+            }
+
+            // ---------------------- Skip updates if crisis triggered ---------------------- //
+            if (crisisTriggered) return;
+
+            const progress = Math.min(Math.max(msg.progress || 0, 0), 1); 
+            const percent = Math.round(progress * 100);
+            const progressText = document.getElementById("progress-text");
+            if (progressText) progressText.textContent = `Processing... ${percent}%`;
+
+            // ---------------------- Redirect when done ---------------------- //
+            if (progress >= 1) {
+              ws.close();
+              spinnerToast.classList.remove('show');
+              spinnerToast.classList.add('hide');
+              setTimeout(() => spinnerToast.remove(), 400);
+              const real_id = msg.real_id || data.entry_id;
+              setTimeout(() => { window.location.href = `/submit-success?id=${real_id}`; }, 200);
+            }
+          };
         } else { showToast(data.message||'Submission failed. Please try again.', 'error'); }
       } catch (err) { console.error(err); showToast('Submission failed. Please try again.', 'error'); }
     });
@@ -192,7 +315,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const safeText = copyBtn.dataset.safeText; // read from data attribute
     copyBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
   }
-
 
   // Expose globally
   window.copySafeTextToClipboard = copySafeTextToClipboard;

@@ -1,4 +1,4 @@
-{# submit-success.html — updated with emotion summary save-state 202512232128 #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 202512241346 (YYYYMMDDhhmm) #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
@@ -33,14 +33,19 @@
           <span>{{ match.excerpt }}</span>
           <span class="similarity-badge">{{ match.similarity_pct }}%</span>
         </div>
-        <small>(Source ID: {{ match.entry_id }})</small><br>
+        <small>
+          (Source ID: 
+          <a href="/submit-success?id={{ match.entry_id }}" class="source-link">
+            {{ match.entry_id }}
+          </a>)
+        </small><br>
       {% endfor %}
     </blockquote>
     {% endif %}
 
     <!-- Parse feedback button -->
     <blockquote class="parse-feedback-bar">
-      <span>Not parsed correctly?</span>
+      <span>Matching seems unusual?</span>
       <button type="button" class="report-parse-btn" onclick="openReportModal()">Report Issue</button>
     </blockquote>
 
