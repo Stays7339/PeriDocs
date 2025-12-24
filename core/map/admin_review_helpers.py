@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/admin_review_helpers.py
-# save-state updated 202512221551
+# save-state updated 202512231656
 # ==========================================
 import os
 import uuid
@@ -9,9 +9,12 @@ import hashlib
 import logging
 from datetime import datetime
 from typing import Dict, Any, Optional, List
-
+import asyncio
 import numpy as np
 from core.map import centroids
+
+from sklearn.cluster import AgglomerativeClustering
+import aiofiles
 
 logger = logging.getLogger("peridocs.review")
 logger.setLevel(logging.INFO)
@@ -37,7 +40,7 @@ def current_review_file() -> str:
     )
 
 # ---------------- Journal Loading ----------------
-def _load_journal_entries() -> List[Dict[str, Any]]:
+async def _load_journal_entries() -> List[Dict[str, Any]]:
     global _cached_journal_entries
     if _cached_journal_entries is not None:
         return _cached_journal_entries
@@ -45,8 +48,9 @@ def _load_journal_entries() -> List[Dict[str, Any]]:
         _cached_journal_entries = []
         return []
     try:
-        with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-            _cached_journal_entries = json.load(f)
+        async with aiofiles.open(JOURNALS_FILE, "r", encoding="utf-8") as f:
+            content = await f.read()
+            _cached_journal_entries = json.loads(content)
             return _cached_journal_entries
     except Exception as e:
         logger.warning(f"Failed to load journals.json: {e}")
@@ -54,19 +58,19 @@ def _load_journal_entries() -> List[Dict[str, Any]]:
         return []
 
 # ---------------- Persistence ----------------
-def save_review_queue(file_path: Optional[str] = None):
+async def save_review_queue(file_path: Optional[str] = None):
     if file_path is None:
         file_path = current_review_file()
     os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    np.savez(file_path, review_queue=REVIEW_QUEUE)
+    await asyncio.to_thread(np.savez, file_path, review_queue=REVIEW_QUEUE)
     logger.info(f"Review queue saved to {file_path}")
 
-def load_review_queue(file_path: Optional[str] = None):
+async def load_review_queue(file_path: Optional[str] = None):
     global REVIEW_QUEUE
     if file_path is None:
         file_path = current_review_file()
     if os.path.exists(file_path):
-        data = np.load(file_path, allow_pickle=True)
+        data = await asyncio.to_thread(np.load, file_path, allow_pickle=True)
         REVIEW_QUEUE = dict(data["review_queue"].item())
         logger.info(f"Loaded review queue from {file_path}")
         return
@@ -79,7 +83,7 @@ def load_review_queue(file_path: Optional[str] = None):
         REVIEW_FILE_TEMPLATE.format(yearmonth=prev_month)
     )
     if os.path.exists(prev_file):
-        data = np.load(prev_file, allow_pickle=True)
+        data = await asyncio.to_thread(np.load, prev_file, allow_pickle=True)
         REVIEW_QUEUE = dict(data["review_queue"].item())
         logger.info(f"Carried over review queue from {prev_file}")
     else:
@@ -94,8 +98,8 @@ def _stable_precentroid_id(entry: Dict[str, Any]) -> str:
     md5hash = hashlib.md5(cluster_string.encode()).hexdigest()
     return f"precentroid_{md5hash}"
 
-def find_candidate_centroid_ids(since_timestamp: Optional[str] = None) -> List[str]:
-    entries = _load_journal_entries()
+async def find_candidate_centroid_ids(since_timestamp: Optional[str] = None) -> List[str]:
+    entries = await _load_journal_entries()
     candidate_map: Dict[str, List[Dict[str, Any]]] = {}
     for e in entries:
         assigned = e.get("centroid_id")
@@ -117,8 +121,8 @@ def find_candidate_centroid_ids(since_timestamp: Optional[str] = None) -> List[s
         for k2 in keys[i+1:]:
             if k2 in visited:
                 continue
-            vec1 = np.mean([np.array(e.get("embedding", [0]*768)) for e in cluster_entries], axis=0)
-            vec2 = np.mean([np.array(e.get("embedding", [0]*768)) for e in candidate_map[k2]], axis=0)
+            vec1 = np.mean([np.array(e.get("embedding", [0]*1024)) for e in cluster_entries], axis=0)
+            vec2 = np.mean([np.array(e.get("embedding", [0]*1024)) for e in candidate_map[k2]], axis=0)
             sim = np.dot(vec1, vec2) / (np.linalg.norm(vec1)*np.linalg.norm(vec2) + 1e-8)
             if sim > 0.95:
                 cluster_entries.extend(candidate_map[k2])
@@ -127,7 +131,7 @@ def find_candidate_centroid_ids(since_timestamp: Optional[str] = None) -> List[s
     return list(merged_map.keys())
 
 # ---------------- Review Queue ----------------
-def add_review_suggestion(
+async def add_review_suggestion(
     *,
     centroid_id: str,
     suggestion_type: str,
@@ -152,11 +156,11 @@ def add_review_suggestion(
         "human_labels_ledger": [],
     }
     if save:
-        save_review_queue()
+        await save_review_queue()
     return suggestion_id
 
-# ---------------- Explicit Human Mutations (verbatim) ----------------
-def update_review_status(
+# ---------------- Explicit Human Mutations ----------------
+async def update_review_status(
     suggestion_id: str,
     *,
     status: str,
@@ -172,15 +176,18 @@ def update_review_status(
         note = note[:MAX_NOTE_CHARS]
 
     if status == "accepted" and cid not in centroids.CENTROIDS:
-        centroids.create_centroid_from_precentroid(cid)
+        await centroids.create_centroid_from_precentroid(cid)
+
+    if status == "rejected":
+        await recluster_rejected_precentroid(cid, similarity_threshold=0.92)
 
     REVIEW_QUEUE[suggestion_id]["status"] = status
     if note is not None:
         REVIEW_QUEUE[suggestion_id]["human_note"] = note
-    save_review_queue()
+    await save_review_queue()
     return flash
 
-def update_review_labels(suggestion_id: str, labels: List[str]) -> Optional[str]:
+async def update_review_labels(suggestion_id: str, labels: List[str]) -> Optional[str]:
     if suggestion_id not in REVIEW_QUEUE:
         raise KeyError("Unknown suggestion_id")
 
@@ -195,41 +202,28 @@ def update_review_labels(suggestion_id: str, labels: List[str]) -> Optional[str]
     REVIEW_QUEUE[suggestion_id]["human_labels_ledger"] = ledger
     REVIEW_QUEUE[suggestion_id]["human_labels"] = labels
 
-    save_review_queue()
+    await save_review_queue()
     return flash
 
-# ---------------- Review Queue Listing (verbatim) ----------------
-def list_review_queue(status: Optional[str] = None) -> List[Dict[str, Any]]:
+# ---------------- Review Queue Listing ----------------
+async def list_review_queue(status: Optional[str] = None) -> List[Dict[str, Any]]:
     items = list(REVIEW_QUEUE.values())
     if status:
         items = [i for i in items if i["status"] == status]
 
     for i in items:
         cid = i["centroid_id"]
-        i["samples"] = centroids.get_journal_entry_samples_for_centroid(cid)
+        i["samples"] = await centroids.get_journal_entry_samples_for_centroid(cid)
         i["centroid_exists"] = cid in centroids.CENTROIDS
 
     return sorted(items, key=lambda x: x["created_at"])
 
-def print_review_queue(status: Optional[str] = None):
-    items = list_review_queue(status)
-    if not items:
-        print("No review suggestions.")
-        return
-    for i in items:
-        print(
-            f"{i['suggestion_id']} | "
-            f"{i['suggestion_type']} | "
-            f"centroid={i['centroid_id']} | "
-            f"status={i['status']}"
-        )
-
 # ---------------- Helpers for Enqueuing Centroid Suggestions ----------------
-def enqueue_split_suggestions(watch_threshold: float = 0.85, since_timestamp: Optional[str] = None) -> List[str]:
+async def enqueue_split_suggestions(watch_threshold: float = 0.85, since_timestamp: Optional[str] = None) -> List[str]:
     out_ids = []
-    suggestions = centroids.suggest_split_candidates(watch_threshold=watch_threshold)
+    suggestions = await centroids.suggest_split_candidates(watch_threshold=watch_threshold)
     for s in suggestions:
-        out_ids.append(add_review_suggestion(
+        out_ids.append(await add_review_suggestion(
             centroid_id=s["centroid_id"],
             suggestion_type="split_centroid",
             metrics={
@@ -241,52 +235,111 @@ def enqueue_split_suggestions(watch_threshold: float = 0.85, since_timestamp: Op
         ))
     return out_ids
 
+# ---------------- Semantic Reclustering Gate ----------------
+async def recluster_rejected_precentroid(
+    rejected_precentroid_id: str,
+    similarity_threshold: float = 0.92
+) -> list[str]:
+    candidate_texts = await centroids.load_candidate_journal_entries_for_precentroid(
+        rejected_precentroid_id
+    )
+    if not candidate_texts:
+        logger.warning(f"No candidate entries found for reclustering {rejected_precentroid_id}")
+        return []
+
+    embedding_fn = await centroids.get_embedding_function()
+    candidate_vectors = np.stack(await asyncio.gather(
+        *[embedding_fn(text) for text in candidate_texts]
+    ))
+
+    norms = np.linalg.norm(candidate_vectors, axis=1, keepdims=True) + 1e-8
+    norm_vectors = candidate_vectors / norms
+    similarity_matrix = np.dot(norm_vectors, norm_vectors.T)
+    distance_matrix = 1.0 - similarity_matrix
+
+    clustering = AgglomerativeClustering(
+        n_clusters=None,
+        affinity='precomputed',
+        linkage='complete',
+        distance_threshold=1.0 - similarity_threshold
+    )
+    labels = clustering.fit_predict(distance_matrix)
+
+    new_precentroid_ids = []
+    journal_entries = await _load_journal_entries()
+
+    for lbl in np.unique(labels):
+        subgroup_texts = [candidate_texts[i] for i in range(len(candidate_texts)) if labels[i] == lbl]
+        if not subgroup_texts:
+            continue
+
+        combined_hash = hashlib.md5("".join(subgroup_texts).encode()).hexdigest()
+        new_id = f"precentroid_{combined_hash}"
+
+        for entry in journal_entries:
+            nlp_data = entry.setdefault("nlp", {})
+            assigned_id = nlp_data.get("assigned_centroid_id")
+            if assigned_id == rejected_precentroid_id and entry.get("safe_text") in subgroup_texts:
+                nlp_data["assigned_centroid_id"] = new_id
+
+        new_precentroid_ids.append(new_id)
+
+    try:
+        async with aiofiles.open(centroids.JOURNALS_FILE, "w", encoding="utf-8") as f:
+            await f.write(json.dumps(journal_entries, ensure_ascii=False, indent=2))
+    except Exception as e:
+        logger.warning(f"Failed to save journals after reclustering: {e}")
+
+    logger.info(
+        f"Reclustered rejected precentroid {rejected_precentroid_id} "
+        f"into {len(new_precentroid_ids)} new precentroids"
+    )
+    return new_precentroid_ids
+
 # ---------------- Initialize / Refresh Queue ----------------
-def refresh_review_queue():
-    load_review_queue()
+async def refresh_review_queue():
+    await load_review_queue()
 
     last_refresh_ts = None
     if os.path.exists(LAST_REFRESH_FILE):
         try:
-            with open(LAST_REFRESH_FILE, "r", encoding="utf-8") as f:
-                last_refresh_ts = json.load(f).get("last_refresh")
+            async with aiofiles.open(LAST_REFRESH_FILE, "r", encoding="utf-8") as f:
+                last_refresh_ts = json.loads(await f.read()).get("last_refresh")
         except Exception as e:
             logger.warning(f"Failed to read last refresh timestamp: {e}")
 
     added = False
 
-    # ---------------- Split suggestions ----------------
-    split_ids = enqueue_split_suggestions(since_timestamp=last_refresh_ts)
+    split_ids = await enqueue_split_suggestions(since_timestamp=last_refresh_ts)
     if split_ids:
         added = True
 
-    # ---------------- New centroid suggestions ----------------
-    candidate_ids = find_candidate_centroid_ids(since_timestamp=last_refresh_ts)
+    candidate_ids = await find_candidate_centroid_ids(since_timestamp=last_refresh_ts)
     for cid in candidate_ids:
         if any(v["centroid_id"] == cid and v["suggestion_type"] == "new_centroid"
                for v in REVIEW_QUEUE.values()):
             continue
-        add_review_suggestion(
+        await add_review_suggestion(
             centroid_id=cid,
             suggestion_type="new_centroid",
             metrics={
-                "candidate_count": len(centroids.get_journal_entry_samples_for_centroid(cid)),
+                "candidate_count": len(await centroids.get_journal_entry_samples_for_centroid(cid)),
             },
             save=False
         )
         added = True
 
     if added:
-        save_review_queue()
+        await save_review_queue()
         logger.info("Review queue incrementally updated with new split or centroid suggestions.")
 
     try:
-        with open(LAST_REFRESH_FILE, "w", encoding="utf-8") as f:
-            json.dump({"last_refresh": _now_iso()}, f)
+        async with aiofiles.open(LAST_REFRESH_FILE, "w", encoding="utf-8") as f:
+            await f.write(json.dumps({"last_refresh": _now_iso()}))
     except Exception as e:
         logger.warning(f"Failed to update last refresh timestamp: {e}")
 
-def initialize_review_queue():
-    load_review_queue()
-    refresh_review_queue()
+async def initialize_review_queue():
+    await load_review_queue()
+    await refresh_review_queue()
     logger.info("Review queue initialized and refreshed on startup.")

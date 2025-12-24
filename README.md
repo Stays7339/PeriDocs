@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 22 December 2025 (202512221538 - YYYYMMDDhhmm)
+## Canonical Project Directory as of 23 December 2025 (202512231909 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -208,7 +208,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ admin.py                      # "/admin-review"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ journal.py                    # "/submit", "/submit-success"
-│  │  ├─ info-navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
@@ -251,7 +251,6 @@ PeriDocs-code/                         # Root project folder
 │      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
 │      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
 │      ├─ embeddings.py                   # Manages SentenceTransformer model, embedding computation, caching, and encryption.
-│      ├─ encryption.py                   # Fernet-based encryption/decryption for sensitive textual data.
 │      ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
 │      ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.

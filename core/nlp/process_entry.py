@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# updated 202512221511
+# save-state 202512232046 (YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
@@ -38,40 +38,12 @@ async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 1
 
     timestamp = datetime.now(timezone.utc).isoformat()
     ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()[:8]
-
-    # ---------------- CRISIS CHECK ----------------
-    crisis_msg = await crisis_notification_async(text)
-    if crisis_msg:
-        sha8 = sha8_hash(text)
-        record = {
-            "timestamp": timestamp,
-            "text": text,
-            "user_ip_hash": ip_salt,
-            "sha8": sha8,
-            "centroid_id": None,
-            "crisis_flag": True,
-        }
-        append_crisis_record(record)
-        encrypted_text = encrypt_text(text)
-        return {
-            "sha8": sha8,
-            "encrypted_text": encrypted_text,
-            "safe_text": None,
-            "embedding": None,
-            "clause_embeddings": None,
-            "centroid_id": None,
-            "centroid_distance": None,
-            "crisis_flag": True,
-            "timestamp": timestamp,
-            "ip_salt": ip_salt,
-            "crisis_warning": crisis_msg,
-            "embedding_file": JOURNALS_EMBED_FILE,
-            "clause_embedding_file": JOURNALS_CLAUSE_EMBED_FILE
-        }
+    encrypted_raw_ip = encrypt_text(user_ip)
+    encrypted_raw_text = encrypt_text(text)
 
     # ---------------- SAFE TEXT ----------------
     safe_text = redact_pii(text)
-    encrypted_text = encrypt_text(safe_text)
+    encrypted_safe_text = encrypt_text(safe_text)
 
     # ---------------- CLAUSE SPLIT ----------------
     clauses = split_into_clauses(safe_text)
@@ -82,27 +54,34 @@ async def process_entry_async(text: str, user_ip: str, max_clause_words: int = 1
     doc_embedding = np.mean(clause_embeddings, axis=0)
 
     # ---------------- CENTROID ASSIGNMENT ----------------
-    centroid_id, centroid_distance = assign_vector_to_existing_centroids(doc_embedding)
+    centroid_id, centroid_distance = await assign_vector_to_existing_centroids(doc_embedding)
 
     # ---------------- HASH ----------------
     sha8 = sha8_hash(safe_text)
 
-    # ---------------- RETURN FULL ENTRY ----------------
-    return {
-        "sha8": sha8,
-        "encrypted_text": encrypted_text,
-        "safe_text": safe_text,
-        "embedding": doc_embedding.tolist(),
-        "clause_embeddings": [e.tolist() for e in clause_embeddings],
-        "centroid_id": centroid_id,
-        "centroid_distance": centroid_distance,
-        "crisis_flag": False,
+    # ---------------- CRISIS CHECK ----------------
+    crisis_msg = await crisis_notification_async(text)
+
+    # ---------------- CONSTRUCT ENTRY ----------------
+    entry: Dict[str, Any] = {
+        "journal_id": sha8,
         "timestamp": timestamp,
         "ip_salt": ip_salt,
-        "embedding_file": JOURNALS_EMBED_FILE,
-        "clause_embedding_file": JOURNALS_CLAUSE_EMBED_FILE
+        "encrypted_raw_ip": encrypted_raw_ip,
+        "encrypted_raw_text": encrypted_safe_text,
+        "crisis_flag": bool(crisis_msg),
+        "safe_text": "" if crisis_msg else safe_text,
+        "centroid_id": None if crisis_msg else centroid_id,
+        "centroid_distance": None if crisis_msg else centroid_distance,
+        "embedding": None if crisis_msg else doc_embedding.tolist(),
+        "embedding_file": None if crisis_msg else JOURNALS_EMBED_FILE,
+        "clause_embeddings": [] if crisis_msg else [e.tolist() for e in clause_embeddings],
+        "clause_embedding_file": None if crisis_msg else JOURNALS_CLAUSE_EMBED_FILE
     }
 
+    append_crisis_record(entry)  # store exactly what will be returned
+
+    return entry
 
 # ---------------- Sync Wrapper ----------------
 def process_entry(text: str, user_ip: str, max_clause_words: int = 100) -> Dict[str, Any]:

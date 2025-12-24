@@ -1,78 +1,12 @@
-<!-- base.html save-state 202512201732 -->
+<!-- PeriDocs-code/app/templates/base.html save-state 202512232059 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
-  <link rel="icon" type="image/png" href="/static/favicon.png">
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="/static/favicon.png" type="image/png">
   <title>{% block title %}PeriDocs{% endblock %}</title>
-
   <link rel="stylesheet" href="/static/style.css">
-
-  <!-- Inline tweaks for header and floating buttons -->
-  <style>
-    html, body {
-      height: 100%;
-      overflow: hidden;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* Header with logo + wordmark */
-    header.site-wordmark {
-      position: absolute;
-      top: 1.25rem;
-      left: 1.5rem;
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      font-family: 'Cabinet Grotesk', sans-serif;
-      font-weight: 700;
-      font-size: 1.6rem;
-      color: var(--text);
-      opacity: 0.95;
-      user-select: none;
-      pointer-events: auto;
-    }
-
-    .brand-link {
-      display: flex;
-      align-items: center;
-      text-decoration: none;
-      color: inherit;
-    }
-
-    .brand-logo {
-      height: 3.2rem;
-      width: auto;
-      display: block;
-    }
-
-    .brand-text {
-      line-height: 1;
-    }
-
-    /* Floating buttons */
-    #feedback-btn, #theme-toggle-btn {
-      position: fixed;
-      bottom: 1.5rem;
-      background: var(--accent);
-      color: #fff;
-      border: none;
-      padding: 0.6rem 1rem;
-      border-radius: 10px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 0.9rem;
-      z-index: 1000;
-      box-shadow: 0 4px 12px rgba(17,17,17,0.12);
-      transition: background 0.16s ease;
-    }
-
-    #feedback-btn:hover, #theme-toggle-btn:hover { background: #6b708f; }
-    #feedback-btn { right: 1.5rem; }
-    #theme-toggle-btn { left: 1.5rem; }
-  </style>
 </head>
 
 <body>
@@ -83,35 +17,16 @@
     </a>
   </header>
 
-  <div class="wrap">
-    {% block content %}{% endblock %}
-  </div>
+  <div class="wrap">{% block content %}{% endblock %}</div>
 
   <button id="theme-toggle-btn" aria-label="Toggle theme">Dark Mode</button>
   <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
 
   {% include 'includes/modal-feedback.html' %}
 
-  <!-- Centralized Toast for feedback / notifications -->
-  <div id="feedback-notification" style="
-    position: fixed;
-    bottom: 1.5rem;
-    right: 1.5rem;
-    padding: 0.75rem 1rem;
-    border-radius: 6px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    font-size: 0.9rem;
-    z-index: 1001;
-    display: none;
-    transition: opacity 0.3s ease;
-    background-color: #F5E8A3;
-    color: #000;
-  "></div>
+  <div id="general-toast-notification"></div>
+  <div id="privacy-toast"></div>
 
-  <!-- Toast for cookie/privacy notice -->
-  <div id="privacy-toast" style="display:none; position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);"></div>
-
-  <!-- Scripts -->
   <script src="/static/peridocs-ui.js" defer></script>
 </body>
 </html>

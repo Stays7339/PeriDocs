@@ -1,4 +1,12 @@
-// peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/journal (save-state 202512201740 YYYYMMDDhhmm)
+// peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/journal, privacy toast 
+// (save-state 202512232129 (YYYYMMDDhhmm)
+
+/* Notes:
+  - Cooldowns are client-side and privacy-first.
+  - Theme state persists on refresh.
+  - Privacy toast only shows once per user unless localStorage is cleared.
+*/
+
 document.addEventListener("DOMContentLoaded", () => {
   // ---------------------- DOM Elements ---------------------- //
   const feedbackModal = document.querySelector(".feedback-modal");
@@ -8,7 +16,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelBtn = document.getElementById("cancel-feedback");
   const feedbackForm = document.querySelector("#feedback-form");
   const journalForm = document.querySelector('#journal-form');
-  const toastContainer = document.querySelector("#feedback-notification");
+  const toastContainer = document.querySelector("#general-toast-notification");
+  const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
   const root = document.documentElement;
 
@@ -133,9 +142,58 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  /* Notes:
-     - Cooldowns are entirely client-side, so a user could bypass them by clearing storage or switching devices.
-     - Client-side cooldown is privacy-first, no telemetry, but it does not protect the server.
-     - Theme state now persists on refresh and is stored alongside cooldowns, in a single file.
-  */
+  // ---------------------- Privacy / Cookie Notice ---------------------- //
+  if (privacyToast) {
+    const TOAST_KEY = "privacyToastDismissed";
+    const dismissed = localStorage.getItem(TOAST_KEY) === "true";
+
+    privacyToast.innerHTML = `
+      <img src="/static/cookies-icon-by-trinh-ho-from-flaticon-dot-com.png"
+        alt="Cookie icon"
+        class="cookie-icon"
+        title="Cookie icon by Trinh Ho from Flaticon"
+        style="width:85px; height:85px;">
+      <span>
+        We use <strong>minimal</strong> local storage to improve your experience.
+        By continuing to use this site, you agree to our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages.
+      </span>
+      <button id="privacy-toast-dismiss">&times;</button>
+    `;
+
+    const dismissBtn = privacyToast.querySelector("#privacy-toast-dismiss");
+
+    if (!dismissed) {
+      privacyToast.style.display = "flex";
+      requestAnimationFrame(() => privacyToast.classList.add("show"));
+    }
+
+    dismissBtn?.addEventListener("click", () => {
+      privacyToast.classList.remove("show");
+      privacyToast.classList.add("hide");
+      setTimeout(() => { privacyToast.style.display = "none"; }, 400);
+      localStorage.setItem(TOAST_KEY, "true");
+    });
+  }
+
+  // ---------------------- Copy Safe Text to Clipboard ---------------------- //
+  function copySafeTextToClipboard(safeText) {
+    if (!safeText) return;
+    navigator.clipboard.writeText(safeText).then(() => {
+      showToast("Safe text copied to clipboard!", "success");
+    }).catch(err => {
+      console.error("Clipboard copy failed:", err);
+      showToast("Failed to copy safe text.", "error");
+    });
+  }
+
+  // ---------------------- Copy Safe Text Button Binding ---------------------- //
+  const copyBtn = document.getElementById("copy-entry-btn");
+  if (copyBtn) {
+    const safeText = copyBtn.dataset.safeText; // read from data attribute
+    copyBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
+  }
+
+
+  // Expose globally
+  window.copySafeTextToClipboard = copySafeTextToClipboard;
 });

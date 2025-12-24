@@ -1,4 +1,4 @@
-{# submit-success.html — updated with emotion summary save-state 202512221515 #}
+{# submit-success.html — updated with emotion summary save-state 202512232128 #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
@@ -46,10 +46,15 @@
 
     <!-- Action buttons -->
     <div class="meta" style="margin-top:12px;">
-      <a class="btn primary" href="/save/{{ entry_id }}">Save this entry privately</a>
+      <button 
+          class="btn primary" 
+          type="button" 
+          id="copy-entry-btn"
+          data-safe-text="{{ safe_text | e }}">
+            Save this entry privately
+      </button>
       <a class="btn ghost" href="/">Return</a>
     </div>
-
   </div>
   {% include 'includes/footer.html' %}
 </div>
