@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/journal, privacy toast 
-// save-state 202512241529 (YYYYMMDDhhmm)
+// save-state 202512242015 (YYYYMMDDhhmm)
 // ==========================================
 
 /* Notes:
@@ -318,4 +318,122 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Expose globally
   window.copySafeTextToClipboard = copySafeTextToClipboard;
+
+  // Show Santa hat on Dec 25
+  (function() {
+    const today = new Date();
+    const month = today.getMonth(); // 0-11
+    const date = today.getDate();   // 1-31
+    if (month === 11 && (date === 25)) { // Dec 24 or 25
+      const hat = document.getElementById('santa-hat');
+      if (hat) hat.style.display = 'block';
+    }
+  })();
+
+  //show snowfall
+  (function() {
+    const hat = document.getElementById('santa-hat');
+    const canvas = document.getElementById('snow-canvas');
+    if (!canvas || !hat) return;
+
+    const today = new Date();
+    const isXmas = today.getMonth() === 11 && today.getDate() === 25;
+    if (!isXmas) return; // only on Dec 25
+
+    let active = false;
+    let fadeOut = false;
+    let animationId;
+    const ctx = canvas.getContext('2d');
+
+    let width = canvas.width = window.innerWidth;
+    let height = canvas.height = window.innerHeight;
+
+    const flakes = [];
+    const flakeCount = 120;
+
+    for (let i = 0; i < flakeCount; i++) {
+      flakes.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        r: Math.random() * 3 + 1,
+        d: Math.random() * flakeCount,
+        alpha: 1
+      });
+    }
+
+    let angle = 0;
+
+    function drawFlakes() {
+      ctx.clearRect(0, 0, width, height);
+      ctx.beginPath();
+      for (let i = 0; i < flakeCount; i++) {
+        const f = flakes[i];
+        ctx.fillStyle = `rgba(255,255,255,${f.alpha})`;
+        ctx.moveTo(f.x, f.y);
+        ctx.arc(f.x, f.y, f.r, 0, Math.PI * 2);
+      }
+      ctx.fill();
+      updateFlakes();
+    }
+
+    function updateFlakes() {
+      angle += 0.01;
+      for (let i = 0; i < flakeCount; i++) {
+        const f = flakes[i];
+        f.y += Math.cos(angle + f.d) + 1 + f.r / 2;
+        f.x += Math.sin(angle) * 0.5;
+
+        // Only respawn if NOT fading out
+        if (!fadeOut) {
+          if (f.x > width + 5 || f.x < -5 || f.y > height) {
+            f.x = Math.random() * width;
+            f.y = -10;
+            f.alpha = 1;
+          }
+        }
+
+        // Fade out gradually
+        if (fadeOut) {
+          f.alpha -= 0.02; // fade speed
+          if (f.alpha < 0) f.alpha = 0;
+        }
+      }
+    }
+
+
+    function animate() {
+      drawFlakes();
+      if (fadeOut && flakes.every(f => f.alpha <= 0)) {
+        // completely done
+        canvas.style.display = 'none';
+        active = false;
+        fadeOut = false;
+        cancelAnimationFrame(animationId);
+        return;
+      }
+      animationId = requestAnimationFrame(animate);
+    }
+
+    function startSnow() {
+      if (active) return;
+      active = true;
+      fadeOut = false;
+      canvas.style.display = 'block';
+      animate();
+    }
+
+    function stopSnow() {
+      if (!active) return;
+      fadeOut = true; // start graceful fade
+    }
+
+    hat.addEventListener('mouseenter', startSnow);
+    hat.addEventListener('mouseleave', stopSnow);
+
+    window.addEventListener('resize', () => {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    });
+
+  })();
 });

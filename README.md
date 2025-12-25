@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 24 December 2025 (202512241555 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 24 December 2025 (202512241857 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -217,7 +217,8 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ peridocs-logo-v1.png
 │  │  ├─ peridocs-logo-v1-white.png
 │  │  ├─ favicon.png
-│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for cookies
+│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for privacy notice about local storage
+│  │  ├─ cookiessanta-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │

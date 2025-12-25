@@ -1,4 +1,4 @@
-<!-- PeriDocs-code/app/templates/base.html save-state 202512241357 -->
+<!-- PeriDocs-code/app/templates/base.html save-state 202512242016 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -13,9 +13,18 @@
   <header class="site-wordmark">
     <a href="/" class="brand-link">
       <img src="/static/peridocs-logo-v1.png" alt="PeriDocs logo" class="brand-logo">
-      <span class="brand-text">PeriDocs.org</span>
+      <span class="brand-text">
+        PeriDocs.or
+        <span id="letter-g">
+          g
+          <img src="/static/santa-hat-free-icon-by-surang-from-flaticon-dot-com.png"
+              alt=""
+              id="santa-hat">
+        </span>
+      </span>
     </a>
   </header>
+
 
   <div class="wrap">{% block content %}{% endblock %}</div>
 
@@ -25,10 +34,10 @@
   {% include 'includes/modal-feedback.html' %}
   {% include 'includes/modal-crisis.html' %}
 
-
   <div id="general-toast-container"></div>
   <div id="privacy-toast"></div>
 
   <script src="/static/peridocs-ui.js" defer></script>
+  <canvas id="snow-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;display:none;"></canvas>
 </body>
 </html>
