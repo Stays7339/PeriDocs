@@ -1,557 +1,395 @@
 # ==========================================
 # core/map/centroids.py
-# save-state 202512271141
+# save-state 202512291826 (YYYYMMDDhhmm)
 # ==========================================
 
 """
 Centroid management for embeddings (cluster-level vectors).
 
-Terminology (locked for this module):
+LOCKED INVARIANTS:
 
-- Vector:
-    A 1024-dimensional numeric array (float32/float64).
-    This is the concrete numerical object used for math.
-
-- Embedding:
-    The semantic representation produced by the language model.
-    In the current PeriDocs architecture, the embedding is numerically
-    identical to the vector. The distinction is conceptual, not structural.
-
-- Centroid:
-    A cluster-level vector representing the running mean of multiple
-    entry-level vectors, plus metadata (count, variance, density).
-
-- Variance:
-    Per-dimension spread of vectors assigned to a centroid.
-    Used as a weak signal for drift and over-broad clusters.
-
-- Precentroid:
-    A proposed centroid ID for which human review is required before creation.
-
-- Candidate Journal Entry:
-    A journal entry that is unassigned or marked as "suggest_new_centroid" and
-    therefore eligible for human review and precentroid formation.
-
-Design principles:
-
-- No silent ontology formation.
-- No binary “magic thresholds” pretending to be truth.
-- The system suggests; humans decide.
-- Density and drift are relative, not absolute.
-- Early-stage uncertainty is preserved, not collapsed.
-
-Features:
-
-- Tracks per-centroid mean, count, variance, and density.
-- Density is relative to global average (human-scaled).
-- Drift and split are flagged, never auto-executed.
-- Precentroid creation is suggested, not automatic.
-- Windowed persistence: centroids_YYYYMM.npz with carry-over.
-- REPL-friendly inspection helpers.
+- No text → embedding conversion occurs in this module.
+- All vectors are precomputed upstream.
+- Missing vectors cause immediate failure.
+- Journal embeddings are immutable and never rewritten.
+- Deterministic IDs and month-based snapshots are preserved.
+- Humans commit all structural changes.
 """
 
 import numpy as np
-from typing import Dict, Tuple, Optional, Any, List, Callable
+from typing import Dict, List, Any, Optional
 import logging
 import os
 import json
-from datetime import datetime
 import asyncio
 import aiofiles
-import glob
+from sklearn.cluster import KMeans, AgglomerativeClustering
+from datetime import datetime
 
-# ---------------- Logging Setup ----------------
+# ---------------- Logging ----------------
 logger = logging.getLogger("peridocs.centroids")
 logger.setLevel(logging.INFO)
-
-ch = logging.StreamHandler()
-ch.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(message)s")
-ch.setFormatter(formatter)
-
 if not logger.hasHandlers():
-    logger.addHandler(ch)
+    h = logging.StreamHandler()
+    h.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
+    logger.addHandler(h)
 
-# ---------------- In-Memory State ----------------
+# ============================================================
+# === CORE STATE & I/O =======================================
+# ============================================================
+
 CENTROIDS: Dict[str, np.ndarray] = {}
 CENTROID_COUNTS: Dict[str, int] = {}
 CENTROID_VARS: Dict[str, np.ndarray] = {}
 CENTROID_DENSITIES: Dict[str, float] = {}
 
-# ---------------- File Handling ----------------
-CENTROID_DIR = "data"
+# Explicit snapshot history
+CENTROID_HISTORY: Dict[str, List[Dict[str, Any]]] = {}
+
+# ---------------- Paths ----------------
+DATA_DIR = "data"
 CENTROID_FILE_TEMPLATE = "centroids_{yearmonth}.npz"
+ID_COUNTER_FILE = os.path.join(DATA_DIR, "centroid_id_counter.json")
+HISTORY_FILE = os.path.join(DATA_DIR, "centroid_history.json")
+JOURNALS_FILE = os.path.join(DATA_DIR, "journals.json")
 
-# ---------------- Global Embedding Function ----------------
-_GLOBAL_EMBEDDING_FN: Optional[Callable[[str], np.ndarray]] = None
 
-async def set_embedding_function(fn: Callable[[str], np.ndarray]):
-    global _GLOBAL_EMBEDDING_FN
-    _GLOBAL_EMBEDDING_FN = fn
+# ---------------- Deterministic ID Counter ----------------
+async def _load_id_counter() -> int:
+    if not os.path.exists(ID_COUNTER_FILE):
+        return 0
+    async with aiofiles.open(ID_COUNTER_FILE, "r", encoding="utf-8") as f:
+        return int(json.loads(await f.read())["next_id"])
 
-async def get_embedding_function() -> Callable[[str], np.ndarray]:
-    if _GLOBAL_EMBEDDING_FN is None:
-        raise RuntimeError("Global embedding function not set. Call set_embedding_function() at startup.")
-    return _GLOBAL_EMBEDDING_FN
+async def _save_id_counter(val: int) -> None:
+    os.makedirs(DATA_DIR, exist_ok=True)
+    async with aiofiles.open(ID_COUNTER_FILE, "w", encoding="utf-8") as f:
+        await f.write(json.dumps({"next_id": val}, indent=2))
 
-async def current_centroid_file() -> str:
-    ym = datetime.utcnow().strftime("%Y%m")
-    return os.path.join(CENTROID_DIR, CENTROID_FILE_TEMPLATE.format(yearmonth=ym))
+async def generate_id(prefix: str) -> str:
+    counter = await _load_id_counter()
+    new_id = f"{prefix}_{counter:08d}"
+    await _save_id_counter(counter + 1)
+    return new_id
 
-# ---------------- Helper: Load precomputed embeddings ----------------
-async def load_embeddings_from_dumps(entry_texts: List[str]) -> List[np.ndarray]:
-    dump_pattern = os.path.join(CENTROID_DIR, "journals_embeddings_dump*.npz")
-    dump_files = sorted(glob.glob(dump_pattern))
-    embedding_map: Dict[str, np.ndarray] = {}
+# ---------------- Current NPZ Path ----------------
+async def _current_centroid_file() -> str:
+    yearmonth = datetime.utcnow().strftime("%Y%m")
+    return os.path.join(DATA_DIR, CENTROID_FILE_TEMPLATE.format(yearmonth=yearmonth))
 
-    for dump_file in dump_files:
-        try:
-            data = np.load(dump_file, allow_pickle=True)
-            dump_dict = dict(data.get("embeddings", {}).item())
-            embedding_map.update(dump_dict)
-        except Exception as e:
-            logger.warning(f"Failed to load embeddings from {dump_file}: {e}")
+# ---------------- Core Persistence ----------------
+async def save_state() -> None:
+    os.makedirs(DATA_DIR, exist_ok=True)
 
-    vectors = []
-    for text in entry_texts:
-        vec = embedding_map.get(text)
-        if vec is None:
-            vec = np.zeros(1024, dtype=np.float32)
-        vectors.append(vec)
-
-    return vectors
-
-# ---------------- File I/O ----------------
-async def save_centroids(file_path: Optional[str] = None):
-    if file_path is None:
-        file_path = await current_centroid_file()
-
-    os.makedirs(os.path.dirname(file_path), exist_ok=True)
-
-    await asyncio.to_thread(np.savez,
-        file_path,
+    await asyncio.to_thread(
+        np.savez,
+        await _current_centroid_file(),
         centroids=CENTROIDS,
         counts=CENTROID_COUNTS,
         variances=CENTROID_VARS,
         densities=CENTROID_DENSITIES,
     )
 
-    logger.info(f"Centroids saved to {file_path}")
+    async with aiofiles.open(HISTORY_FILE, "w", encoding="utf-8") as f:
+        await f.write(json.dumps(CENTROID_HISTORY, indent=2))
 
-async def load_centroids(file_path: Optional[str] = None):
-    global CENTROIDS, CENTROID_COUNTS, CENTROID_VARS, CENTROID_DENSITIES
+    logger.info("Centroid state saved")
 
-    if file_path is None:
-        file_path = await current_centroid_file()
+async def load_state() -> None:
+    global CENTROIDS, CENTROID_COUNTS, CENTROID_VARS, CENTROID_DENSITIES, CENTROID_HISTORY
 
-    if os.path.exists(file_path):
-        data = await asyncio.to_thread(np.load, file_path, allow_pickle=True)
-        CENTROIDS = dict(data["centroids"].item())
-        CENTROID_COUNTS = dict(data["counts"].item())
-        CENTROID_VARS = dict(data.get("variances", {}).item())
-        CENTROID_DENSITIES = dict(data.get("densities", {}).item())
-        logger.info(f"Loaded centroids from {file_path}")
+    path = await _current_centroid_file()
+    if not os.path.exists(path):
+        logger.warning("No centroid file found; starting fresh")
         return
 
-    prev_month = (
-        datetime.utcnow().replace(day=1) - np.timedelta64(1, "D")
-    ).strftime("%Y%m")
-    prev_file = os.path.join(CENTROID_DIR, CENTROID_FILE_TEMPLATE.format(yearmonth=prev_month))
-    if os.path.exists(prev_file):
-        data = await asyncio.to_thread(np.load, prev_file, allow_pickle=True)
-        CENTROIDS = dict(data["centroids"].item())
-        CENTROID_COUNTS = dict(data["counts"].item())
-        CENTROID_VARS = dict(data.get("variances", {}).item())
-        CENTROID_DENSITIES = dict(data.get("densities", {}).item())
-        logger.info(f"Carried over centroids from {prev_file}")
-    else:
-        logger.warning("No centroid file found; starting fresh.")
+    data = await asyncio.to_thread(np.load, path, allow_pickle=True)
+    CENTROIDS = dict(data["centroids"].item())
+    CENTROID_COUNTS = dict(data["counts"].item())
+    CENTROID_VARS = dict(data["variances"].item())
+    CENTROID_DENSITIES = dict(data["densities"].item())
 
-# ---------------- Math Helpers ----------------
-async def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    if os.path.exists(HISTORY_FILE):
+        async with aiofiles.open(HISTORY_FILE, "r", encoding="utf-8") as f:
+            CENTROID_HISTORY = json.loads(await f.read())
+    else:
+        CENTROID_HISTORY = {}
+
+    logger.info("Centroid state loaded")
+
+# ---------------- Snapshot Utilities ----------------
+def _now_snapshot_id() -> int:
+    return int(datetime.utcnow().timestamp())
+
+def _snapshot_centroid(cid: str) -> None:
+    if cid not in CENTROIDS:
+        raise ValueError(f"Cannot snapshot missing centroid {cid}")
+    CENTROID_HISTORY.setdefault(cid, []).append({
+        "snapshot": _now_snapshot_id(),
+        "vector": CENTROIDS[cid].tolist()
+    })
+
+# ============================================================
+# === Math / Analysis Layer =================================
+# ============================================================
+
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     denom = np.linalg.norm(a) * np.linalg.norm(b)
     return float(np.dot(a, b) / denom) if denom != 0 else 0.0
 
-async def compute_density(centroid_vec: np.ndarray, member_vectors: List[np.ndarray]) -> float:
-    if not member_vectors:
-        return 0.0
-    sims = [await cosine_similarity(v, centroid_vec) for v in member_vectors]
+def _cosine_distance(a: np.ndarray, b: np.ndarray) -> float:
+    return 1.0 - _cosine_similarity(a, b)
+
+async def compute_density(centroid_vec: np.ndarray, members: List[np.ndarray]) -> float:
+    if not members:
+        raise RuntimeError("Density computation with zero members")
+    sims = [_cosine_similarity(v, centroid_vec) for v in members]
     return float(np.mean(sims))
 
-async def global_average_density() -> float:
-    if not CENTROID_DENSITIES:
-        return 0.0
-    return float(np.mean(list(CENTROID_DENSITIES.values())))
+async def centroid_drift(cid: str) -> Optional[float]:
+    history = CENTROID_HISTORY.get(cid)
+    if not history or len(history) < 1:
+        return None
+    last_vec = np.array(history[-1]["vector"])
+    return _cosine_distance(CENTROIDS[cid], last_vec)
 
-# ---------------- Inspection Helpers ----------------
+async def cohesion_score(centroid_vec: np.ndarray, member_vecs: List[np.ndarray]) -> float:
+    if not member_vecs:
+        raise ValueError("Cohesion requires member vectors")
+    sims = [_cosine_similarity(v, centroid_vec) for v in member_vecs]
+    return float(np.var(sims))
+
+async def hypothetical_split_analysis(member_vecs: List[np.ndarray]) -> Dict[str, Any]:
+    if len(member_vecs) < 2:
+        raise ValueError("Split analysis requires >=2 vectors")
+
+    X = np.stack(member_vecs)
+    centroid_before = np.mean(X, axis=0)
+    cohesion_before = await cohesion_score(centroid_before, member_vecs)
+
+    kmeans = KMeans(n_clusters=2, random_state=42).fit(X)
+    results = []
+    for i in (0, 1):
+        cluster = X[kmeans.labels_ == i]
+        cvec = np.mean(cluster, axis=0)
+        results.append(await cohesion_score(cvec, cluster.tolist()))
+
+    return {
+        "cohesion_before": cohesion_before,
+        "cohesion_after_avg": float(np.mean(results)),
+        "explanation": (
+            "This centroid decomposes into two tighter groups."
+            if np.mean(results) < cohesion_before
+            else "Splitting does not improve internal cohesion."
+        )
+    }
+
+# ============================================================
+# === Inspection / Utility ==================================
+# ============================================================
+
 async def list_centroids() -> List[Dict[str, Any]]:
     out = []
-    for cid, vec in CENTROIDS.items():
+    for cid in sorted(CENTROIDS.keys()):
         out.append({
             "centroid_id": cid,
-            "count": CENTROID_COUNTS.get(cid, 0),
-            "density": CENTROID_DENSITIES.get(cid),
-            "avg_variance": float(np.mean(CENTROID_VARS[cid])) if cid in CENTROID_VARS else None,
-            "first_10_dims": vec[:10].tolist(),
+            "count": CENTROID_COUNTS[cid],
+            "density": CENTROID_DENSITIES[cid],
+            "avg_variance": float(np.mean(CENTROID_VARS[cid])),
         })
     return out
 
-async def print_centroids():
-    centroids_list = await list_centroids()
-    if not centroids_list:
-        print("No centroids loaded.")
-        return
-    print(f"Total centroids: {len(centroids_list)}\n")
-    for c in centroids_list:
-        print(f"{c['centroid_id']} | count={c['count']} | density={c['density']} | avg_var={c['avg_variance']}")
+# ============================================================
+# === Structural / Mutation Layer ===========================
+# ============================================================
 
-# ---------------- Drift & Split Suggestion ----------------
-async def centroid_drift_score(centroid_id: str) -> Optional[float]:
-    if centroid_id not in CENTROID_DENSITIES:
-        return None
-    global_avg = await global_average_density()
-    if global_avg == 0:
-        return None
-    return CENTROID_DENSITIES[centroid_id] / global_avg
+# ---------------- Precentroid Creation ----------------
+async def create_precentroid(*, journal_entries: List[Dict[str, Any]]) -> str:
+    if not journal_entries:
+        raise ValueError("journal_entries required")
 
-async def suggest_split_candidates(watch_threshold: float = 0.85) -> List[Dict[str, Any]]:
-    suggestions = []
-    for cid in CENTROIDS.keys():
-        score = await centroid_drift_score(cid)
-        if score is not None and score < watch_threshold:
-            suggestions.append({
-                "centroid_id": cid,
-                "drift_score": round(score, 3),
-                "count": CENTROID_COUNTS.get(cid, 0),
-                "avg_variance": float(np.mean(CENTROID_VARS.get(cid, 0))),
-            })
-    return suggestions
+    vectors: List[np.ndarray] = []
+    embedding_cache: Dict[str, Dict[str, List[float]]] = {}
 
-async def print_split_suggestions():
-    suggestions = await suggest_split_candidates()
-    if not suggestions:
-        print("No centroid split suggestions.")
-        return
-    print("Centroid split suggestions:")
-    for s in suggestions:
-        print(f"- {s['centroid_id']} | drift={s['drift_score']} | count={s['count']} | avg_var={s['avg_variance']}")
+    journal_entries = sorted(journal_entries, key=lambda e: e["journal_id"])
 
-# ---------------- Manual Split Execution ----------------
-async def split_centroid_with_vectors(centroid_id: str, member_vectors: List[np.ndarray]) -> List[str]:
-    from sklearn.cluster import KMeans
-    if len(member_vectors) < 2:
-        return [centroid_id]
-    X = np.stack(member_vectors)
-    kmeans = await asyncio.to_thread(KMeans(n_clusters=2, random_state=42).fit, X)
-    new_ids = []
-    for i in range(2):
-        new_vec = kmeans.cluster_centers_[i]
-        new_id = datetime.utcnow().strftime("centroid_%Y%m%d%H%M%S")  # timestamped ID
-        CENTROIDS[new_id] = new_vec
-        idxs = np.where(kmeans.labels_ == i)[0]
-        CENTROID_COUNTS[new_id] = len(idxs)
-        CENTROID_VARS[new_id] = np.var(X[idxs], axis=0)
-        CENTROID_DENSITIES[new_id] = float(np.mean([await cosine_similarity(v, new_vec) for v in X[idxs]]))
-        new_ids.append(new_id)
-    CENTROIDS.pop(centroid_id, None)
-    CENTROID_COUNTS.pop(centroid_id, None)
-    CENTROID_VARS.pop(centroid_id, None)
-    CENTROID_DENSITIES.pop(centroid_id, None)
-    logger.info(f"Split centroid {centroid_id} into {new_ids}")
-    await save_centroids()
-    return new_ids
-
-def _generate_timestamped_id(prefix: str = "precentroid") -> str:
-    ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    return f"{prefix}_{ts}"
-
-# ---------------- Main Assignment Logic ----------------
-async def assign_vector_to_existing_centroids(vec: np.ndarray, similarity_threshold: float = 0.78, semantic_score: Optional[float] = None, journal_entry: Optional[dict] = None) -> Tuple[str, float]:
-    if not CENTROIDS:
-        label = "suggest_new_centroid"
-        score = float(semantic_score) if semantic_score is not None else 0.0
-        if journal_entry is not None:
-            journal_entry.setdefault("nlp", {})["assigned_centroid_id"] = label
-        return label, score
-    best_id = None
-    best_sim = -1.0
-    for cid, centroid_vec in CENTROIDS.items():
-        sim = await cosine_similarity(vec, centroid_vec)
-        if sim > best_sim:
-            best_sim = sim
-            best_id = cid
-    if best_sim >= similarity_threshold and best_id is not None:
-        count = CENTROID_COUNTS[best_id]
-        old_mean = CENTROIDS[best_id]
-        new_mean = (old_mean * count + vec) / (count + 1)
-        old_var = CENTROID_VARS.get(best_id, np.zeros_like(vec))
-        new_var = (old_var * count + (vec - old_mean) ** 2) / (count + 1)
-        CENTROIDS[best_id] = new_mean
-        CENTROID_COUNTS[best_id] = count + 1
-        CENTROID_VARS[best_id] = new_var
-        CENTROID_DENSITIES[best_id] = (CENTROID_DENSITIES.get(best_id, best_sim) * count + best_sim) / (count + 1)
-        if journal_entry is not None:
-            journal_entry.setdefault("nlp", {})["assigned_centroid_id"] = best_id
-        await save_centroids()
-        return best_id, 1.0 - best_sim
-    label = "suggest_new_centroid"
-    if journal_entry is not None:
-        journal_entry.setdefault("nlp", {})["assigned_centroid_id"] = label
-    return label, float(semantic_score) if semantic_score is not None else 1.0 - best_sim
-
-# ---------------- Candidate / Precentroid Logic ----------------
-async def load_candidate_journal_entries_for_precentroid(precentroid_id: str) -> List[str]:
-    JOURNALS_FILE = os.path.join(CENTROID_DIR, "journals.json")
-    if not os.path.exists(JOURNALS_FILE):
-        return []
-    try:
-        async with aiofiles.open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-            content = await f.read()
-            all_entries = json.loads(content)
-    except Exception as e:
-        logger.warning(f"Failed to load journals.json: {e}")
-        return []
-    candidate_entries = []
-    for entry in all_entries:
-        assigned_id = entry.get("nlp", {}).get("assigned_centroid_id")
-        if assigned_id is None or assigned_id == "suggest_new_centroid":
-            candidate_entries.append(entry.get("safe_text", ""))
-    return candidate_entries
-
-async def create_precentroid_or_centroid(
-    entries: Optional[List[Dict]] = None,
-    precentroid_id: Optional[str] = None,
-    promote: bool = False
-) -> str:
-    """
-    Create a precentroid or a centroid from either:
-      - A list of entries, or
-      - An existing precentroid ID (loads candidate entries from journals.json)
-
-    If promote=True, creates a permanent centroid instead of a precentroid.
-    Returns the timestamped ID of the created object.
-    """
-    if entries is None:
-        if precentroid_id is None:
-            raise ValueError("Must provide either entries or precentroid_id")
-        entries_texts = await load_candidate_journal_entries_for_precentroid(precentroid_id)
-        if not entries_texts:
-            logger.warning(f"No candidate entries found for precentroid {precentroid_id}")
-            return precentroid_id
-        vectors = await load_embeddings_from_dumps(entries_texts)
-        entries = [{"embedding": vec} for vec in vectors]
-        centroid_vec = np.mean(vectors, axis=0)
-    else:
-        vectors = [e["embedding"] for e in entries]
-        centroid_vec = np.mean(vectors, axis=0)
-
-    prefix = "centroid" if promote else "precentroid"
-    ts_id = _generate_timestamped_id(prefix=prefix)
-
-    CENTROIDS[ts_id] = centroid_vec
-    CENTROID_COUNTS[ts_id] = len(vectors)
-    CENTROID_VARS[ts_id] = np.var(vectors, axis=0)
-    CENTROID_DENSITIES[ts_id] = await compute_density(centroid_vec, vectors)
-
-    await save_centroids()
-    logger.info(f"Created {'centroid' if promote else 'precentroid'} {ts_id} from {len(entries)} entries")
-    return ts_id
-
-async def get_journal_entry_samples_for_centroid(centroid_id: str) -> List[str]:
-    JOURNALS_FILE = os.path.join(CENTROID_DIR, "journals.json")
-    if not os.path.exists(JOURNALS_FILE):
-        return []
-    try:
-        async with aiofiles.open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-            content = await f.read()
-            all_entries = json.loads(content)
-    except Exception as e:
-        logger.warning(f"Failed to load journals.json: {e}")
-        return []
-    samples = []
-    for entry in all_entries:
-        assigned_id = entry.get("nlp", {}).get("assigned_centroid_id")
-        if assigned_id == centroid_id or (centroid_id.startswith("precentroid_") and (assigned_id is None or assigned_id == "suggest_new_centroid")):
-            text = entry.get("safe_text", "")
-            if text:
-                samples.append(text)
-    return samples
-
-# ---------------- Batch Update Centroid Densities ----------------
-async def recalc_all_centroid_densities():
-    """
-    Recalculate densities for all loaded centroids based on their current member vectors.
-    Uses get_journal_entry_samples_for_centroid to fetch texts and the global embedding function.
-    """
-    embedding_fn = await get_embedding_function()
-    for cid in list(CENTROIDS.keys()):
-        try:
-            samples = await get_journal_entry_samples_for_centroid(cid)
-            if not samples:
-                CENTROID_DENSITIES[cid] = 0.0
-                continue
-            vectors = [await embedding_fn(text) for text in samples]
-            centroid_vec = CENTROIDS[cid]
-            CENTROID_DENSITIES[cid] = await compute_density(centroid_vec, vectors)
-        except Exception as e:
-            logger.warning(f"Failed to recalc density for centroid {cid}: {e}")
-    await save_centroids()
-    logger.info("Recalculated densities for all centroids.")
-
-# ================= Lineage + Backup Extension =================
-
-# ---------------- In-Memory Lineage State ----------------
-CENTROID_PARENTS: Dict[str, Optional[str]] = {}
-CENTROID_METADATA: Dict[str, Dict[str, Any]] = {}
-
-# ---------------- Backup Helpers ----------------
-def _backup_root_dir() -> str:
-    return os.path.join(CENTROID_DIR, "backup")
-
-def _timestamp() -> str:
-    return datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-
-async def _write_backup_snapshot(payload: Dict[str, Any]) -> None:
-    ts = _timestamp()
-    backup_dir = os.path.join(_backup_root_dir(), ts)
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backup_file = os.path.join(
-        backup_dir,
-        f"centroid_backup_{ts}.json"
-    )
-
-    async with aiofiles.open(backup_file, "w", encoding="utf-8") as f:
-        await f.write(json.dumps(payload, indent=2, default=str))
-
-    logger.info(f"Centroid lineage backup written to {backup_file}")
-
-# ---------------- Promotion with Explicit Parent ----------------
-async def promote_precentroid_to_centroid(
-    precentroid_id: str,
-    entries: Optional[List[Dict[str, Any]]] = None
-) -> str:
-    """
-    Promote an existing precentroid into a new centroid.
-
-    - Creates a NEW centroid ID
-    - Records parent_centroid_id explicitly
-    - Stores original precentroid ID as immutable metadata
-    - Writes a timestamped backup snapshot
-    """
-
-    if precentroid_id not in CENTROIDS:
-        raise ValueError(f"Precentroid {precentroid_id} does not exist")
-
-    # derive vectors
-    if entries is not None:
-        vectors = [e["embedding"] for e in entries]
-    else:
-        samples = await get_journal_entry_samples_for_centroid(precentroid_id)
-        if not samples:
-            raise ValueError(f"No samples found for precentroid {precentroid_id}")
-        embedding_fn = await get_embedding_function()
-        vectors = [await embedding_fn(text) for text in samples]
+    for entry in journal_entries:
+        jid = entry["journal_id"]
+        emb_file = entry["embedding_file"]
+        if not os.path.exists(emb_file):
+            raise FileNotFoundError(emb_file)
+        if emb_file not in embedding_cache:
+            async with aiofiles.open(emb_file, "r", encoding="utf-8") as f:
+                embedding_cache[emb_file] = json.loads(await f.read())
+        if jid not in embedding_cache[emb_file]:
+            raise KeyError(f"Missing embedding for {jid}")
+        vec = embedding_cache[emb_file][jid]
+        if len(vec) != 1024:
+            raise ValueError(f"Embedding dim != 1024 for {jid}")
+        vectors.append(np.array(vec))
 
     centroid_vec = np.mean(vectors, axis=0)
+    cid = await generate_id("precentroid")
 
-    new_id = _generate_timestamped_id(prefix="centroid")
+    CENTROIDS[cid] = centroid_vec
+    CENTROID_COUNTS[cid] = len(vectors)
+    CENTROID_VARS[cid] = np.var(vectors, axis=0)
+    CENTROID_DENSITIES[cid] = await compute_density(centroid_vec, vectors)
 
-    # create new centroid
-    CENTROIDS[new_id] = centroid_vec
-    CENTROID_COUNTS[new_id] = len(vectors)
-    CENTROID_VARS[new_id] = np.var(vectors, axis=0)
-    CENTROID_DENSITIES[new_id] = await compute_density(centroid_vec, vectors)
+    _snapshot_centroid(cid)
+    await save_state()
+    logger.info(f"Created precentroid {cid}")
 
-    # lineage
-    CENTROID_PARENTS[new_id] = precentroid_id
-    CENTROID_METADATA[new_id] = {
-        "created_at": datetime.utcnow().isoformat(),
-        "parent_centroid_id": precentroid_id,
-        "source_type": "promotion",
-    }
+    return cid
 
-    # snapshot backup
-    await _write_backup_snapshot({
-        "event": "promote_precentroid",
-        "timestamp": datetime.utcnow().isoformat(),
-        "precentroid_id": precentroid_id,
-        "new_centroid_id": new_id,
-        "counts": CENTROID_COUNTS[new_id],
-        "density": CENTROID_DENSITIES[new_id],
-        "metadata": CENTROID_METADATA[new_id],
-    })
+# ---------------- Approval ----------------
+async def approve_precentroid(precentroid_id: str) -> str:
+    if not precentroid_id.startswith("precentroid_"):
+        raise ValueError("Only precentroids may be approved")
+    if precentroid_id not in CENTROIDS:
+        raise ValueError("Precentroid missing")
 
-    await save_centroids()
-    logger.info(f"Promoted {precentroid_id} → {new_id}")
+    new_id = precentroid_id.replace("precentroid_", "centroid_", 1)
+    if new_id in CENTROIDS:
+        raise RuntimeError("Centroid ID collision")
+
+    CENTROIDS[new_id] = CENTROIDS.pop(precentroid_id)
+    CENTROID_COUNTS[new_id] = CENTROID_COUNTS.pop(precentroid_id)
+    CENTROID_VARS[new_id] = CENTROID_VARS.pop(precentroid_id)
+    CENTROID_DENSITIES[new_id] = CENTROID_DENSITIES.pop(precentroid_id)
+    CENTROID_HISTORY[new_id] = CENTROID_HISTORY.pop(precentroid_id)
+
+    _snapshot_centroid(new_id)
+    await save_state()
+    logger.info(f"Approved {new_id}")
 
     return new_id
 
-# ---------------- Lineage Inspection ----------------
-async def get_centroid_lineage(centroid_id: str) -> Dict[str, Any]:
-    return {
-        "centroid_id": centroid_id,
-        "parent_centroid_id": CENTROID_PARENTS.get(centroid_id),
-        "metadata": CENTROID_METADATA.get(centroid_id, {}),
-    }
-
-# ================= Precentroid Confirmation & Cleanup =================
-# explicit, human-acknowledged deletion only
-
-async def confirm_centroid_operational(
-    centroid_id: str,
+# ---------------- Burst / Split Commit ----------------
+async def burst_rejected_precentroid(
+    precentroid_id: str,
     *,
-    require_parent: bool = True
-) -> None:
+    journal_entries: List[Dict[str, Any]],
+    min_similarity: float,
+    n_clusters: int = 2,
+) -> List[str]:
+    if precentroid_id not in CENTROIDS:
+        raise ValueError("Precentroid missing")
+
+    vectors = []
+    embedding_cache: Dict[str, Dict[str, List[float]]] = {}
+    journal_entries = sorted(journal_entries, key=lambda e: e["journal_id"])
+
+    for entry in journal_entries:
+        jid = entry["journal_id"]
+        emb_file = entry["embedding_file"]
+        if emb_file not in embedding_cache:
+            async with aiofiles.open(emb_file, "r", encoding="utf-8") as f:
+                embedding_cache[emb_file] = json.loads(await f.read())
+        vectors.append(np.array(embedding_cache[emb_file][jid]))
+
+    X = np.stack(vectors)
+    clustering = AgglomerativeClustering(
+        n_clusters=min(n_clusters, len(vectors)),
+        affinity="cosine",
+        linkage="average",
+    )
+    labels = clustering.fit_predict(X)
+
+    new_ids = []
+    for lbl in sorted(set(labels)):
+        idxs = np.where(labels == lbl)[0]
+        cluster_vecs = X[idxs]
+        centroid_vec = np.mean(cluster_vecs, axis=0)
+        density = await compute_density(centroid_vec, list(cluster_vecs))
+        if density < min_similarity:
+            continue
+        new_id = await generate_id("precentroid")
+        CENTROIDS[new_id] = centroid_vec
+        CENTROID_COUNTS[new_id] = len(cluster_vecs)
+        CENTROID_VARS[new_id] = np.var(cluster_vecs, axis=0)
+        CENTROID_DENSITIES[new_id] = density
+        _snapshot_centroid(new_id)
+        new_ids.append(new_id)
+
+    for d in (CENTROIDS, CENTROID_COUNTS, CENTROID_VARS, CENTROID_DENSITIES, CENTROID_HISTORY):
+        d.pop(precentroid_id, None)
+
+    await save_state()
+    logger.info(f"Burst {precentroid_id} → {new_ids}")
+    return new_ids
+
+async def commit_split(cid: str, *, member_vecs: List[np.ndarray]) -> List[str]:
+    if cid not in CENTROIDS:
+        raise ValueError("Centroid not found")
+
+    X = np.stack(member_vecs)
+    kmeans = KMeans(n_clusters=2, random_state=42).fit(X)
+    new_ids = []
+    for i in (0, 1):
+        vecs = X[kmeans.labels_ == i]
+        nid = await generate_id("centroid")
+        CENTROIDS[nid] = np.mean(vecs, axis=0)
+        CENTROID_COUNTS[nid] = len(vecs)
+        CENTROID_VARS[nid] = np.var(vecs, axis=0)
+        CENTROID_DENSITIES[nid] = float(np.mean([_cosine_similarity(v, CENTROIDS[nid]) for v in vecs]))
+        _snapshot_centroid(nid)
+        new_ids.append(nid)
+
+    for d in (CENTROIDS, CENTROID_COUNTS, CENTROID_VARS, CENTROID_DENSITIES, CENTROID_HISTORY):
+        d.pop(cid, None)
+
+    await save_state()
+    return new_ids
+
+# ---------------- SAAJE AUTO-ASSIGN ----------------
+# Software-Auto-Added Journal Entry (SAAJE)
+SAAJE_AFFILIATIONS: Dict[str, Dict[str, float]] = {}  # journal_id -> {centroid_id: similarity}
+
+async def assign_saaje(journal_entry: Dict[str, Any], min_similarity: float = 0.7) -> None:
     """
-    Explicitly confirm that a promoted centroid is operating correctly.
-
-    Only after this confirmation:
-      - the parent precentroid (if any) is deleted
-      - deletion is backed up with full metadata
-
-    This function is intentionally irreversible.
+    Auto-assign a journal entry to one or more centroids if similarity >= min_similarity.
+    Does not mutate centroid vectors; updates density, variance, and affiliations.
     """
+    jid = journal_entry["journal_id"]
+    emb_file = journal_entry["embedding_file"]
 
-    if centroid_id not in CENTROIDS:
-        raise ValueError(f"Centroid {centroid_id} does not exist")
+    if not os.path.exists(emb_file):
+        raise FileNotFoundError(f"Embedding file not found: {emb_file}")
 
-    parent_id = CENTROID_PARENTS.get(centroid_id)
+    async with aiofiles.open(emb_file, "r", encoding="utf-8") as f:
+        embedding_data = json.loads(await f.read())
 
-    if require_parent and not parent_id:
-        raise ValueError(f"Centroid {centroid_id} has no parent precentroid")
+    if jid not in embedding_data:
+        raise KeyError(f"Embedding missing for journal_id {jid}")
 
-    if parent_id and parent_id not in CENTROIDS:
-        raise ValueError(f"Parent precentroid {parent_id} not found")
+    vec = np.array(embedding_data[jid])
+    if len(vec) != 1024:
+        raise ValueError(f"Embedding dim != 1024 for {jid}")
 
-    # mark confirmed
-    CENTROID_METADATA.setdefault(centroid_id, {})
-    CENTROID_METADATA[centroid_id]["confirmed_at"] = datetime.utcnow().isoformat()
-    CENTROID_METADATA[centroid_id]["status"] = "confirmed"
+    affinities: Dict[str, float] = {}
 
-    # backup snapshot BEFORE deletion
-    await _write_backup_snapshot({
-        "event": "confirm_centroid_and_delete_precentroid",
-        "timestamp": datetime.utcnow().isoformat(),
-        "centroid_id": centroid_id,
-        "deleted_precentroid_id": parent_id,
-        "centroid_metadata": CENTROID_METADATA.get(centroid_id),
-        "precentroid_state": {
-            "vector": CENTROIDS.get(parent_id).tolist() if parent_id else None,
-            "count": CENTROID_COUNTS.get(parent_id),
-            "density": CENTROID_DENSITIES.get(parent_id),
-        },
-    })
+    # Compare to all existing centroids
+    for cid, centroid_vec in CENTROIDS.items():
+        if not cid.startswith("centroid_"):
+            continue  # only approved centroids
+        sim = _cosine_similarity(vec, centroid_vec)
+        if sim >= min_similarity:
+            affinities[cid] = sim
 
-    # delete precentroid safely
-    if parent_id:
-        CENTROIDS.pop(parent_id, None)
-        CENTROID_COUNTS.pop(parent_id, None)
-        CENTROID_VARS.pop(parent_id, None)
-        CENTROID_DENSITIES.pop(parent_id, None)
-        CENTROID_METADATA.pop(parent_id, None)
-        CENTROID_PARENTS.pop(parent_id, None)
+    if not affinities:
+        logger.info(f"SAAJE {jid} did not meet min_similarity for any centroid")
+        return
 
-        logger.info(f"Precentroid {parent_id} deleted after confirmation of {centroid_id}")
+    # Record SAAJE affiliations
+    SAAJE_AFFILIATIONS[jid] = dict(sorted(affinities.items(), key=lambda x: x[1], reverse=True))
 
-    await save_centroids()
+    # Update centroid stats: density and variance
+    for cid, sim in SAAJE_AFFILIATIONS[jid].items():
+        # Dummy density recomputation including this SAAJE (without altering centroid_vec)
+        density_members = [CENTROIDS[cid]] + [vec]  # minimal inclusion
+        CENTROID_DENSITIES[cid] = float(np.mean([_cosine_similarity(v, CENTROIDS[cid]) for v in density_members]))
+        CENTROID_VARS[cid] = np.var(np.vstack([CENTROIDS[cid], vec]), axis=0)
+
+    logger.info(f"SAAJE {jid} assigned to centroids: {list(SAAJE_AFFILIATIONS[jid].keys())}")
+    await save_state()

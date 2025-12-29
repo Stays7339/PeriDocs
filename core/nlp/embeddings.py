@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 202512171302
+# save-state updated 202512291528
 # ------------------------------------------
 
 from __future__ import annotations
@@ -13,6 +13,9 @@ import os
 from dotenv import load_dotenv
 import concurrent.futures
 import logging
+import inspect
+import json
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("peridocs.embeddings")
@@ -56,7 +59,7 @@ def _find_snapshot_folder(base_path: Path) -> Path:
     raise RuntimeError(f"No valid model snapshot found under {base_path}")
 
 # ---------------- Embedding ----------------
-async def get_embedding_async(text_or_texts: str | list[str]) -> np.ndarray | list[np.ndarray]:
+async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | None = None) -> np.ndarray | list[np.ndarray]:
     """
     Compute embedding(s) for input text or list of texts.
     - If a single string is provided, returns np.ndarray.
@@ -64,6 +67,8 @@ async def get_embedding_async(text_or_texts: str | list[str]) -> np.ndarray | li
     
     Does NOT normalize; downstream code should normalize for cosine similarity, centroids, etc.
     Uses caching if TOKEN_EMBED_PRECOMPUTE=True.
+
+    Logs each call with timestamp, caller info, and optional journal_id.
     """
     if isinstance(text_or_texts, str):
         texts = [text_or_texts]
@@ -98,7 +103,45 @@ async def get_embedding_async(text_or_texts: str | list[str]) -> np.ndarray | li
             _embedding_cache[t] = emb
         results.append(emb)
 
+    # ---------------- Logging ----------------
+    try:
+        await _log_embedding_call(journal_id)
+    except Exception as e:
+        logger.warning(f"Failed to log embedding call: {e}")
+
     return results[0] if single_input else results
+
+# ---------------- Async Logging Helper ----------------
+_EMBEDDINGS_LOG_FILE = Path(PROJECT_ROOT) / "data" / "embeddings_run_log.jsonl"
+
+async def _log_embedding_call(journal_id: str | None = None):
+    """
+    Asynchronously logs embedding function call to a persistent JSONL file.
+    Captures timestamp, caller function, caller file, caller line, and optional journal_id.
+    """
+    import aiofiles
+
+    # Inspect caller
+    stack = inspect.stack()
+    if len(stack) > 2:
+        caller_frame = stack[2]
+    else:
+        caller_frame = stack[1]
+    caller_info = {
+        "function": caller_frame.function,
+        "file": os.path.relpath(caller_frame.filename, PROJECT_ROOT),
+        "line": caller_frame.lineno
+    }
+
+    log_entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "caller": caller_info,
+        "journal_id": journal_id
+    }
+
+    _EMBEDDINGS_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    async with aiofiles.open(_EMBEDDINGS_LOG_FILE, "a", encoding="utf-8") as f:
+        await f.write(json.dumps(log_entry) + "\n")
 
 # ---------------- Encryption ----------------
 def encrypt_text(text: str) -> str:

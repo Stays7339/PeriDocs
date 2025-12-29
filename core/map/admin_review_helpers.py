@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/admin_review_helpers.py
-# save-state 202512271433
+# save-state 202512271554
 # ==========================================
 import os
 import uuid
@@ -130,7 +130,6 @@ async def list_review_queue(status: Optional[str] = None) -> List[Dict[str, Any]
 
 # ---------------- Candidate Discovery ----------------
 def _stable_precentroid_id(entry: Dict[str, Any]) -> str:
-    dom_emotion = entry.get("dominant_emotion", "None")
     embedding_str = json.dumps(entry.get("embedding", ""))
     return f"precentroid_{hashlib.md5((dom_emotion + embedding_str).encode()).hexdigest()}"
 
