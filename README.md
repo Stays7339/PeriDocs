@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 24 December 2025 (202512241857 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 29 December 2025 (202512291317 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -205,13 +205,14 @@ PeriDocs-code/                         # Root project folder
 │  │
 ├─ routes/
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
-│  │  ├─ admin.py                      # "/admin-review"
+│  │  ├─ admin_routing.py              # "/admin*"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ journal.py                    # "/submit", "/submit-success"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
+│  │  ├─ admin-review.js                 # Allows humans to dictate what counts and what doesn't with centroids and semantic auto-groups
 │  │  ├─ style.css                       # Main stylesheet
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/journal 
 │  │  ├─ peridocs-logo-v1.png

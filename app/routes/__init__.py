@@ -1,7 +1,7 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 202512231949
-# ==========================================
+# save-state 2025122911291156
+# ========================================== 
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -20,6 +20,10 @@ logging.getLogger("uvicorn.access").addFilter(FilterStatic())
 # -------------------------------------------------------------------
 
 app = FastAPI()
+print(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
+
+# ********* app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None) is important for not leaving the backend publicly exposed *********
+
 
 @app.on_event("startup")
 async def preload_embedding_model():
@@ -31,9 +35,16 @@ async def preload_embedding_model():
 async def embedding_async(text: str):
     return await get_embedding_async(text)
 
-# Set async embedding function in centroids
 asyncio.create_task(centroids.set_embedding_function(embedding_async))
 
+# ---------------- Static Files ----------------
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
-from app.routes import info_navigation, journal, feedback, admin  # noqa: F401
+# ---------------- Import app-bound routes (side effects only) ----------------
+from app.routes import info_navigation
+from app.routes import journal
+from app.routes import feedback
+
+# ---------------- Include router-based routes ----------------
+from app.routes import admin_routing
+app.include_router(admin_routing.router)

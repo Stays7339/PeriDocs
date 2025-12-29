@@ -1,179 +1,43 @@
-<!-- admin-review.html save-state 202512171941-->
+{# PeriDocs-code/app/templates/admin-review.html save-state 202512291350 #}
 {% extends "base.html" %}
 {% block title %}Admin Review · PeriDocs{% endblock %}
 
 {% block content %}
 <div class="card admin-review-card">
   <div class="card-content">
-    <h1>Centroid Review Queue</h1>
+    <h1>Centroid Review</h1>
 
     {% if flash %}
-    <div class="flash-message">{{ flash }}</div>
+      <div class="flash-message">{{ flash }}</div>
     {% endif %}
 
-    {% if suggestions|length == 0 %}
-      <p class="empty-state">No review suggestions.</p>
-    {% else %}
-    <table class="review-table">
-      <thead>
-        <tr>
-          <th></th>
-          <th>Type</th>
-          <th>Centroid</th>
-          <th>Metrics</th>
-          <th>Status</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-      <tbody>
-      {% for s in suggestions %}
-        <tr>
-          <td>
-            <details>
-              <summary></summary>
-              <div class="expanded">
+    <!-- ---------------- Swiping Card Interface ---------------- -->
+    <div id="review-card-container" class="swipe-card">
+      <h2 id="card-title">Loading...</h2>
+      <p id="card-summary"></p>
+      <ul id="card-meta"></ul>
+      <div id="card-details" style="display:none;"></div>
 
-                {% if not s.centroid_exists %}
-                  <p class="pre-centroid-message">
-                    Centroid does not exist yet. Review these sample entries to decide on creation.
-                  </p>
-                {% endif %}
+      <button id="read-more-btn" class="btn secondary">Read more</button>
+      <button id="approve-btn" class="btn primary">Approve</button>
+      <button id="reject-btn" class="btn danger">Reject</button>
+    </div>
 
-                <h4>Sample entries</h4>
-                <ul class="samples">
-                  {% for sample in s.samples %}
-                    <li>{{ sample }}</li>
-                  {% endfor %}
-                </ul>
+    <hr>
 
-                {% if s.suggestion_type == "new_centroid" and s.metrics.candidate_count > 0 %}
-                  <div>Candidate entries: {{ s.metrics.candidate_count }}</div>
-                {% endif %}
+    <script>
+    document.querySelectorAll(".note-input, .label-input").forEach(el=>{
+        const counter = document.getElementById((el.classList.contains("note-input")?"note":"label")+"-count-"+el.dataset.suggestionId);
+        if(counter) el.addEventListener("input", ()=>{
+            counter.textContent = el.value.length+" / "+el.dataset.max+" chars";
+        });
+    });
+    </script>
 
-                <h4>Status</h4>
-                <form method="post" action="/admin-review/update-status">
-                  <input type="hidden" name="suggestion_id" value="{{ s.suggestion_id }}">
-                  <select name="status">
-                    <option {{ "selected" if s.status=="pending" }}>pending</option>
-                    <option {{ "selected" if s.status=="accepted" }}>accepted</option>
-                    <option {{ "selected" if s.status=="rejected" }}>rejected</option>
-                  </select>
-                  <input
-                    type="text"
-                    name="human_note"
-                    placeholder="optional note"
-                    value="{{ s.human_note or '' }}"
-                    data-max="1000"
-                    data-suggestion-id="{{ s.suggestion_id }}"
-                    class="note-input"
-                  >
-                  <small id="note-count-{{ s.suggestion_id }}">0 / 1000 chars</small>
-                  <button type="submit">Update</button>
-                </form>
+    <!-- ---------------- Include admin_review.js only here ---------------- -->
+    <script src="/static/admin_review.js" defer></script>
 
-                <h4>Human labels</h4>
-                <form method="post" action="/admin-review/update-labels">
-                  <input type="hidden" name="suggestion_id" value="{{ s.suggestion_id }}">
-                  <input
-                    type="text"
-                    name="labels"
-                    placeholder="comma-separated"
-                    value="{{ s.human_labels | join(', ') }}"
-                    data-max="100"
-                    data-suggestion-id="{{ s.suggestion_id }}"
-                    class="label-input"
-                  >
-                  <small id="label-count-{{ s.suggestion_id }}">0 / 100 chars</small>
-                  <button type="submit">Save labels</button>
-                </form>
 
-              </div>
-            </details>
-          </td>
 
-          <td>{{ s.suggestion_type }}</td>
-          <td class="mono">{{ s.centroid_id }}</td>
-          <td>
-            {% for k,v in s.metrics.items() %}
-              <div>{{ k }}: {{ v }}</div>
-            {% endfor %}
-          </td>
-          <td>{{ s.status }}</td>
-          <td>{{ s.created_at }}</td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% endif %}
-  </div>
 </div>
-
-<style>
-.admin-review-card { max-width: 1100px; }
-details summary { cursor: pointer; }
-.expanded { padding: 0.5rem 0 1rem 1rem; background-color: #f9f9f9; border-left: 3px solid #ccc; }
-.samples { font-size: 0.85rem; padding-left: 1rem; }
-.mono { font-family: monospace; }
-
-.flash-message {
-  background-color: #fff4e5;
-  border: 1px solid #ffcc80;
-  color: #663c00;
-  padding: 0.75rem;
-  margin-bottom: 1rem;
-  border-radius: 4px;
-}
-
-.pre-centroid-message {
-  font-weight: bold;
-  color: #b71c1c;
-  margin-bottom: 0.5rem;
-}
-
-/* Spreadsheet-style table styling */
-.review-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 0.95rem;
-}
-
-.review-table th, .review-table td {
-  border: 1px solid #ccc;
-  padding: 0.5rem;
-  vertical-align: top;
-}
-
-.review-table th {
-  background-color: #f0f0f0;
-  text-align: left;
-}
-
-.review-table tbody tr:nth-child(even) {
-  background-color: #fbfbfb;
-}
-
-.review-table tbody tr:hover {
-  background-color: #f1f7ff;
-}
-</style>
-
-<script>
-function updateCount(el) {
-  const maxChars = parseInt(el.dataset.max);
-  const id = el.dataset.suggestionId;
-  const displayId = el.name === 'labels' ? 'label-count-' + id : 'note-count-' + id;
-  const display = document.getElementById(displayId);
-  const length = el.value.length;
-  display.textContent = `${length} / ${maxChars} chars`;
-  display.style.color = length > maxChars ? 'red' : 'inherit';
-}
-
-// Initialize counters and attach input events
-window.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.label-input, .note-input').forEach(input => {
-    updateCount(input);
-    input.addEventListener('input', () => updateCount(input));
-  });
-});
-</script>
 {% endblock %}
