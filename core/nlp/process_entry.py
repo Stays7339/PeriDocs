@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202512241139 (YYYYMMDDhhmm)
+# save-state 202601012100 (YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from .pii import redact_pii
 from .hash_utils import sha8_hash
 from .crisis_detector import crisis_notification_async
 from .crisis_recorder import append_crisis_record
-from core.map.centroids import assign_vector_to_existing_centroids
 from .clause_utils import split_into_clauses, sliding_window_clauses
 
 # ---- BACKUP / TIMESTAMPED EMBEDDINGS ----
@@ -71,16 +70,12 @@ async def process_entry_async(
     doc_embedding = np.mean(clause_embeddings, axis=0)
     report_progress()  # 3 / total_steps
 
-    # ---------------- CENTROID ASSIGNMENT ----------------
-    centroid_id, centroid_distance = await assign_vector_to_existing_centroids(doc_embedding)
-    report_progress()  # 4 / total_steps
-
     # ---------------- HASH ----------------
     sha8 = sha8_hash(safe_text)
 
     # ---------------- CRISIS CHECK ----------------
     crisis_msg = await crisis_notification_async(text)
-    report_progress()  # 5 / total_steps
+    report_progress()  # 4 / total_steps
 
     # ---------------- CONSTRUCT ENTRY ----------------
     entry: Dict[str, Any] = {
@@ -91,8 +86,8 @@ async def process_entry_async(
         "encrypted_raw_text": encrypted_safe_text,
         "crisis_flag": bool(crisis_msg),
         "safe_text": "" if crisis_msg else safe_text,
-        "centroid_id": None if crisis_msg else centroid_id,
-        "centroid_distance": None if crisis_msg else centroid_distance,
+        "centroid_id": None, # handled downstream by core/map/*
+        "centroid_distance": None, # handled downstream by core/map/*
         "embedding": None if crisis_msg else doc_embedding.tolist(),
         "embedding_file": None if crisis_msg else JOURNALS_EMBED_FILE,
         "clause_embeddings": [] if crisis_msg else [e.tolist() for e in clause_embeddings],

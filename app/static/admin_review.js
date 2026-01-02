@@ -1,175 +1,145 @@
 // ==========================================
 // PeriDocs-code/app/static/admin_review.js 
-// save-state 202512291254 (YYYYMMDDhhmm)
+// save-state 202601012210 (YYYYMMDDhhmm)
 // ==========================================
-
 let currentIndex = 0;
-let precentroids = [];
+let reviewQueue = [];
 
-/* --------------------------------------------------
-   Loud fetch wrapper
-   -------------------------------------------------- */
-async function checkedFetch(url, opts = {}) {
+// ---------------- Fetch wrapper ----------------
+async function checkedFetch(url, opts={}) {
   const resp = await fetch(url, opts);
-
   if (!resp.ok) {
-    let text = "";
-    try {
-      text = await resp.text();
-    } catch (_) {
-      text = "<no response body>";
-    }
+    let text = "<no response body>";
+    try { text = await resp.text(); } catch (_) {}
     throw new Error(`${resp.status} ${resp.statusText}: ${text}`);
   }
-
   return resp;
 }
 
-/* --------------------------------------------------
-   Data loading
-   -------------------------------------------------- */
-async function fetchPrecentroids() {
-  // Show loading toast while fetching
-  const loadingToastId = showToast("Loading precentroids...", "info", 0); // 0 duration = manual removal
-
+// ---------------- Load queue ----------------
+async function fetchReviewQueue() {
+  const loadingToastId = showToast("Loading review queue...", "info", 0);
   try {
     const resp = await checkedFetch("/admin/review-queue-json");
-    precentroids = await resp.json();
+    reviewQueue = await resp.json();
     currentIndex = 0;
     renderCard();
     dismissToast(loadingToastId);
-  } catch (err) {
+  } catch(err) {
     dismissToast(loadingToastId);
-    console.error("Failed to fetch precentroids:", err);
-    showToast(`Failed to load precentroids: ${err.message}`, "error", 5000);
+    console.error("Failed to fetch review queue:", err);
+    showToast(`Failed to load review queue: ${err.message}`, "error", 5000);
   }
 }
 
-/* --------------------------------------------------
-   Rendering
-   -------------------------------------------------- */
+// ---------------- Render card ----------------
 function renderCard() {
-  const card = precentroids[currentIndex];
+  const card = reviewQueue[currentIndex];
+  const titleEl = document.getElementById("card-title");
+  const summaryEl = document.getElementById("card-summary");
+  const metaEl = document.getElementById("card-meta");
+  const detailsEl = document.getElementById("card-details");
 
   if (!card) {
-    document.getElementById("card-title").innerText = "No more precentroids";
-    document.getElementById("card-summary").innerText = "";
-    document.getElementById("card-meta").innerHTML = "";
-    document.getElementById("card-details").style.display = "none";
+    titleEl.innerText = "No more items";
+    summaryEl.innerText = "";
+    metaEl.innerHTML = "";
+    detailsEl.style.display = "none";
     return;
   }
 
-  document.getElementById("card-title").innerText = card.id;
-  document.getElementById("card-summary").innerText =
-    card.summary || "No summary available.";
-
-  const metaList = document.getElementById("card-meta");
-  metaList.innerHTML = "";
-  for (const [key, val] of Object.entries(card.meta || {})) {
+  titleEl.innerText = card.id;
+  summaryEl.innerText = card.summary || "No summary available.";
+  metaEl.innerHTML = "";
+  for (const [k,v] of Object.entries(card.meta || {})) {
     const li = document.createElement("li");
-    li.innerText = `${key}: ${val}`;
-    metaList.appendChild(li);
+    li.innerText = `${k}: ${JSON.stringify(v)}`;
+    metaEl.appendChild(li);
   }
-
-  document.getElementById("card-details").style.display = "none";
+  detailsEl.style.display = "none";
 }
 
-/* --------------------------------------------------
-   UI controls
-   -------------------------------------------------- */
-document
-  .getElementById("read-more-btn")
-  .addEventListener("click", () => {
-    const details = document.getElementById("card-details");
-    details.style.display =
-      details.style.display === "none" ? "block" : "none";
-  });
+// ---------------- Toggle details ----------------
+document.getElementById("read-more-btn").addEventListener("click", () => {
+  const details = document.getElementById("card-details");
+  details.style.display = (details.style.display === "none") ? "block" : "none";
+});
 
-/* --------------------------------------------------
-   Actions
-   -------------------------------------------------- */
+// ---------------- Swipe action ----------------
 async function swipeAction(action) {
-  const card = precentroids[currentIndex];
+  const card = reviewQueue[currentIndex];
   if (!card) return;
 
-  const endpoint =
-    action === "approve"
-      ? `/admin/precentroid/${card.id}/approve`
-      : `/admin/precentroid/${card.id}/reject`;
+  let endpoint;
+  if (card.type === "precentroid") {
+    endpoint = `/admin/precentroid/${card.id}/${action}`;
+  } else if (card.type === "split_suggestion") {
+    endpoint = `/admin/centroid/${card.id}/execute-split`;
+  } else {
+    console.warn("Unknown card type:", card.type);
+    return;
+  }
 
-  const actionToastId = showToast(
-    `${action === "approve" ? "Approving" : "Rejecting"} ${card.id}...`,
-    "info",
-    0
-  ); // Manual removal toast
-
+  const toastId = showToast(`${action}ing ${card.id}...`, "info", 0);
   try {
     await checkedFetch(endpoint, { method: "POST" });
-    dismissToast(actionToastId);
-    showToast(
-      `${action === "approve" ? "Approved" : "Rejected"} ${card.id}`,
-      "success"
-    );
+    dismissToast(toastId);
+    showToast(`${action.charAt(0).toUpperCase() + action.slice(1)}ed ${card.id}`, "success");
     currentIndex++;
     renderCard();
-  } catch (err) {
-    dismissToast(actionToastId);
+  } catch(err) {
+    dismissToast(toastId);
     console.error(`Failed to ${action} ${card.id}:`, err);
-    showToast(
-      `Failed to ${action} ${card.id}: ${err.message}`,
-      "error",
-      5000
-    );
+    showToast(`Failed to ${action} ${card.id}: ${err.message}`, "error", 5000);
   }
 }
 
-/* --------------------------------------------------
-   Button bindings
-   -------------------------------------------------- */
-document
-  .getElementById("approve-btn")
-  .addEventListener("click", () => swipeAction("approve"));
+// ---------------- Button bindings ----------------
+document.getElementById("approve-btn").addEventListener("click", () => swipeAction("approve"));
+document.getElementById("reject-btn").addEventListener("click", () => swipeAction("reject"));
 
-document
-  .getElementById("reject-btn")
-  .addEventListener("click", () => swipeAction("reject"));
-
-/* --------------------------------------------------
-   Keyboard shortcuts
-   -------------------------------------------------- */
-document.addEventListener("keydown", (e) => {
+// ---------------- Keyboard shortcuts ----------------
+document.addEventListener("keydown", e => {
   if (e.key === "ArrowLeft") swipeAction("reject");
   if (e.key === "ArrowRight") swipeAction("approve");
 });
 
-/* --------------------------------------------------
-   Toast helpers (integrated with peridocs-ui.js)
-   -------------------------------------------------- */
-function showToast(message, type = "info", duration = 2500) {
-  if (!window.showToast) {
-    console.warn(
-      "peridocs-ui.js toast system not loaded. Falling back to alert."
-    );
-    alert(message);
-    return null;
-  }
-  // window.showToast from peridocs-ui.js
+// ---------------- Toast helpers ----------------
+function showToast(message, type="info", duration=2500) {
+  if (!window.showToast) { alert(message); return null; }
   return window.showToast(message, type, duration);
 }
-
 function dismissToast(toastId) {
-  // This assumes peridocs-ui.js returns an ID you can dismiss; if not, no-op
   if (window.dismissToast) window.dismissToast(toastId);
 }
 
-/* --------------------------------------------------
-   Init
-   -------------------------------------------------- */
-document.addEventListener("DOMContentLoaded", () => {
-  if (typeof fetchPrecentroids === "function") {
-    fetchPrecentroids().catch((err) => {
-      console.error("Admin review failed to initialize:", err);
-      showToast(`Admin review failed to initialize: ${err.message}`, "error", 5000);
-    });
+
+// ---------------- Queue stats display ----------------
+async function updateQueueStats() {
+  const statsEl = document.getElementById("queue-stats");
+  if (!statsEl) return;
+
+  try {
+    const resp = await fetch("/admin/review-queue-json");
+    if (!resp.ok) throw new Error("Failed to fetch queue JSON");
+    const data = await resp.json();
+    statsEl.textContent = `Pending review items: ${data.length}`;
+  } catch (err) {
+    console.error("Failed to update queue stats:", err);
+    statsEl.textContent = "Unable to load review queue stats.";
   }
+}
+
+// Call it after loading queue
+document.addEventListener("DOMContentLoaded", () => {
+  updateQueueStats();
+});
+
+
+// ---------------- Init ----------------
+document.addEventListener("DOMContentLoaded", () => {
+  fetchReviewQueue().catch(err => {
+    console.error("Failed to initialize review queue:", err);
+    showToast(`Failed to initialize: ${err.message}`, "error", 5000);
+  });
 });

@@ -1,14 +1,15 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2025122911291156
+# save-state 202601012145 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import asyncio
-from core.map import centroids
+#from core.map import centroids
 from core.nlp.embeddings import _load_model, get_embedding_async
 import logging
+
 
 
 # ------------------- static file logging filter -------------------
@@ -31,11 +32,6 @@ async def preload_embedding_model():
     await _load_model()
     print("Model preloaded and ready!")
 
-# ---------------- Embedding Function Wrapper ----------------
-async def embedding_async(text: str):
-    return await get_embedding_async(text)
-
-asyncio.create_task(centroids.set_embedding_function(embedding_async))
 
 # ---------------- Static Files ----------------
 app.mount("/static", StaticFiles(directory="app/static"), name="static")

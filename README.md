@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 29 December 2025 (202512291317 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 30 December 2025 (202601012040 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -244,7 +244,8 @@ PeriDocs-code/                         # Root project folder
 ├─ core/
 │   ├─ map/
 │   │   ├─ admin_review_helpers.py        # logic for creating a dashboard for human administrators at PeriDocs.
-│   │   └─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
+│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
+│   │   └─ saaje.py                       # Software-auto-added journal entries so that centroids math stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention.
 │   │
 │   │
 │   │
