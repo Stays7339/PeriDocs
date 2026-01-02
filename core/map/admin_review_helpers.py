@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/admin_review_helpers.py
-# save-state 202601020003
+# save-state 202601021700
 # ==========================================
 import os
 import uuid
@@ -178,34 +178,16 @@ async def find_candidate_precentroid_ids(since_timestamp: Optional[str] = None) 
         cid for cid in centroids.CENTROIDS
         if cid.startswith("precentroid_")
     ]
+    
+
     return candidate_ids
 
-    # Merge highly similar candidates
-    merged: Dict[str, List[Dict[str, Any]]] = {}
-    keys = list(candidate_map.keys())
-    visited = set()
-    for i, k1 in enumerate(keys):
-        if k1 in visited: continue
-        cluster_entries = candidate_map[k1]
-        visited.add(k1)
-        for k2 in keys[i+1:]:
-            if k2 in visited: continue
-            vec1 = np.mean([np.array(e.get("embedding", [0]*1024)) for e in cluster_entries], axis=0)
-            vec2 = np.mean([np.array(e.get("embedding", [0]*1024)) for e in candidate_map[k2]], axis=0)
-            sim = np.dot(vec1, vec2) / (np.linalg.norm(vec1)*np.linalg.norm(vec2) + 1e-8)
-            if sim > 0.95:
-                cluster_entries.extend(candidate_map[k2])
-                visited.add(k2)
-        merged[k1] = cluster_entries
-    return list(merged.keys())
 
 # ---------------- Auto Precentroids ----------------
-async def auto_create_precentroids_for_unaffiliated(similarity_threshold: float = 0.55) -> List[str]:
-    """
-    Scan all journals and create one or more precentroids for any entries
-    not yet affiliated with any centroid or precentroid.
-    Highly similar entries are clustered into separate precentroids.
-    """
+async def auto_create_precentroids_for_unaffiliated(
+    similarity_threshold: float = 0.55,
+    min_cluster_size: int = 2,
+) -> list[str]:
     JOURNALS_FILE = os.path.join(centroids.DATA_DIR, "journals.json")
     if not os.path.exists(JOURNALS_FILE):
         return []
@@ -213,48 +195,48 @@ async def auto_create_precentroids_for_unaffiliated(similarity_threshold: float 
     async with aiofiles.open(JOURNALS_FILE, "r", encoding="utf-8") as f:
         all_entries = json.loads(await f.read())
 
+    affiliated_ids = set()
+    for affs in centroids.SAAJE_AFFILIATIONS.values():
+        affiliated_ids.update(affs.keys())
+
     unaffiliated = [
-        e for e in all_entries
-        if not e.get("nlp", {}).get("assigned_centroid_id")
-        or e["nlp"]["assigned_centroid_id"] == "suggest_new_centroid"
+        e for e in all_entries if e["journal_id"] not in affiliated_ids
     ]
-    if not unaffiliated:
+
+    if len(unaffiliated) < min_cluster_size:
         return []
 
-    # Cluster unaffiliated entries based on similarity
-    clusters: List[List[Dict[str, Any]]] = []
-    for entry in unaffiliated:
-        vec1 = np.array(entry.get("embedding", [0]*1024))
-        placed = False
-        for cluster in clusters:
-            cluster_vec = np.mean([np.array(e.get("embedding", [0]*1024)) for e in cluster], axis=0)
-            sim = np.dot(vec1, cluster_vec) / (np.linalg.norm(vec1)*np.linalg.norm(cluster_vec)+1e-8)
-            if sim >= similarity_threshold:
-                cluster.append(entry)
-                placed = True
-                break
-        if not placed:
-            clusters.append([entry])
+    vectors = []
+    for e in unaffiliated:
+        vec = await centroids._load_embedding_for_journal(e["journal_id"])
+        vectors.append(vec)
 
-    precentroid_ids = []
-    for cluster in clusters:
-        pre_id = await centroids.cluster_id_from_entries(cluster)
-        if pre_id not in centroids.CENTROIDS and pre_id not in centroids.CENTROID_METADATA:
-            await centroids.create_precentroid(journal_entries=cluster)
-            precentroid_ids.append(pre_id)
-            logger.info(f"Auto-created precentroid titled {pre_id} with {len(cluster)} entries")
+    X = np.stack(vectors)
+    clustering = AgglomerativeClustering(
+        n_clusters=None,
+        distance_threshold=1 - similarity_threshold,
+        affinity="cosine",
+        linkage="average",
+    )
+    labels = clustering.fit_predict(X)
 
-            # Also create a REVIEW_QUEUE entry for human review
-            await add_review_suggestion(
-                centroid_id=pre_id,
-                suggestion_type="new_centroid",
-                metrics={"candidate_count": len(cluster)},
-                save=False
-            )
+    precentroid_ids: list[str] = []
+    for lbl in set(labels):
+        members = [
+            unaffiliated[i]
+            for i in range(len(unaffiliated))
+            if labels[i] == lbl
+        ]
+        if len(members) < min_cluster_size:
+            continue
 
-    if precentroid_ids:
-        await save_review_queue()
+        cid = await centroids.create_precentroid(
+            journal_entries=members,
+            similarity_threshold=similarity_threshold,
+        )
+        precentroid_ids.append(cid)
 
+    return precentroid_ids
 
 # ---------------- Queue Refresh ----------------
 async def enqueue_split_suggestions(watch_threshold: float = 0.85) -> List[str]:

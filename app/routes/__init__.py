@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 202601012145 (YYYYMMDDhhmm)
+# save-state 202601021421 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -9,6 +9,8 @@ import asyncio
 #from core.map import centroids
 from core.nlp.embeddings import _load_model, get_embedding_async
 import logging
+from core.map import ledger, centroids
+
 
 
 
@@ -32,6 +34,13 @@ async def preload_embedding_model():
     await _load_model()
     print("Model preloaded and ready!")
 
+@app.on_event("startup")
+async def load_centroid_state():
+    print("Loading centroid state...")
+    await centroids.load_state()
+    print("Centroid state loaded and ledger integrity verified.")
+
+
 
 # ---------------- Static Files ----------------
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
@@ -44,3 +53,4 @@ from app.routes import feedback
 # ---------------- Include router-based routes ----------------
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
+

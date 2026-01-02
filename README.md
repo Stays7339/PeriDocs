@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 30 December 2025 (202601012040 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 02 January 2026 (202601021420 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -195,7 +195,7 @@ PeriDocs-code/                         # Root project folder
 ├─ app/                                # Backend + frontend application code
 │  │
 │  ├─ helpers/
-│  │  ├─ __init__.py
+│  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # raw similarity computations for entry-to-entry
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
@@ -244,8 +244,9 @@ PeriDocs-code/                         # Root project folder
 ├─ core/
 │   ├─ map/
 │   │   ├─ admin_review_helpers.py        # logic for creating a dashboard for human administrators at PeriDocs.
-│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion
-│   │   └─ saaje.py                       # Software-auto-added journal entries so that centroids math stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention.
+│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
+│   │   ├─ ledger.py                      # ==== CRITICAL ===== FOR ALL OF PERIDOCS. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
+│   │   └─ saaje.py                       # controls assignment of Software-auto-added journal entries (SAAJEs). This is so centroids math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism..
 │   │
 │   │
 │   │
