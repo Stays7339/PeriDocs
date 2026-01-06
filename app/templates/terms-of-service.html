@@ -1,134 +1,130 @@
-{# PeriDocs-code/app/templates/terms-of-service.html save-state 202512301040 #}
+{# PeriDocs-code/app/templates/terms-of-service.html save-state 202601052141 #}
 {% extends "base.html" %}
 {% block title %}Terms of Service — PeriDocs{% endblock %}
 
 {% block content %}
+
 <div class="wrap">
   <div class="card">
     <div class="card-content">
       <h1>PeriDocs Terms of Service</h1>
 
-      <p><strong>Effective Date:</strong> 30 December 2025</p>
 
-      <h2>1. Acceptance of Terms</h2>
-      <p>
-        By accessing or using PeriDocs ("we","us","Service"), the individual(s) using the Service ("User", "Users") agrees to these Terms of Service ("Terms"). 
-        If you do not agree, do not use the Service.
-      </p>
+  <p><strong>Effective Date:</strong> 5 January 2026</p>
 
-      <h2>2. Description of Service</h2>
-      <p>
-        PeriDocs is an educational platform that analyzes user-submitted text and provides semantic, 
-        sentiment, and entity-based insights connected to reviewed materials and community experiences. 
-        The Service is intended solely for personal learning, reflection, and educational purposes.
-      </p>
+  <h2>1. Acceptance of Terms</h2>
+  <p>
+    By accessing or using PeriDocs (“PeriDocs,” “we,” “us,” or “the Service”), the individual(s) using the Service (“User,” “Users”) agree to these Terms of Service (“Terms”). 
+    If you do not agree, do not use the Service.
+  </p>
 
-      <h2>3. User Content and Privacy</h2>
-      <p>
-        The Service stores entries securely, pseudonymizes IP addresses via HMAC for operational purposes, 
-        and encrypts IP addresses in escalated crisis incidents or legal incidents. In normal use, PeriDocs staff and 
-        developers only see pseudonymized identifiers derived from IPs. The server (the Service's computers) sees 
-        the IP for each request, but raw addresses are encrypted and stored only in verified crisis escalations or legal escalations. Only 
-        authorized legal operations personnel can decrypt these original IP records, and every access is logged in an 
-        auditable trail. User consents to this minimal data collection by using the Service. User retains ownership of submitted content. 
+  <h2>2. Description of Service</h2>
+  <p>
+    PeriDocs is an educational journaling and analysis platform. The Service allows Users to submit text entries for educational, reflective, and analytical purposes. 
+    Insights are generated for personal learning and reflection only and are not a substitute for professional advice.
+  </p>
 
-        By submitting content, User grants the Service a <strong>worldwide, royalty-free, sublicensable, and transferable license</strong> 
-        to use, reproduce, distribute, and display submitted content solely for:
-        <ul>
-          <li>-Operating the Service</li>
-          <li>-Providing analysis</li>
-          <li>-Sharing anonymized submissions</li>
-          <li>-Aggregated statistics and derivative insights generated internally (e.g., vector embeddings, cosine similarity data used in <code>nlp.py</code>)</li>
-        </ul>
-        To clarify aforementioned terms:
-        <ul>
-          <li><strong>-Worldwide:</strong> Content may be used anywhere in the world.</li>
-          <li><strong>-Royalty-free:</strong> User is not owed any payment for PeriDocs’ use.</li>
-          <li><strong>-Sublicensable:</strong> PeriDocs may grant rights to trusted partners or service providers for operational purposes. “Sublicensing applies only to operational service providers (hosting, storage, security auditing). We never sublicense to marketing or AI training partners.</li>
-          <li><strong>-Transferable:</strong> PeriDocs may transfer the license to a successor entity (e.g., in case of acquisition).</li>
-          <li><strong>-Embeddings:</strong> Embeddings are non-reversible numeric vectors that cannot be attributed to a specific user and are classified as non-personal statistical data.”.</li>
-        </ul>
+  <h2>3. User Content, Data Processing, and Deletion</h2>
+  <p>
+    PeriDocs processes user-submitted content (“Entries”) for the sole purposes of operating the Service, providing requested analyses, and maintaining system integrity.
+  </p>
 
-        This license does not grant PeriDocs ownership; User retains all copyrights. Entries are stored perpetually unless removed via email request. User is responsible for saving their entry ID. Algorithms may be fallible; results are educational only.
-        <strong>Removal and License Revocation:</strong> User may revoke this license by submitting a removal request 
-        via <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with the entry's unique ID. 
-        PeriDocs will remove the specific entry and revoke the license; aggregated statistics and derivative insights 
-        may persist as anonymized, non-identifiable data. Cross-reference our <a href="/privacy-policy">Privacy Policy</a> for additional privacy compliance details.
+  <h3>3.1 Data Collected</h3>
+  <ul>
+    <li>Account identifiers (e.g., email address)</li>
+    <li>User-submitted text entries</li>
+    <li>System-generated metadata required for operation (e.g., timestamps, internal identifiers)</li>
+    <li>Technical request data (including IP addresses, pseudonymized for routine operation)</li>
+  </ul>
+  <p>
+    IP addresses are processed transiently for network security and abuse prevention. Raw IP addresses are not retained in plaintext beyond immediate operational necessity. Encrypted incident records containing IP data may be retained only in limited circumstances involving legal compliance or credible safety escalations, accessible solely by authorized legal operations personnel. All access is logged in an auditable trail.
+  </p>
 
-        In cases where an entry triggers a safety or legal escalation, encrypted incident records may be stored and disclosed only to authorized legal operations personnel or law enforcement as legally required. All actions involving decryption or promotion of such data are logged in an auditable trail with timestamps, justification, and actor identification.
-      </p>
+  <h3>3.2 Derived and Analytical Data</h3>
+  <p>
+    PeriDocs may generate internal analytical representations of Entries, including semantic embeddings and similarity indices. These are used solely to provide Service features, are never sold or licensed for advertising, and are treated as personal data when reasonably linkable to a User.
+  </p>
 
-      <h2>3A. Age Eligibility</h2>
-      <p>
-        PeriDocs is intended for individuals who are <strong>16 years of age or older</strong>.
-        Users under 16 years old are not permitted to create accounts, submit entries,
-        or access any part of the Service. This restriction ensures compliance with:
-      </p>
-      <ul>
-        <li>-The California Consumer Privacy Act (CCPA) and Children’s Online Privacy Protection Act (COPPA)</li>
-        <li>-The European Union’s General Data Protection Regulation (GDPR) and GDPR-K child data protections</li>
-      </ul>
+  <h3>3.3 License Grant</h3>
+  <p>
+    By submitting content, Users grant PeriDocs a limited, non-exclusive, worldwide, royalty-free license to process, store, and display Entries solely for:
+  </p>
+  <ul>
+    <li>Operating and maintaining the Service</li>
+    <li>Providing requested analyses and features</li>
+    <li>Ensuring security, integrity, and lawful operation</li>
+  </ul>
+  <p>
+    This license is not granted for advertising, marketing, or training third-party systems. Users retain all ownership rights in their content.
+  </p>
 
-      <p>
-        By using the Service, User represents and warrants that they are <strong>at least 16 years old</strong>.
-        If we learn that a User is under 16, we will delete the associated data and put forth efforts to prohibit further access.
-      </p>
-      <p>
-        If you believe a minor under 16 has used the Service, contact us at 
-        <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
-      </p>
+  <h3>3.4 Deletion and Erasure Rights</h3>
+  <p>
+    Users may request deletion of their content and associated data through the Service’s account interface or by contacting 
+    <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
+  </p>
+  <ul>
+    <li>PeriDocs will permanently delete User Entries</li>
+    <li>Associated analytical representations, including embeddings and similarity indices, will be permanently deleted</li>
+    <li>Related metadata will be permanently deleted or irreversibly anonymized, except where retention is required by law</li>
+  </ul>
+  <p>
+    Deletion is destructive and irreversible. Deleted data cannot be restored, and deletion may permanently impair or disable features associated with the User’s account. Users do not need to supply entry identifiers to exercise deletion rights. Limited legal records may be retained strictly as required by law.
+  </p>
 
-      <h2>4. Prohibited Use</h2>
-      <p>
-        User may not submit content that violates laws, infringes third-party rights or 
-        intellectual property, or is intended to harm others, nor content giving rise to a reasonable suspicion of such intent. Submissions indicating imminent harm may 
-        trigger crisis escalation procedures. Submissions are used internally for analysis, insight generation, 
-        and indexing. Attempts to extract, scrape, or reuse PeriDocs content (including aggregated or derivative insights) outside personal or subscribed use are prohibited, reflecting broader legal protections such as cutting-edge industry practices against unauthorized scraping.
-      </p>
+  <h2>3A. Age Eligibility</h2>
+  <p>
+    The Service is intended solely for individuals who are at least 16 years of age, or the minimum age of digital consent in their jurisdiction, whichever is higher. 
+    PeriDocs does not knowingly process personal data from individuals below this age. If such data is discovered, it will be deleted without undue delay. Users represent and warrant they meet the applicable age requirement by using the Service.
+  </p>
 
-      <h2>5. No Medical or Mental Health Advice</h2>
-      <p>
-        PeriDocs does not provide medical, clinical, mental health, or therapeutic advice. Insights generated are for 
-        educational and reflective purposes only and do not replace professional care.
-      </p>
+  <h2>4. Prohibited Use</h2>
+  <p>
+    Users may not submit content that violates laws, infringes third-party rights or intellectual property, or is intended to harm others. Submissions indicating imminent harm may trigger crisis escalation procedures. Attempts to extract, scrape, or reuse PeriDocs content outside personal or subscribed use are prohibited.
+  </p>
 
-      <h2>6. Escalations and Legal Compliance</h2>
-      <p>
-        In cases of flagged entries indicating risk of harm or other legal concerns, encrypted incident records 
-        may be stored and disclosed only to authorized legal operations personnel or law enforcement as required by law. 
-        All actions are logged in an auditable trail.
-      </p>
+  <h2>5. No Medical or Mental Health Advice</h2>
+  <p>
+    PeriDocs does not provide medical, clinical, mental health, or therapeutic advice. Insights are for educational and reflective purposes only.
+  </p>
 
-      <h2>7. Limitation of Liability</h2>
-      <p>
-        PeriDocs is provided "as-is." The Service is not responsible for any reliance on content or outcomes derived 
-        from submissions. Use is at User's own risk.
-      </p>
+  <h2>6. Escalations and Legal Compliance</h2>
+  <p>
+    In cases of flagged entries indicating credible risk of harm or legal obligation, encrypted incident records may be stored and disclosed only to authorized legal operations personnel or law enforcement as required by law. All access is auditable.
+  </p>
 
-      <h2>8. Refunds and Payments</h2>
-      <p>
-        Paid features or subscription refunds are handled via <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. 
-        Free access remains fully functional, while paid tiers provide enhanced features such as tracking, 
-        search history, and curated deep-dive content.
-      </p>
+  <h2>7. Limitation of Liability</h2>
+  <p>
+    The Service is provided “as-is.” PeriDocs is not responsible for reliance on content or outcomes derived from submissions. Use is at the User’s own risk.
+  </p>
 
-      <h2>9. Changes to Terms</h2>
-      <p>
-        PeriDocs may update these Terms from time to time. Continued use constitutes acceptance of the updated Terms.
-      </p>
+  <h2>8. Payments and Refunds</h2>
+  <p>
+    Paid features are optional and clearly identified prior to purchase. Refunds are provided in accordance with applicable consumer protection laws. Users may exercise a right of withdrawal within the statutory period where required.
+  </p>
+  <p>
+    Refund requests may be submitted via the account interface or by contacting 
+    <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. Approved refunds are processed using the original payment method within a commercially reasonable timeframe. PeriDocs does not guarantee refunds outside legally mandated circumstances unless explicitly stated at the time of purchase.
+  </p>
 
-      <h2>10. Jurisdiction</h2>
-      <p>
-        These Terms are governed by the laws of Atlanta, Georgia, USA and applicable international privacy and data protection laws. 
-        Cross-reference our <a href="/privacy-policy">Privacy Policy</a> for details on data handling.
-      </p>
+  <h2>9. Changes to Terms</h2>
+  <p>
+    PeriDocs may update these Terms from time to time. Continued use constitutes acceptance of the updated Terms.
+  </p>
 
-      <h2>11. Contact</h2>
-      <p>
-        Questions regarding these Terms can be sent to <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
-      </p>
-    </div>
-    {% include 'includes/footer.html' %}
+  <h2>10. Governing Law and Jurisdiction</h2>
+  <p>
+    These Terms are governed by the laws of the State of Georgia, United States of America, without regard to conflict-of-law principles. Nothing in these Terms limits any rights Users may have under applicable mandatory consumer protection or data protection laws, including the GDPR the CPPA where applicable.
+  </p>
+
+  <h2>11. Contact</h2>
+  <p>
+    Questions regarding these Terms can be sent to 
+    <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
+  </p>
+</div>
+{% include 'includes/footer.html' %}
+
   </div>
 </div>
 {% endblock %}

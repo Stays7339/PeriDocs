@@ -1,4 +1,4 @@
-<!--privacy policy page for PeriDocs.org-->
+{# PeriDocs-code/app/templates/privacy.html save-state 202601052139 #}
 {% extends "base.html" %}
 {% block title %}Privacy Policy — PeriDocs{% endblock %}
 
@@ -6,74 +6,187 @@
 <div class="wrap">
   <div class="card">
     <div class="card-content">
-        <h1>PeriDocs Privacy Policy</h1>
+      <h1>PeriDocs Privacy Policy</h1>
 
-        <p><strong>Effective Date:</strong> 3 November 2025</p>
-        <p>
-        PeriDocs ("the Service") is committed to transparency and privacy. This document outlines what information we collect, 
-        how it is used, and how we protect the Users of the Service ("Users"). Cross-reference our <a href="/terms-of-service">Terms of Service</a> for licensing and content usage.
-        </p>
+      <p><strong>Effective Date:</strong> 5 January 2026</p>
 
-        <h2>1. Service Data Collection</h2>
-        <p>
-        When Users submit content, the User's computer (client-side) temporarily processes their network address (IP) to protect 
-        the service from abuse and comply with legal obligations if a threat is detected. The server (the Service's computers) sees the IP on every request, 
-        but raw IPs are never exposed to staff or developers under normal operations. Routine logging uses a pseudonymized 
-        HMAC hash of the IP, never storing raw IPs. These pseudonyms enable rate-limiting, detection of repeated submissions, 
-        and operational analytics without compromising privacy. Raw IPs are only accessible to authorized legal operations personnel 
-        in cases of crisis or legal escalation.
-        </p>
+      <p>
+        PeriDocs (“PeriDocs,” “we,” “us,” or “the Service”) provides an educational journaling and analysis platform.
+        This Privacy Policy explains what personal data is processed, how it is processed, and the rights available
+        to Users under applicable data protection laws. This document must be read together with our
+        <a href="/terms-of-service">Terms of Service</a>, which governs licensing, acceptable use, and deletion.
+      </p>
 
-        <h2>2. Text Analysis and Internal Metrics</h2>
-        <p>
-        Submitted text is processed to generate internal, numeric, non-reversible representations (embeddings), semantic similarity comparisons, 
-        and sentiment or emotional tone metrics using curated lexicons and NLP models. These analyses are used solely for:
-        <ul>
-          <li>Providing educational and reflective insights to Users</li>
-          <li>Detecting repeated ideas or related content in your writing history</li>
-          <li>Generating anonymized, aggregate statistics for system performance and research</li>
-        </ul>
-        These representations cannot be traced back to individual Users and are never shared publicly or used for profiling, marketing, or clinical judgment.
-        </p>
+      <h2>1. Scope and Governing Principles</h2>
+      <p>
+        PeriDocs is designed around the principles of data minimization, determinism, auditability, and human oversight.
+        Personal data is processed only where necessary to operate the Service, comply with legal obligations, and
+        maintain system integrity. No personal data is processed for advertising, behavioral profiling, or resale.
+      </p>
 
-        <h2>3. Crisis and Safety Escalations</h2>
-        <p>
-        If a submission indicates potential harm to self or others, the system may flag it. Relevant ephemeral logs are copied into a secured incident file. The originating raw IP may 
-        be encrypted with a private asymmetric key and stored securely on servers fully managed by PeriDocs. Only authorized 
-        legal operations personnel can decrypt these records and share them with law enforcement when legally required. 
-        Every decryption or escalation action is recorded in an auditable log, including timestamp, reason, and actor. Escalation records are retained until resolution or as required by law. 
-        For users outside the U.S., local emergency services are referenced for guidance, while U.S. users are directed to 911 or 988.
-        </p>
+      <p>
+        Where applicable, PeriDocs processes personal data in accordance with the General Data Protection Regulation
+        (GDPR) and the laws of the State of Georgia, United States of America. Users subject to CPPA legislation may have additional rights.
+      </p>
 
-        <h2>4. Data Minimization and Retention</h2>
-        <p>
-        Routine logs of pseudonymized IPs and ephemeral system activity are retained for 30 days and automatically purged. 
-        Encrypted escalation records are retained until resolution or legal retention requirements. No behavioral telemetry, 
-        analytics profiles, or marketing data are collected. Entries themselves are stored perpetually unless a user 
-        requests removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> with their saved entry ID, at which point the license granted in TOS section 3 is revoked.
-        </p>
+      <h2>2. Categories of Data Processed</h2>
 
-        <h2>5. Local Storage and Sessions</h2>
-        <p>
-        Browser storage is minimal and ephemeral, used only for session tokens, dark mode preferences, or temporary cooldown timers. 
-        Session tokens are not linked to personal information.
-        </p>
+      <h3>2.1 Account and Access Data</h3>
+      <p>
+        PeriDocs processes basic account identifiers such as email address and internal account IDs.
+        Authentication data is used solely to provide account access and is not shared or repurposed.
+      </p>
 
-        <h2>6. Legal Compliance and Jurisdiction</h2>
-        <p>
-        PeriDocs complies with lawful requests from authorities in the jurisdictions where Users of the Service reside. 
-        Escalated data may be disclosed only when required to prevent imminent harm or satisfy legal obligations. 
-        This Privacy Policy is governed by the laws of Atlanta, Georgia, USA and applicable international privacy regulations.
-        </p>
+      <h3>2.2 User-Submitted Journal Entries</h3>
+      <p>
+        Users may submit free-form journal entries. These entries may contain personal or sensitive information
+        depending on what the User chooses to write. PeriDocs does not require or solicit health, medical, or
+        diagnostic information.
+      </p>
 
-        <h2>7. Contact</h2>
-        <p>
-        For privacy, safety inquiries, or to request content removal, contact <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>. 
-        Verified safety reports and removal requests will be addressed in compliance with legal obligations.
-        </p>
+      <h3>2.3 Derived Analytical Data</h3>
+      <p>
+        To operate the Service, PeriDocs generates internal analytical representations of journal entries,
+        including semantic embeddings, similarity scores, centroid membership, and related metadata.
+      </p>
+
+      <p>
+        In accordance with applicable data protection laws, PeriDocs treats derived analytical data as
+        <strong>personal data</strong> where it is reasonably linkable to a User or their content.
+      </p>
+
+      <p>
+        Embeddings are immutable numeric vectors generated using an offline-cached language model.
+        They are never recomputed, never modified, and never reused for unrelated purposes.
+      </p>
+
+      <h3>2.4 Technical and Network Data</h3>
+      <p>
+        The Service necessarily processes network metadata such as IP addresses to deliver requests,
+        protect against abuse, and ensure system security.
+      </p>
+
+      <p>
+        Under normal operations:
+      </p>
+      <ul>
+        <li>Raw IP addresses are not visible to staff or developers</li>
+        <li>Routine logs store only pseudonymized IP representations using keyed HMAC</li>
+        <li>Pseudonymized identifiers are used for rate-limiting and abuse detection only</li>
+      </ul>
+
+      <p>
+        Raw IP addresses may be encrypted and retained only in narrowly defined legal or safety escalation scenarios,
+        as described below.
+      </p>
+
+      <h2>3. Purpose of Processing</h2>
+      <p>
+        Personal data is processed solely for the following purposes:
+      </p>
+      <ul>
+        <li>Operating and maintaining the PeriDocs Service</li>
+        <li>Providing requested educational and reflective analyses</li>
+        <li>Maintaining deterministic, auditable system behavior</li>
+        <li>Preventing abuse, fraud, or system misuse</li>
+        <li>Complying with legal obligations</li>
+      </ul>
+
+      <p>
+        PeriDocs does not process personal data for advertising, behavioral tracking, marketing analytics,
+        or automated decision-making with legal or similarly significant effects.
+      </p>
+
+      <h2>4. Centroids, Moderation, and Human Oversight</h2>
+      <p>
+        Journal entries may be grouped into human-approved semantic clusters (“Centroids”) as described in
+        PeriDocs’ published technical specification. All centroid creation, approval, rejection, splitting,
+        and labeling decisions require explicit human moderation.
+      </p>
+
+      <p>
+        Software-generated suggestions never create authoritative categories on their own and never override
+        human decisions. All centroid evolution is auditable and deterministic.
+      </p>
+
+      <h2>5. Crisis and Legal Escalations</h2>
+      <p>
+        If a submission indicates credible risk of harm or triggers a legal obligation, the system may
+        generate a restricted incident record.
+      </p>
+
+      <p>
+        In such cases:
+      </p>
+      <ul>
+        <li>Relevant data may be copied into a secured incident file</li>
+        <li>Raw IP addresses may be encrypted using asymmetric encryption</li>
+        <li>Access is limited to authorized legal operations personnel</li>
+        <li>Every access, decryption, or disclosure is logged with timestamp, reason, and actor</li>
+      </ul>
+
+      <p>
+        Incident records are retained only as long as necessary to resolve the escalation or satisfy legal
+        retention requirements.
+      </p>
+
+      <h2>6. Data Retention</h2>
+      <p>
+        Data retention follows strict minimization rules:
+      </p>
+      <ul>
+        <li>Pseudonymized operational logs are retained for up to 30 days</li>
+        <li>Encrypted escalation records are retained only as legally required</li>
+        <li>Journal entries and derived analytical data persist until deletion is requested or required by law</li>
+      </ul>
+
+      <h2>7. Deletion and Erasure Rights</h2>
+      <p>
+        Users may request deletion of their personal data through the account interface or by contacting
+        <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
+      </p>
+
+      <p>
+        Upon a verified deletion request, PeriDocs will permanently delete:
+      </p>
+      <ul>
+        <li>User journal entries</li>
+        <li>Associated embeddings and similarity data</li>
+        <li>Centroid associations attributable to the User</li>
+        <li>Related metadata, except where retention is legally required</li>
+      </ul>
+
+      <p>
+        Deletion is irreversible and may permanently disable features associated with the User’s account.
+        PeriDocs does not require Users to supply entry identifiers to exercise deletion rights.
+      </p>
+
+      <h2>8. Local Storage and Sessions</h2>
+      <p>
+        The Service uses minimal browser storage for session management and interface preferences.
+        Session tokens are short-lived and are not used for tracking across services.
+      </p>
+
+      <h2>9. International Users</h2>
+      <p>
+        PeriDocs is operated from the United States. Personal data may be processed on servers located
+        in jurisdictions different from the User’s residence, subject to appropriate safeguards.
+      </p>
+
+      <h2>10. Changes to This Policy</h2>
+      <p>
+        This Privacy Policy may be updated to reflect changes in law or system behavior.
+        Material changes will be reflected by updating the effective date.
+      </p>
+
+      <h2>11. Contact</h2>
+      <p>
+        Privacy or data protection inquiries may be directed to
+        <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
+      </p>
 
     </div>
-      {% include 'includes/footer.html' %}
+    {% include 'includes/footer.html' %}
   </div>
 </div>
 {% endblock %}

@@ -1,224 +1,135 @@
 # ==========================================
 # core/map/saaje.py
-# save-state 202601021659 (YYYYMMDDhhmm)
+# Save-state: 202601051835
 # ==========================================
+
 """
-SAAJE (Software-Auto-Added Journal Entry) assignment layer.
+SAAJE (Software-Auto-Added Journal Entry) helpers.
 
-Responsibilities:
-- Entry → centroid affiliation (many-to-many)
-- Thresholded, reversible, non-destructive
-- Triggered asynchronously after persistence events
-- Triggered again after material centroid changes
+This module:
+- computes similarity against existing centroids
+- decides whether a journal qualifies as a SAAJE
+- delegates all mutation to CentroidSystem
+- emits only centroid-owned ledger events
 
-This module NEVER:
-- Computes embeddings
-- Creates / mutates centroids
-- Performs admin actions
-- Blocks journal submission paths
+This module owns no state.
 """
 
-from __future__ import annotations
-
-import asyncio
-import json
+from typing import Dict, List, Tuple
 import logging
-import os
-from typing import Dict, Iterable, Optional
 
-import numpy as np
-import aiofiles
-
-from .centroids import (
-    CENTROIDS,
-    SAAJE_AFFILIATIONS,
-    CENTROID_METADATA,
-    save_state,
-    _cosine_similarity,
+from core.map.centroids import (
+    cosine_similarity,
+    load_embedding,
 )
+from core.map.runtime import centroid_system
 
 logger = logging.getLogger("peridocs.saaje")
-logger.setLevel(logging.INFO)
-if not logger.hasHandlers():
-    h = logging.StreamHandler()
-    h.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
-    logger.addHandler(h)
 
 
-# -------------------------------------------------
-# Core entry-level assignment
-# -------------------------------------------------
-
-async def assign_entry_saaje(
-    *,
-    journal_id: str,
-    embedding: np.ndarray,
-    min_similarity: float = 0.7,
-) -> Dict[str, float]:
+class SaajeDecision:
     """
-    Compute centroid affiliations for a single journal entry.
+    Immutable decision result.
+    """
+    __slots__ = ("centroid_id", "similarity")
+
+    def __init__(self, centroid_id: str, similarity: float):
+        self.centroid_id = centroid_id
+        self.similarity = similarity
+
+
+async def evaluate_saaje_candidates(
+    journal_id: str,
+    *,
+    min_similarity: float,
+    max_affiliations: int | None = None,
+) -> List[SaajeDecision]:
+    """
+    Determine which existing centroids a journal entry qualifies
+    to be auto-attached to as a SAAJE.
+
+    Deterministic ordering:
+    - sorted by similarity desc
+    - tie-broken by centroid_id
+    """
+    journal_vec = load_embedding(journal_id)
+    system = centroid_system
+
+    decisions: List[SaajeDecision] = []
+
+    # Snapshot under system lock to ensure consistency
+    async with system._lock:
+        centroids = list(system._centroids.values())
+
+    for c in centroids:
+        if c.centroid_id.startswith("precentroid_"):
+            continue  # spec: no SAAJEs on precentroids
+
+        sim = cosine_similarity(journal_vec, c.current.vector)
+        if sim >= min_similarity:
+            decisions.append(SaajeDecision(c.centroid_id, sim))
+
+    decisions.sort(
+        key=lambda d: (-d.similarity, d.centroid_id)
+    )
+
+    if max_affiliations is not None:
+        decisions = decisions[:max_affiliations]
+
+    return decisions
+
+
+async def apply_saajes(
+    journal_id: str,
+    *,
+    min_similarity: float,
+    max_affiliations: int | None = None,
+) -> List[Tuple[str, float]]:
+    """
+    Evaluate and attach SAAJEs to qualifying centroids.
 
     Returns:
-        {centroid_id: similarity}
+        List of (centroid_id, similarity) applied.
 
     Side effects:
-        Updates SAAJE_AFFILIATIONS + persists state if matches found.
+        - ADD_SAAJE events recorded via CentroidSystem
     """
-    if embedding.shape[0] != 1024:
-        raise ValueError("SAAJE embedding dim must be 1024")
-
-    affinities: Dict[str, float] = {}
-
-    for cid, centroid_vec in CENTROIDS.items():
-        if not cid.startswith("centroid_"):
-            continue
-        if CENTROID_METADATA.get(cid, {}).get("status") != "approved":
-            continue
-
-        sim = _cosine_similarity(embedding, centroid_vec)
-        if sim >= min_similarity:
-            affinities[cid] = sim
-
-    if not affinities:
-        logger.info(f"SAAJE: {journal_id} matched no centroids")
-        return {}
-
-    SAAJE_AFFILIATIONS[journal_id] = dict(
-        sorted(affinities.items(), key=lambda x: x[1], reverse=True)
+    decisions = await evaluate_saaje_candidates(
+        journal_id,
+        min_similarity=min_similarity,
+        max_affiliations=max_affiliations,
     )
 
-    await save_state()
-    logger.info(
-        f"SAAJE: {journal_id} → {list(SAAJE_AFFILIATIONS[journal_id].keys())}"
-    )
+    applied: List[Tuple[str, float]] = []
 
-    return SAAJE_AFFILIATIONS[journal_id]
-
-
-# -------------------------------------------------
-# Background task helpers (non-blocking)
-# -------------------------------------------------
-
-def spawn_saaje_for_entry(
-    *,
-    journal_id: str,
-    embedding_list: list[float],
-    min_similarity: float = 0.7,
-) -> None:
-    """
-    Fire-and-forget SAAJE assignment.
-
-    Safe to call from request paths.
-    """
-    try:
-        vec = np.array(embedding_list, dtype=float)
-    except Exception:
-        logger.exception("Failed to cast embedding for SAAJE")
-        return
-
-    asyncio.create_task(
-        assign_entry_saaje(
-            journal_id=journal_id,
-            embedding=vec,
-            min_similarity=min_similarity,
-        )
-    )
-
-
-# -------------------------------------------------
-# Re-evaluation after centroid changes
-# -------------------------------------------------
-
-async def reassign_saaje_for_centroids(
-    *,
-    affected_centroid_ids: Optional[Iterable[str]] = None,
-    min_similarity: float = 0.7,
-) -> None:
-    """
-    Re-run SAAJE assignment for *existing* entries
-    after a material centroid change (approval, split, burst).
-
-    If affected_centroid_ids is None:
-        Full re-evaluation.
-    Else:
-        Only entries previously touching those centroids.
-    """
-    if not SAAJE_AFFILIATIONS:
-        logger.info("SAAJE reassign skipped (no existing affiliations)")
-        return
-
-    affected = set(affected_centroid_ids) if affected_centroid_ids else None
-
-    # snapshot to avoid mutation during iteration
-    journal_ids = list(SAAJE_AFFILIATIONS.keys())
-
-    for jid in journal_ids:
-        if affected:
-            if not affected.intersection(SAAJE_AFFILIATIONS.get(jid, {})):
-                continue
-
-        emb = await _load_embedding_for_journal(jid)
-        if emb is None:
-            continue
-
-        await assign_entry_saaje(
-            journal_id=jid,
-            embedding=emb,
-            min_similarity=min_similarity,
-        )
-
-    logger.info("SAAJE re-evaluation complete")
-
-
-# -------------------------------------------------
-# Internal utilities
-# -------------------------------------------------
-
-async def _load_embedding_for_journal(journal_id: str) -> Optional[np.ndarray]:
-    """
-    Loads embedding from the journal embedding dump files.
-
-    Intentionally isolated here so we can later
-    swap storage backends without touching logic.
-    """
-    from glob import glob
-
-    embed_files = sorted(glob("data/journals_embeddings_dump*.json"))
-
-    for path in embed_files:
+    for d in decisions:
         try:
-            async with aiofiles.open(path, "r", encoding="utf-8") as f:
-                data = json.loads(await f.read())
-            if journal_id in data:
-                vec = np.array(data[journal_id], dtype=float)
-                if vec.shape[0] != 1024:
-                    raise ValueError("Invalid embedding dimension")
-                return vec
-        except Exception:
-            continue
+            await centroid_system.add_saaje(
+                d.centroid_id,
+                journal_id,
+                d.similarity,
+            )
+            applied.append((d.centroid_id, d.similarity))
+        except Exception as e:
+            logger.warning(
+                "Failed to apply SAAJE: centroid=%s journal=%s err=%s",
+                d.centroid_id,
+                journal_id,
+                e,
+            )
 
-    logger.warning(f"SAAJE: embedding not found for {journal_id}")
-    return None
+    return applied
 
-async def reject_saaje(
+
+async def remove_saaje(
     *,
-    journal_id: str,
     centroid_id: str,
-    similarity: float,
-    reason: str | None = None,
+    journal_id: str,
 ) -> None:
-    from datetime import datetime, timezone
+    """
+    Explicit human-driven removal of a SAAJE.
 
-    SAAJE_REJECTIONS.setdefault(journal_id, {})[centroid_id] = {
-        "rejected_at": datetime.now(timezone.utc).isoformat(),
-        "similarity_at_rejection": similarity,
-        "reason": reason,
-    }
-
-    # remove active affiliation if present
-    if journal_id in SAAJE_AFFILIATIONS:
-        SAAJE_AFFILIATIONS[journal_id].pop(centroid_id, None)
-        if not SAAJE_AFFILIATIONS[journal_id]:
-            SAAJE_AFFILIATIONS.pop(journal_id)
-
-    await save_state()
+    Emits:
+        REMOVE_SAAJE event via CentroidSystem
+    """
+    await centroid_system.remove_saaje(centroid_id, journal_id)

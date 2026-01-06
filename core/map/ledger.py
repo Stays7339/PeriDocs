@@ -1,202 +1,215 @@
 # ==========================================
 # core/map/ledger.py
-# save-state 202601021737 (YYYYMMDDhhmm)
+# Save-state: 202601052023
 # ==========================================
-"""
-
-The PeriDocs-code/data/ledger/ directory , alongwith this accompanying python file, is a very import part of the PeriDocs corpus state.
-
-Deleting or modifying files here will break deterministic replay.
-
-The centroid_ledger.json file records the historical issuance
-order of centroid and precentroid identifiers.
-
-It must be versioned, backed up, and transported together with
-journals and centroid state files. If not, the entire system WILL BREAK; there's no doubt about that.
 
 """
+Deterministic identifier and event ledger.
 
+Sole authority for:
+- suffix issuance (precentroid / centroid)
+- event index issuance
+- lifecycle transitions
+- replay audit history
+"""
 
 import os
 import json
-import hashlib
-from typing import List, Dict, Any
+import asyncio
+from typing import Dict, Any, List
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "PeriDocs-code/data")
-LEDGER_FILE = os.path.join(DATA_DIR, "ledger", "centroid_ledger.json")
+LEDGER_PATH = os.path.join(DATA_DIR, "ledger.json")
 
-# ---------------- Utilities ----------------
-
-def _ensure_dir():
-    os.makedirs(os.path.dirname(LEDGER_FILE), exist_ok=True)
-
-def _load_ledger() -> Dict[str, Any]:
-    if not os.path.exists(LEDGER_FILE):
-        return {"events": [], "corpus_fingerprint": None}
-    with open(LEDGER_FILE, "r", encoding="utf-8") as f:
-        ledger = json.load(f)
-    if "events" not in ledger or not isinstance(ledger["events"], list):
-        raise RuntimeError("Ledger corrupted or truncated")
-    return ledger
-
-def _save_ledger(ledger: dict) -> None:
-    """
-    Save ledger to disk and update corpus_fingerprint.
-
-    Uses:
-    - CENTROIDS: current state of centroids and precentroids
-    - REJECTED_PRECENTROIDS: global set/list of rejected precentroid IDs
-    - JOURNALS_FILE: to get journal IDs
-    """
-
-    _ensure_dir()
-
-    # ----- Load journal IDs -----
-    journal_ids = []
-    if os.path.exists(JOURNALS_FILE):
-        with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-            journal_ids = sorted(json.load(f).keys())
-
-    # ----- Separate IDs into categories -----
-    centroid_ids = sorted(
-        cid for cid in CENTROIDS if cid.startswith("centroid_")
-    )
-
-    rejected_precentroid_ids = sorted(
-        rid for rid in REJECTED_PRECENTROIDS if rid in CENTROIDS
-    )
-
-    precentroid_ids = sorted(
-        cid for cid in CENTROIDS
-        if cid.startswith("precentroid_") and cid not in rejected_precentroid_ids
-    )
-
-    # ----- Compute corpus fingerprint -----
-    ledger["corpus_fingerprint"] = compute_corpus_fingerprint(
-        journal_ids=journal_ids,
-        centroid_ids=centroid_ids,
-        precentroid_ids=precentroid_ids,
-        ledger_events=ledger.get("events", []),
-    )
-
-    # ----- Write ledger to disk -----
-    with open(LEDGER_FILE, "w", encoding="utf-8") as f:
-        json.dump(ledger, f, indent=2, sort_keys=True)
+_ledger_lock = asyncio.Lock()
+_ledger_cache: Dict[str, Any] | None = None
 
 
-# ---------------- Corpus Fingerprint ----------------
-
-def compute_corpus_fingerprint(
-    *,
-    journal_ids: list[str],
-    centroid_ids: list[str],
-    precentroid_ids: list[str],
-    ledger_events: list[dict],
-) -> str:
-    """
-    Lightweight determinism fingerprint.
-    Order-stable, content-agnostic, replay-safe.
-    """
-    h = hashlib.sha256()
-
-    def feed(items: list[str]):
-        for item in sorted(items):
-            h.update(item.encode("utf-8"))
-            h.update(b"\0")
-        h.update(b"\1")
-
-    feed(journal_ids)
-    feed(centroid_ids)
-    feed(precentroid_ids)
-
-    for e in ledger_events:
-        h.update(str(e.get("id")).encode("utf-8"))
-        h.update(b"\0")
-
-    return "sha256:" + h.hexdigest()
+def _initial_ledger() -> Dict[str, Any]:
+    return {
+        "next_centroid_id": 1,
+        "next_event_index": 1,
+        "issued_suffixes": {},  # suffix -> allocation_type
+        "events": [],
+    }
 
 
-def _compute_expected_corpus_fingerprint() -> str:
-    from core.map import ledger as ledger_mod
+async def _load() -> Dict[str, Any]:
+    global _ledger_cache
+    if _ledger_cache is not None:
+        return _ledger_cache
 
-    journal_ids = []
-    if os.path.exists(JOURNALS_FILE):
-        with open(JOURNALS_FILE, "r", encoding="utf-8") as f:
-            journal_ids = sorted(json.load(f).keys())
+    os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
 
-    centroid_ids = sorted(cid for cid in CENTROIDS if cid.startswith("centroid_"))
-    precentroid_ids = sorted(cid for cid in CENTROIDS if cid.startswith("precentroid_"))
-
-    ledger_state = ledger_mod._load_ledger()
-
-    return ledger_mod.compute_corpus_fingerprint(
-        journal_ids=journal_ids,
-        centroid_ids=centroid_ids,
-        precentroid_ids=precentroid_ids,
-        ledger_events=ledger_state.get("events", []),
-    )
-
-
-def assert_corpus_fingerprint(expected: str, actual: str) -> None:
-    if expected != actual:
-        raise RuntimeError(
-            "Corpus fingerprint mismatch.\n"
-            f"Expected: {expected}\n"
-            f"Actual:   {actual}"
-        )
-
-
-
-# ---------------- Event Log ID Allocation ----------------
-
-def _next_id_from_events(events: List[Dict[str, Any]]) -> int:
-    used = {e["id"] for e in events if "id" in e}
-    return (max(used) + 1) if used else 1
-
-def allocate_id_if_absent(
-    *,
-    proposal_fingerprint: str,
-    proposal_payload: Dict[str, Any],
-) -> int:
-    """
-    Deterministic, idempotent allocation of a numeric ID for a proposed precentroid.
-
-    If this proposal already exists in the ledger (matching fingerprint),
-    returns the existing ID. Otherwise, allocates exactly one new ID,
-    appends a 'precentroid_proposed' event to the ledger, persists, and returns it.
-
-    Ensures full compliance with immutable-spec expectations.
-    """
-    # Load ledger safely
-    _ensure_dir()
-    if not os.path.exists(LEDGER_FILE):
-        ledger = {"events": [], "corpus_fingerprint": None}
+    if not os.path.exists(LEDGER_PATH):
+        _ledger_cache = _initial_ledger()
+        await _save(_ledger_cache)
     else:
-        with open(LEDGER_FILE, "r", encoding="utf-8") as f:
-            ledger = json.load(f)
+        with open(LEDGER_PATH, "r", encoding="utf-8") as f:
+            _ledger_cache = json.load(f)
 
-    if "events" not in ledger or not isinstance(ledger["events"], list):
-        raise RuntimeError("Ledger corrupted or truncated")
+    return _ledger_cache
 
-    events = ledger["events"]
 
-    # Check for existing proposal fingerprint
-    for e in events:
-        if e.get("type") == "precentroid_proposed" and e.get("proposal_fingerprint") == proposal_fingerprint:
-            return e["id"]
+async def _save(state: Dict[str, Any]) -> None:
+    tmp = LEDGER_PATH + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(state, f, indent=2, sort_keys=True)
+    os.replace(tmp, LEDGER_PATH)
 
-    # Allocate new deterministic ID
-    new_id = _next_id_from_events(events)
 
-    # Append new event
-    events.append({
-        "type": "precentroid_proposed",
-        "id": new_id,
-        "proposal_fingerprint": proposal_fingerprint,
-        "payload": proposal_payload,
-    })
+class IdentifierLedger:
+    """
+    Appendix-A compliant ledger.
+    Identifier allocation is a state transition.
+    """
 
-    # Persist updated ledger
-    _save_ledger(ledger)
+    VALID_KINDS = ("precentroid", "centroid_from_split")
+    VALID_TRANSITIONS = {
+        "precentroid": ("centroid",),
+        "centroid_from_split": ("centroid",),
+    }
 
-    return new_id
+    async def allocate_suffix(self, *, kind: str) -> int:
+        if kind not in self.VALID_KINDS:
+            raise ValueError(f"Invalid allocation kind: {kind}")
+
+        async with _ledger_lock:
+            ledger = await _load()
+            suffix = ledger["next_centroid_id"]
+
+            if str(suffix) in ledger["issued_suffixes"]:
+                raise RuntimeError(f"Suffix {suffix} already issued")
+
+            ledger["next_centroid_id"] += 1
+            ledger["issued_suffixes"][str(suffix)] = {
+                "kind": kind,
+                "consumed": False,       # <-- track lifecycle
+                "approved": False,
+                "rejected": False
+            }
+
+            event_index = await self._allocate_event_index_locked(ledger)
+            ledger["events"].append({
+                "event_index": event_index,
+                "type": "ISSUE_SUFFIX",
+                "suffix": suffix,
+                "kind": kind,
+            })
+
+            await _save(ledger)
+            return suffix
+
+    async def approve_suffix(self, suffix: int) -> None:
+        async with _ledger_lock:
+            ledger = await _load()
+            record = ledger["issued_suffixes"].get(str(suffix))
+            if not record:
+                raise RuntimeError(f"Cannot approve unknown suffix {suffix}")
+            if record["approved"]:
+                raise RuntimeError(f"Suffix {suffix} already approved")
+            if record["rejected"]:
+                raise RuntimeError(f"Cannot approve rejected suffix {suffix}")
+
+            record["approved"] = True
+            record["consumed"] = True
+
+            event_index = await self._allocate_event_index_locked(ledger)
+            ledger["events"].append({
+                "event_index": event_index,
+                "type": "APPROVE_SUFFIX",
+                "suffix": suffix,
+            })
+            await _save(ledger)
+
+    async def reject_suffix(self, suffix: int) -> None:
+        async with _ledger_lock:
+            ledger = await _load()
+            record = ledger["issued_suffixes"].get(str(suffix))
+            if not record:
+                raise RuntimeError(f"Cannot reject unknown suffix {suffix}")
+            if record["approved"]:
+                raise RuntimeError(f"Cannot reject already approved suffix {suffix}")
+            if record["rejected"]:
+                raise RuntimeError(f"Suffix {suffix} already rejected")
+
+            record["rejected"] = True
+            record["consumed"] = True
+
+            event_index = await self._allocate_event_index_locked(ledger)
+            ledger["events"].append({
+                "event_index": event_index,
+                "type": "REJECT_SUFFIX",
+                "suffix": suffix,
+            })
+            await _save(ledger)
+
+    async def record_event(self, payload: Dict[str, Any]) -> int:
+        """
+        Validate that payload has minimal required fields for deterministic replay.
+        Enforce strong schema per event type.
+        """
+        # Base requirement
+        if "type" not in payload:
+            raise ValueError("Event payload missing required 'type' field")
+
+        event_type = payload["type"]
+        required_fields: Dict[str, set] = {
+            "ISSUE_SUFFIX": {"suffix", "kind"},
+            "APPROVE_SUFFIX": {"suffix"},
+            "REJECT_SUFFIX": {"suffix"},
+            "CREATE_PRECENTROID": {"centroid_id", "journal_ids"},
+            "APPROVE_PRECENTROID": {"from", "to", "label", "nne"},
+            "ADD_SAAJE": {"centroid_id", "journal_id", "similarity"},
+            "REMOVE_SAAJE": {"centroid_id", "journal_id"},
+            "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
+            "BURST_PRECENTROID": {"centroid_id", "threshold"},
+            # Extend as needed
+        }
+
+        req_keys = required_fields.get(event_type, set())
+        missing = req_keys - payload.keys()
+        if missing:
+            raise ValueError(f"Event payload missing required keys for {event_type}: {missing}")
+
+        async with _ledger_lock:
+            ledger = await _load()
+            idx = await self._allocate_event_index_locked(ledger)
+            payload = dict(payload)
+            payload["event_index"] = idx
+
+            # --- enforce VALID_TRANSITIONS for suffix events ---
+            if event_type in {"APPROVE_SUFFIX", "REJECT_SUFFIX"}:
+                suffix = payload["suffix"]
+                record = ledger["issued_suffixes"].get(str(suffix))
+                if not record:
+                    raise RuntimeError(f"Suffix {suffix} not found for transition {event_type}")
+
+                allowed = self.VALID_TRANSITIONS.get(record["kind"], ())
+                target_prefix = "centroid" if event_type == "APPROVE_SUFFIX" else None
+                if target_prefix and target_prefix not in allowed:
+                    raise RuntimeError(f"Invalid lifecycle transition for suffix {suffix}: {event_type}")
+
+            ledger["events"].append(payload)
+            await _save(ledger)
+            return idx
+
+    async def replay_events(self):
+        """
+        Yield ledger events in strict event_index order for deterministic replay.
+        """
+        async with _ledger_lock:
+            ledger = await _load()
+            # sort by event_index just in case
+            for event in sorted(ledger["events"], key=lambda e: e["event_index"]):
+                yield dict(event)  # yield a copy to prevent mutation
+
+
+    async def _allocate_event_index_locked(self, ledger: Dict[str, Any]) -> int:
+        idx = ledger["next_event_index"]
+        ledger["next_event_index"] += 1
+        return idx
+
+    async def snapshot(self) -> Dict[str, Any]:
+        async with _ledger_lock:
+            return json.loads(json.dumps(await _load()))

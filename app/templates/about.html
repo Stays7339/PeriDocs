@@ -1,4 +1,4 @@
-  <!-- about page for PeriDocs.org - Updated 202512221420-->
+{# PeriDocs-code/app/templates/about.html save-state 202601052137 #}
 {% extends "base.html" %}
 {% block title %}About PeriDocs - PeriDocs{% endblock %}
 
@@ -6,17 +6,16 @@
 <div class="wrap">
   <div class="card">
     <div class="card-content">
-      <h1>About PeriDocs</h1>
+      <h1>About PeriDocs - updated 5 January 2026</h1>
       <h2>Ethical and design philosophy</h2>
       <p>
         PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. 
         PeriDocs bridges algorithmic detection and nuanced understanding without pretending to replace human judgment.
-        PeriDocs itself is intended to serve as a safe, accessible, and easily navigable space for users to explore our database and find credible, actionable, <strong>AND</strong> personally relevant information 
-        which effectively applies to their unique struggles and experiences. At PeriDocs, we recognize and deeply admire the collective effort 
-        put in by the multitude of individuals and groups aiming to foster wellbeing regardless of personal affiliation. It is our mission to uplift their hard work by matching the right people with the right projects. 
-        PeriDocs prioritizes transparency, accountability, and ethical reflection. 
-        Algorithms, repetition detection, paraphrase mirrors, and crisis flags respect user privacy while providing meaningful educational insights. 
-        The interface avoids addictive engagement patterns and encourages careful exploration, reflection, and depth.
+        PeriDocs itself is intended to serve as an intentional, accessible, and easily navigable space for users to explore our database and find  actionable, <strong>AND</strong> situationally-relevant information 
+        that effectively applies to their unique struggles and experiences. At PeriDocs, we recognize and deeply admire the collective effort 
+        put in by the multitude of individuals and groups aiming to foster wellbeing regardless of personal affiliation. It is our mission to uplift their hard work by suggesting relevant discussions to the people who might want to see them, while avoiding chasing algorithm engagement.
+        PeriDocs prioritizes transparency and ethical reflection. The interface tries to avoid addictive engagement patterns and encourages careful exploration, reflection, and depth.
+        Our inspectable software encourages user privacy while providing meaningful educational insights. 
         The platform does <strong>not</strong> generate therapeutic advice or diagnoses. Instead, it analyzes submitted text and finds relevant, previously verified material to help users interpret or contextualize their own writing.
       </p>
 
@@ -29,46 +28,44 @@
 
       <h2>How analysis works</h2>
       <p>
-          When you submit text, <code>embeddings.py</code> processes it using MiniLM and RoBERTa sentence embeddings (<code>all-MiniLM-L6-v2</code>) and internal helpers like NumPy and FastAPI. 
-          The system breaks text into <em>thousands of vectors</em> (mathematical siblings of words and phrases) and identifies:
-          <ul>
-            <li><strong>Sentiment and emotion anchors:</strong> emotional tone is calculated using lexicons of words and phrases for positive and negative feelings, intensifiers, deintensifiers, and repeated words. Users receive a JSON-visible breakdown across six basic emotions with normalized intensity scores.</li>
-            <li><strong>Semantic similarity:</strong> compares your text with prior entries using embeddings (RoBERTa) to detect repeated ideas, related concepts, or phrasing patterns. Cosine similarity captures synonyms, typos, and paraphrases. Fuzzy or edit-distance highlights are optionally used to show recognized proper nouns, slang, or colloquial terms to the user for transparency.</li>
-          </ul>
+        Imagine PeriDocs as a sprawling city built entirely from ideas, words, and emotions. Each journal entry you submit is like a new citizen arriving in this city, carrying a unique combination of thoughts, feelings, and expressions. The system’s first task is to understand what your citizen seem to be, in abstract terms; your words are transformed into thousands of numeric coordinates called <em>embedding vectors</em>. Think of these vectors as the  practically non-reversible anonymized versions character traits of the ideas within your writing. Embedding Vectors capture the meaning, tone, and subtle relationships between words and phrases, so the system can compare them to everyone else in the city.
+      </p>
+      <p>
+        These citizens don’t wander randomly. These written-journal-entry "citizens" are guided into neighborhoods called <strong>centroids</strong>, which are like areas of the city where similar ideas live nearby each other. Centroids keep and track the identity that its residents and commuters give it, meaning the neighborhood remembers its history and evolves carefully over time as more entries arrive. We like to use shorthand to remember this idea: <strong>neighborhood of nuance emotion (NNE) </strong>. Before a new NNE is officially recognized, it exists in a probationary stage called a <em>precentroid</em>, which allows the system to test its boundaries and determine if it truly represents a unique cluster of thought.
+      </p>
+      <p>
+        To help with placement, the system uses <strong>Software-auto-added journal entries (SAAJEs)</strong> as a way to suggest "addresses” for new "citizens". A SAAJE is not the literal words from your journal entry; rather, a SAAJE is a fingerprint derived from your entry’s embedding vectors that shows which centroids your ideas align with most closely. Think of it like a postal system: your mail (entry) is sorted by the relation of words to one another, not by the verbatim words themselves. This supports real-world privacy within the PeriDocs system while still guiding your thoughts into the right neighborhood. SAAJEs are subject to in-house human review where applicable for quality and moderation. This helps us with our goal of making sure neighborhoods grow in a meaningful, coherent way.
+      </p>
+      <p>
+        Once in a NNE, each citizen contributes to the evolving story of the neighborhood. The PeriDocs system continuously monitors these clusters, and if a neighborhood becomes too large or far spread out from citizen-to-citizen, the PeriDocs system may suggest splitting and properly establishing each NNE, much like a city adjusting its district as the population changes. Every large-level change is logged in a permanent internal audit trail, so the "city’s" big-picture history is never lost, and relationships between ideas remain transparent and traceable.
       </p>
 
       <h2>Your saved entry</h2>
       <p>
-        Each journal entry is assigned a unique SHA256-based 8-character ID (for example, <code>5edae32d</code>) to track it privately without storing identifiable information. You are responsible for saving this ID. 
-        Entries are stored securely and visible only to authorized PeriDocs staff for moderation, safety review, or research into system performance. 
-        User text is <strong>never</strong> shared publicly.
+        Every citizen (journal entry) in the PeriDocs city receives a public, unique 8-character ID based on SHA256 hashing (for example, <code>5edae32d</code>). This is your key to accessing your entry later, while also reducing the amount and intensity of personally identifiable about you. Your citizen is stored securely and can only be viewed by authorized staff for moderation, safety review, or research into how the city grows and functions. Raw text is never shared publicly.
       </p>
-
       <p>
-        <strong>Matched Excerpt & Source ID:</strong> Displays the most similar prior entry to your current text with its unique ID. Matches are calculated using embeddings and paraphrased to preserve privacy.
+        When the system finds a similar citizen already living in the city, it provides a <strong>matched excerpt and source ID</strong>. These matches are paraphrased summaries to preserve privacy, highlighting semantic relationships without exposing raw words. This lets you see where your entry fits within the larger community, giving insight into recurring ideas or emotional patterns.
       </p>
-
       <p>
-        <strong>Embedding vectors:</strong> Numeric vectors representing your text for semantic similarity detection. These vectors are maintained in full internally to preserve the nuance and relational patterns of your words; they are never truncated or flattened for storage, and are never shared publicly. Maintaining embeddings before redaction allows PeriDocs to identify related entries across different users without exposing private content, providing semantic linking for educational reflection while keeping raw text confidential.
+        Behind the scenes, the embedding vectors are kept intact. These allow PeriDocs to detect nuanced relationships between entries across the entire city, providing semantic linking for reflection, pattern recognition, and educational insight, all consistently performing some redaction PII (personally indentifiable information); vectors are never flattened, truncated, or shared publicly.
       </p>
 
       <h2>Emotion and sentiment features</h2>
       <p>
-        PeriDocs detects nuanced emotional tone using embeddings from open sourced models so that your expressions can remain vibrant and still be parsed with precision. 
-        The system accounts for context within your words to provide a balanced emotion profile without generating any text or links to other places on the internet that hasn't been approved by a living human being (also wondering about the world on their laptop or phone). These context associations link your post to centroids (more easily known as emotional roots) that helps users understand patterns in their emotional expression over time, all without any generative AI.
+        Every citizen brings emotions with them, and PeriDocs maps these emotional footprints across the city. The system uses embeddings from open-source models to detect subtle shades of feeling, recognizing context, intensity, and recurring emotional patterns in your writing. This is not about generating advice or altering your words—it’s about showing you a detailed emotional map of your expression over time.
+      </p>
+      <p>
+        Each entry’s emotional signature is connected to centroids, which act like “emotional neighborhoods.” For example, a district might represent recurring feelings of frustration or joy, or complex combinations that appear repeatedly across entries. By linking your post to these centroids, the system helps you recognize patterns in the writing you submitted, offering a bird’s-eye view of how moods, intensities, and thought clusters ebb and flow—without ever exposing your literal text or using generative AI.
+      </p>
+      <p>
+        This mapping lets you explore the "City of PeriDocs" and its well-labeled archived of ideas and moods and thoughts in a way that is richly detailed in whats oberserved in the writing of the entry users have submitted. Over time, you can see how your journal entries interact with <strong>neighborhoods of nuance emotion (NNEs) </strong>, track changes, and reflect on the evolving landscape of thoughts and apparent moods from journal entries across time and across the open internet!
       </p>
 
-      <h2>Privacy and safety</h2>
-      <p>
-        PeriDocs adheres to strict privacy protocols. Each submission receives a public 8-character hash ID for general browsing and a pseudonymized back-end identifier derived from your IP using HMAC for analytics and rate-limiting. 
-        The server sees your IP on each request, but human staff do not. Raw IPs are encrypted and stored <strong>only</strong> for the sake of retroactive retreival of user entries in the event of cooperation with law enforcement. 
-        Decrypted records are accessible only to authorized personnel, and all access actions are logged. Users may request content removal by emailing <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a> 
-        with the entry ID. Aggregated anonymized data may persist for internal analytics.
-      </p>
 
       <h2>Crisis detection</h2>
       <p>
-        Submissions indicating risk of harm to self or others are flagged immediately. Users see a safety notification directing them to professional help rather than saving the entry. In the U.S., dial <strong>911</strong> for emergencies or <strong>988</strong> for the Suicide & Crisis Lifeline. Outside the U.S., users are referred to local emergency services.
+        Submissions indicating risk of harm to self or others are flagged immediately. Users see a safety notification notifying the presence of a potential crisis entry. In addition, users are reminded of the existence of emergency services local to their area. See our privacy policy for details about what information is stored for crisis entries. 
       </p>
 
       <h2>Contact</h2>
