@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/admin_review_helpers.py
-# Save-state: 202601051836
+# Save-state: 2026011342
 # ==========================================
 
 """
@@ -18,7 +18,7 @@ All authority lives downstream.
 from typing import List, Dict
 import logging
 
-from core.map.runtime import centroid_system
+#from core.map.runtime import centroid_system
 from core.map.centroids import cosine_similarity, load_embedding
 
 logger = logging.getLogger("peridocs.admin_review")

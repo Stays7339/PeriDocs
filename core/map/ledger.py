@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 202601052023
+# Save-state: 202601131408
 # ==========================================
 
 """
@@ -213,3 +213,25 @@ class IdentifierLedger:
     async def snapshot(self) -> Dict[str, Any]:
         async with _ledger_lock:
             return json.loads(json.dumps(await _load()))
+
+    async def is_loaded(self) -> bool:
+        return _ledger_cache is not None
+
+    async def load(self) -> None:
+        """Explicitly load ledger into cache."""
+        await _load()
+
+    async def has_identifier(self, identifier: str) -> bool:
+        ledger = await _load()
+        # identifier = e.g. "centroid_00000000001"
+        suffix = int(identifier.split("_")[1])
+        return str(suffix) in ledger["issued_suffixes"]
+
+    def get_suffix_state(self, suffix: int) -> str:
+        """Return 'allocated' or 'approved' for prefix checking."""
+        record = _ledger_cache["issued_suffixes"].get(str(suffix))
+        if not record:
+            raise RuntimeError(f"Suffix {suffix} unknown")
+        if record["approved"]:
+            return "approved"
+        return "allocated"

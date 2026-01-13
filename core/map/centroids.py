@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202601052011
+# Save-state: 202601131342
 # ==========================================
 
 import os
@@ -467,62 +467,62 @@ class CentroidSystem:
     precentroid_id: str,
     threshold: float = 0.8
 ) -> List[str]:
-    """
-    Burst a precentroid as a *mode of rejection*.
-    Rejection is finalized only after burst results are created.
-    """
-    await self._assert_ledger_ready()
-    async with self._lock:
-        if precentroid_id not in self._centroids:
-            raise RuntimeError(f"Precentroid {precentroid_id} not found")
+        """
+        Burst a precentroid as a *mode of rejection*.
+        Rejection is finalized only after burst results are created.
+        """
+        await self._assert_ledger_ready()
+        async with self._lock:
+            if precentroid_id not in self._centroids:
+                raise RuntimeError(f"Precentroid {precentroid_id} not found")
 
-        c = self._centroids.pop(precentroid_id)
-        journal_ids = c.current.journal_ids
-        vectors = np.stack([load_embedding(j) for j in journal_ids])
+            c = self._centroids.pop(precentroid_id)
+            journal_ids = c.current.journal_ids
+            vectors = np.stack([load_embedding(j) for j in journal_ids])
 
-        # record burst intent before mutation
-        await self._ledger.record_event({
-            "type": "BURST_PRECENTROID",
-            "centroid_id": precentroid_id,
-            "threshold": threshold,
-        })
+            # record burst intent before mutation
+            await self._ledger.record_event({
+                "type": "BURST_PRECENTROID",
+                "centroid_id": precentroid_id,
+                "threshold": threshold,
+            })
 
-        if len(journal_ids) == 1:
+            if len(journal_ids) == 1:
+                await self._finalize_precentroid_rejection(
+                    precentroid_id=precentroid_id,
+                    c=c,
+                    similarities=[],
+                    threshold=threshold,
+                    extra_archive={
+                        "note": "single entry, archived without burst"
+                    },
+                )
+                return []
+
+            Z = linkage(vectors, method="average", metric="cosine")
+            clusters = fcluster(Z, t=1 - threshold, criterion="distance")
+
+            cluster_map: Dict[int, List[str]] = {}
+            for j_id, cl_id in zip(journal_ids, clusters):
+                cluster_map.setdefault(cl_id, []).append(j_id)
+
+            new_precentroids = []
+            for journals in cluster_map.values():
+                new_cid = await self.create_precentroid(journals)
+                # record stricter local threshold for this semantic region
+                new_c = self._centroids[new_cid]
+                new_c.states[-1].metadata["min_similarity_threshold"] = threshold
+                new_precentroids.append(new_cid)
+
             await self._finalize_precentroid_rejection(
                 precentroid_id=precentroid_id,
                 c=c,
                 similarities=[],
                 threshold=threshold,
                 extra_archive={
-                    "note": "single entry, archived without burst"
+                    "new_precentroids": new_precentroids,
+                    "burst_threshold": threshold,
                 },
             )
-            return []
 
-        Z = linkage(vectors, method="average", metric="cosine")
-        clusters = fcluster(Z, t=1 - threshold, criterion="distance")
-
-        cluster_map: Dict[int, List[str]] = {}
-        for j_id, cl_id in zip(journal_ids, clusters):
-            cluster_map.setdefault(cl_id, []).append(j_id)
-
-        new_precentroids = []
-        for journals in cluster_map.values():
-            new_cid = await self.create_precentroid(journals)
-            # record stricter local threshold for this semantic region
-            new_c = self._centroids[new_cid]
-            new_c.states[-1].metadata["min_similarity_threshold"] = threshold
-            new_precentroids.append(new_cid)
-
-        await self._finalize_precentroid_rejection(
-            precentroid_id=precentroid_id,
-            c=c,
-            similarities=[],
-            threshold=threshold,
-            extra_archive={
-                "new_precentroids": new_precentroids,
-                "burst_threshold": threshold,
-            },
-        )
-
-        return new_precentroids
+            return new_precentroids

@@ -1,12 +1,12 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 202601021421 (YYYYMMDDhhmm)
+# save-state 202601131413 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import asyncio
-#from core.map import centroids
+from core.map import centroids
 from core.nlp.embeddings import _load_model, get_embedding_async
 import logging
 from core.map import ledger, centroids
@@ -37,9 +37,11 @@ async def preload_embedding_model():
 @app.on_event("startup")
 async def load_centroid_state():
     print("Loading centroid state...")
-    await centroids.load_state()
+    ledger_instance = ledger.IdentifierLedger()
+    await ledger_instance.load()  # ensures is_loaded() will return True
+    centroid_system = centroids.CentroidSystem(ledger_instance)
+    await centroid_system.load_state()
     print("Centroid state loaded and ledger integrity verified.")
-
 
 
 # ---------------- Static Files ----------------
