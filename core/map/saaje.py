@@ -22,7 +22,7 @@ from core.map.centroids import (
     cosine_similarity,
     load_embedding,
 )
-from core.map.runtime import centroid_system
+#from core.map.runtime import centroid_system
 
 logger = logging.getLogger("peridocs.saaje")
 
