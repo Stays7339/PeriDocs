@@ -1,17 +1,15 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 202601131413 (YYYYMMDDhhmm)
+# save-state 202602041326 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import asyncio
-from core.map import centroids
 from core.nlp.embeddings import _load_model, get_embedding_async
 import logging
 from core.map import ledger, centroids
-
-
+from core.map.mapping_runtime import initialize_runtime
 
 
 # ------------------- static file logging filter -------------------
@@ -35,13 +33,10 @@ async def preload_embedding_model():
     print("Model preloaded and ready!")
 
 @app.on_event("startup")
-async def load_centroid_state():
-    print("Loading centroid state...")
-    ledger_instance = ledger.IdentifierLedger()
-    await ledger_instance.load()  # ensures is_loaded() will return True
-    centroid_system = centroids.CentroidSystem(ledger_instance)
-    await centroid_system.load_state()
-    print("Centroid state loaded and ledger integrity verified.")
+async def load_mapping_runtime():
+    print("Initializing mapping runtime...")
+    await initialize_runtime(verify=True)
+    print("Mapping runtime initialization complete.")
 
 
 # ---------------- Static Files ----------------

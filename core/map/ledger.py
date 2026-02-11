@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 202601131408
+# Save-state: 202602102008
 # ==========================================
 
 """
@@ -15,11 +15,13 @@ Sole authority for:
 
 import os
 import json
+import logging
 import asyncio
 from typing import Dict, Any, List
+from pathlib import Path
 
-DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "PeriDocs-code/data")
-LEDGER_PATH = os.path.join(DATA_DIR, "ledger.json")
+DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
+LEDGER_PATH = DATA_DIR / "ledger.json"
 
 _ledger_lock = asyncio.Lock()
 _ledger_cache: Dict[str, Any] | None = None
@@ -43,7 +45,7 @@ async def _load() -> Dict[str, Any]:
 
     if not os.path.exists(LEDGER_PATH):
         _ledger_cache = _initial_ledger()
-        await _save(_ledger_cache)
+#        await _save(_ledger_cache)
     else:
         with open(LEDGER_PATH, "r", encoding="utf-8") as f:
             _ledger_cache = json.load(f)
@@ -164,6 +166,8 @@ class IdentifierLedger:
             "REMOVE_SAAJE": {"centroid_id", "journal_id"},
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
             "BURST_PRECENTROID": {"centroid_id", "threshold"},
+            "SUGGEST_SPLIT": {"centroid_id", "threshold", "min_similarity"},
+            "DELETE_JOURNAL": {"journal_id"},
             # Extend as needed
         }
 
@@ -235,3 +239,47 @@ class IdentifierLedger:
         if record["approved"]:
             return "approved"
         return "allocated"
+    
+    async def verify_runtime_state(self, centroids: "CentroidSystem") -> None:
+        """
+        Verify that all centroids in memory have corresponding ledger entries.
+
+        Raises RuntimeError if any discrepancy is found.
+
+        Performance:
+        - Preloads ledger once (O(1) I/O)
+        - Indexes event indices and issued_suffixes (O(N))
+        - Scales to 10k+ centroids efficiently
+        """
+        # Ensure centroids are ready
+        await centroids._assert_ledger_ready()
+
+        # Preload ledger snapshot once
+        ledger_snapshot = await self.snapshot()
+        issued_suffixes = set(ledger_snapshot["issued_suffixes"].keys())
+        ledger_event_indices = {e["event_index"] for e in ledger_snapshot["events"]}
+
+        async with centroids._lock:
+            for cid, c in centroids._centroids.items():
+                # Extract numeric suffix (centroid_00000000001)
+                try:
+                    suffix = cid.split("_")[1]
+                except IndexError:
+                    raise RuntimeError(f"Invalid centroid ID format: {cid}")
+
+                # Check if centroid exists in ledger
+                if suffix not in issued_suffixes:
+                    raise RuntimeError(f"Centroid {cid} exists in memory but is missing from ledger")
+
+                # Check that each centroid state has a corresponding event
+                for s in c.states:
+                    if s.event_index not in ledger_event_indices:
+                        raise RuntimeError(
+                            f"Centroid {cid} state with event_index {s.event_index} missing in ledger"
+                        )
+
+        # Optionally: log success
+        logging.getLogger("peridocs.mapping_runtime").info(
+            f"Verified {len(centroids._centroids)} centroids successfully against ledger."
+        )
+

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/saaje.py
-# Save-state: 202601051835
+# Save-state: 202602031406
 # ==========================================
 
 """
@@ -22,7 +22,8 @@ from core.map.centroids import (
     cosine_similarity,
     load_embedding,
 )
-#from core.map.runtime import centroid_system
+from core.map.mapping_runtime import centroid_system
+
 
 logger = logging.getLogger("peridocs.saaje")
 

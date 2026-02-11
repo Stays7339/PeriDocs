@@ -186,7 +186,7 @@ You now have PeriDocs running locally.
 ---
 
 
-## Canonical Project Directory as of 02 January 2026 (202601021420 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 05 February 2026 (202602051027 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -207,19 +207,19 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ admin_routing.py              # "/admin*"
 │  │  ├─ feedback.py                   # "/feedback"
-│  │  ├─ journal.py                    # "/submit", "/submit-success"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  ├─ journal.py                    # "/submit", "/submit-success"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
 │  │  ├─ admin-review.js                 # Allows humans to dictate what counts and what doesn't with centroids and semantic auto-groups
-│  │  ├─ style.css                       # Main stylesheet
-│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/journal 
-│  │  ├─ peridocs-logo-v1.png
-│  │  ├─ peridocs-logo-v1-white.png
+│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ favicon.png
-│  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png #icon for privacy notice about local storage
-│  │  ├─ cookiessanta-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
+│  │  ├─ peridocs-logo-v1-white.png
+│  │  ├─ peridocs-logo-v1.png
+│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/journal 
+│  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
+│  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
@@ -243,10 +243,11 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ core/
 │   ├─ map/
-│   │   ├─ admin_review_helpers.py        # logic for creating a dashboard for human administrators at PeriDocs.
-│   │   ├─ centroids.py                   # making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
-│   │   ├─ ledger.py                      # ==== CRITICAL ===== FOR ALL OF PERIDOCS. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
-│   │   └─ saaje.py                       # controls assignment of Software-auto-added journal entries (SAAJEs). This is so centroids math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism..
+│   │   ├─ admin_review_helpers.py        # The Moderation Layer - logic for creating a dashboard for human administrators at PeriDocs.
+│   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
+│   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
+│   │   ├─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
+│   │   └─ saaje.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so centroids math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism..
 │   │
 │   │
 │   │
@@ -268,6 +269,7 @@ PeriDocs-code/                         # Root project folder
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
 │  ├─ journals_embeddings_dump20251216_3.json       # Storage for embeddings to keep the main entries much more readable by humans.
+│  ├─ [journals_embeddings_dumpYYYYMMDD_[0-3].json file(s)]
 │  ├─ journals.json                       # Stored journal entries
 │  ├─ names_au.json                       # Common-enough first names and last names from Australia.
 │  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
@@ -278,7 +280,8 @@ PeriDocs-code/                         # Root project folder
 │  ├─ names_uk.json                       # Common-enough first names and last names from United Kingdom.
 │  ├─ names_us.json                       # Common-enough first names and last names from United States.
 │  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
-│  ├─ recorded_crises.json                # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
+│  ├─ recorded_crises.lock                 # The dev is currently not completely sure why .lock file stays around after the software is done writing data.
+│  ├─ recorded_crises.npz                # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 │

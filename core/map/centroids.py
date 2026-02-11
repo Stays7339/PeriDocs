@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202601131342
+# Save-state: 202602031500
 # ==========================================
 
 import os
@@ -16,10 +16,10 @@ from scipy.cluster.hierarchy import linkage, fcluster
 
 logger = logging.getLogger("peridocs.centroids")
 
-DATA_DIR = "data"
-STATE_DIR = "state/centroids"
-ARCHIVE_DIR = "state/archive"
-SUGGESTIONS_DIR = "state/suggestions"
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "PeriDocs-code/data")
+STATE_DIR = os.path.join(DATA_DIR, "centroids")
+ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
+SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
 
 
 # ---------- utilities ----------
@@ -38,15 +38,40 @@ def deterministic_mean(vectors: List[np.ndarray]) -> np.ndarray:
 
 
 def load_embedding(journal_id: str) -> np.ndarray:
-    matches = sorted(glob.glob(os.path.join(DATA_DIR, f"{journal_id}.*")))
-    if len(matches) != 1:
-        raise RuntimeError(f"Embedding resolution failure for {journal_id}")
-    path = matches[0]
-    if path.endswith(".npz"):
-        data = np.load(path)
-        return data["embedding"]
-    with open(path, "r", encoding="utf-8") as f:
-        return np.array(json.load(f)["embedding"], dtype=np.float32)
+    """
+    Deterministically resolve a journal embedding from windowed dump files.
+    Enforces:
+    - sorted glob order
+    - single source of truth
+    - loud failure on duplicate or missing embeddings
+    """
+
+    dump_files = sorted(
+        glob.glob(os.path.join(DATA_DIR, "journals_embeddings_dump*.json"))
+    )
+
+    if not dump_files:
+        raise RuntimeError("No embedding dump files found.")
+
+    found_vector = None
+
+    for path in dump_files:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if journal_id in data:
+            if found_vector is not None:
+                raise RuntimeError(
+                    f"Duplicate embedding detected across dump files for {journal_id}"
+                )
+
+            found_vector = np.array(data[journal_id], dtype=np.float32)
+
+    if found_vector is None:
+        raise RuntimeError(f"Embedding not found for journal_id {journal_id}")
+
+    return found_vector
+
 
 
 # ---------- models ----------
@@ -109,6 +134,8 @@ class CentroidSystem:
         self._ledger = ledger
         self._centroids: Dict[str, Centroid] = {}
         self._lock = asyncio.Lock()
+        self._split_suggestions: Dict[str, Dict[int, Dict]] = {}  # centroid_id -> event_index -> suggestion payload
+
 
     async def _assert_ledger_ready(self) -> None:
         """
@@ -405,31 +432,157 @@ class CentroidSystem:
     # ----- drift & split suggestion -----
 
     async def analyze_and_suggest_split(self, centroid_id: str, threshold: float) -> None:
+        """
+        Perform drift analysis on a centroid.
+
+        If drift falls below threshold:
+            - Record a SUGGEST_SPLIT ledger event
+            - Persist an atomic suggestion artifact to disk
+
+        This method is:
+            - Deterministic
+            - Ledger-backed
+            - Crash-safe
+            - Replay-auditable
+        """
+
         await self._assert_ledger_ready()
-        c = self._centroids[centroid_id]
-        history = c.states
-        if len(history) < 2:
-            return
 
-        sims = [
-            cosine_similarity(history[i - 1].vector, history[i].vector)
-            for i in range(1, len(history))
-        ]
+        async with self._lock:
+            if centroid_id not in self._centroids:
+                raise RuntimeError(f"Unknown centroid {centroid_id}")
 
-        if min(sims) < threshold:
+            c = self._centroids[centroid_id]
+            history = c.states
+
+            if len(history) < 2:
+                return
+
+            sims = [
+                cosine_similarity(history[i - 1].vector, history[i].vector)
+                for i in range(1, len(history))
+            ]
+
+            min_sim = min(sims)
+
+            if min_sim >= threshold:
+                return
+
+            # --- Ledger event (authoritative) ---
+            event_index = await self._ledger.record_event({
+                "type": "SUGGEST_SPLIT",
+                "centroid_id": centroid_id,
+                "threshold": threshold,
+                "min_similarity": min_sim,
+            })
+
+            # --- Durable artifact ---
             os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
-            with open(os.path.join(SUGGESTIONS_DIR, f"{centroid_id}_split.json"), "w") as f:
-                json.dump(
-                    {
-                        "centroid_id": centroid_id,
-                        "label": c.label,
-                        "nne": c.nne,
-                        "similarities": sims,
-                        "threshold": threshold,
+
+            payload = {
+                "event_index": event_index,
+                "centroid_id": centroid_id,
+                "label": c.label,
+                "nne": c.nne,
+                "similarities": sims,
+                "threshold": threshold,
+                "min_similarity": min_sim,
+            }
+
+            final_path = os.path.join(
+                SUGGESTIONS_DIR,
+                f"{centroid_id}_split_{event_index}.json",
+            )
+            tmp_path = final_path + ".tmp"
+
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(tmp_path, final_path)
+
+    
+    # ----- review projection & admin utilities -----
+
+    async def build_review_queue(self) -> List[Dict]:
+        """
+        Build a projection of centroids requiring human review.
+
+        This is a READ-ONLY projection.
+        It does not mutate state.
+        It reflects live in-memory runtime state only.
+        """
+
+        await self._assert_ledger_ready()
+
+        async with self._lock:
+            queue: List[Dict] = []
+
+            for centroid_id, c in self._centroids.items():
+                metadata = c.current.metadata or {}
+                review_status = metadata.get("review_status", "approved")
+
+                if review_status != "pending":
+                    continue
+
+                queue.append({
+                    "suggestion_id": f"new_{centroid_id}",
+                    "centroid_id": centroid_id,
+                    "suggestion_type": "new_centroid",
+                    "samples": [],
+                    "human_note": metadata.get("human_note", ""),
+                    "metrics": {
+                        "journal_count": len(c.current.journal_ids),
                     },
-                    f,
-                    indent=2,
-                )
+                    "human_labels": metadata.get("human_labels", []),
+                    "status": review_status,
+                    "created_at": metadata.get("created_at"),
+                })
+
+            return queue
+    
+    async def _load_split_suggestions(self) -> None:
+        """
+        Preload all split suggestion artifacts from SUGGESTIONS_DIR into memory.
+        """
+        self._split_suggestions.clear()
+        os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
+
+        for path in sorted(glob.glob(os.path.join(SUGGESTIONS_DIR, "*.json"))):
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                cid = data["centroid_id"]
+                idx = data["event_index"]
+                self._split_suggestions.setdefault(cid, {})[idx] = data
+
+    async def remove_journal_globally(self, journal_id: str) -> Dict[str, List[str]]:
+        """
+        Remove a journal entry from every centroid where it exists as a SAAJE.
+
+        This method:
+        - Enforces ledger readiness
+        - Maintains locking guarantees
+        - Records proper REMOVE_SAAJE events
+        - Persists all resulting state transitions
+
+        Returns:
+            Dict[centroid_id, ["removed"]]
+        """
+
+        await self._assert_ledger_ready()
+
+        removed: Dict[str, List[str]] = {}
+
+        async with self._lock:
+            centroids_list = list(self._centroids.values())
+
+        for c in centroids_list:
+            if journal_id in c.current.saajes:
+                await self.remove_saaje(c.centroid_id, journal_id)
+                removed.setdefault(c.centroid_id, []).append("removed")
+
+        return removed
 
     async def suggest_precentroid_for_journal(self, journal_id: str, threshold: float = 0.7) -> str | None:
         """
