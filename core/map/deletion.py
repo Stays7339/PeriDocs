@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602102007
+# Save-state: 202602111102
 # ==========================================
 
 """
@@ -137,10 +137,12 @@ class DeletionManager:
             centroids_list = list(self._centroids._centroids.values())
 
         for c in centroids_list:
-            if journal_id in c.current.saajes:
-                await self.remove_saaje(
+            if journal_id in c.current.journal_ids:
+                await self._remove_journal_from_centroid(
                     centroid_id=c.centroid_id,
                     journal_id=journal_id,
+                    reason=reason,
+                    initiated_by=initiated_by,
                 )
                 removed.setdefault(c.centroid_id, []).append("removed")
 
@@ -149,6 +151,12 @@ class DeletionManager:
     # ------------------------------------------------------------
     # EMBEDDING FILE DELETION
     # ------------------------------------------------------------
+"""
+Embedding deletion intentionally disabled.
+
+Data Governance Agreement Article 6.2:
+"The Company may retain only ... the associated embedding vector..."
+Embeddings are retained for deterministic replay and ledger integrity.
 
     async def delete_embedding_from_dumps(
         self,
@@ -189,6 +197,9 @@ class DeletionManager:
 
         for path in dump_files:
             await process_file(path)
+
+"""
+return
 
     # ------------------------------------------------------------
     # FULL JOURNAL DELETION ORCHESTRATION

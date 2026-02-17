@@ -6,7 +6,7 @@ repetition, and sentiment adjustments.
 """
 
 from typing import List, Dict, Any
-from app.helpers.entry_similarity import compute_similarity_to_other_entries
+from .entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 
 def find_top_matches(

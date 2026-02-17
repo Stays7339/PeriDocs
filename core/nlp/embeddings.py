@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 202512291528
+# save-state updated 202602171601
 # ------------------------------------------
 
 from __future__ import annotations
@@ -112,7 +112,7 @@ async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | 
     return results[0] if single_input else results
 
 # ---------------- Async Logging Helper ----------------
-_EMBEDDINGS_LOG_FILE = Path(PROJECT_ROOT) / "data" / "embeddings_run_log.jsonl"
+# _EMBEDDINGS_LOG_FILE = Path(PROJECT_ROOT) / "data" / "embeddings_run_log.jsonl"
 
 async def _log_embedding_call(journal_id: str | None = None):
     """

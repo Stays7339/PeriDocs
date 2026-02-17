@@ -1,17 +1,17 @@
 # ==========================================
 # app/core/map/admin_review_helpers.py
-# Fully merged, save-state: 202602031426
+# Fully merged, save-state: 202602151509
 # ==========================================
 
 """
 Admin review helpers for PeriDocs.
 
 This module:
+- Automatically scans for journals that might belong best in a precentroid
 - Builds the review queue from ledger/centroid state
 - Coordinates human moderation actions
 - Never mutates centroid state directly
 - Records no independent state outside the ledger
-All authority lives downstream.
 """
 
 import asyncio

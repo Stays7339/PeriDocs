@@ -1,76 +1,41 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202602031500
+# Save-state: 202602171634
 # ==========================================
 
 import os
 import json
 import glob
 import asyncio
+import functools
 import logging
+import re
+from datetime import datetime, timezone
 from typing import Dict, List
 import numpy as np
 from numpy.linalg import norm
 from core.map.ledger import IdentifierLedger
 from scipy.cluster.hierarchy import linkage, fcluster
+from concurrent.futures import ThreadPoolExecutor
+from app.helpers.entry_similarity import (
+    cosine_similarity,
+    deterministic_mean,
+    safe_load_embedding as load_embedding,
+)
+
+
 
 logger = logging.getLogger("peridocs.centroids")
 
-DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "PeriDocs-code/data")
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 STATE_DIR = os.path.join(DATA_DIR, "centroids")
 ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
 
-
-# ---------- utilities ----------
-
-def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    d = norm(a) * norm(b)
-    if d == 0:
-        raise ValueError("Zero vector")
-    return float(np.dot(a, b) / d)
-
-
-def deterministic_mean(vectors: List[np.ndarray]) -> np.ndarray:
-    if not vectors:
-        raise ValueError("Empty vector list")
-    return np.stack(vectors).mean(axis=0)
-
-
-def load_embedding(journal_id: str) -> np.ndarray:
-    """
-    Deterministically resolve a journal embedding from windowed dump files.
-    Enforces:
-    - sorted glob order
-    - single source of truth
-    - loud failure on duplicate or missing embeddings
-    """
-
-    dump_files = sorted(
-        glob.glob(os.path.join(DATA_DIR, "journals_embeddings_dump*.json"))
-    )
-
-    if not dump_files:
-        raise RuntimeError("No embedding dump files found.")
-
-    found_vector = None
-
-    for path in dump_files:
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        if journal_id in data:
-            if found_vector is not None:
-                raise RuntimeError(
-                    f"Duplicate embedding detected across dump files for {journal_id}"
-                )
-
-            found_vector = np.array(data[journal_id], dtype=np.float32)
-
-    if found_vector is None:
-        raise RuntimeError(f"Embedding not found for journal_id {journal_id}")
-
-    return found_vector
+# Ensure directories exist at startup
+os.makedirs(STATE_DIR, exist_ok=True)
+os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
+logger.info(f"Ensuring centroid state directory exists at {STATE_DIR}")
 
 
 
@@ -123,7 +88,7 @@ class Centroid:
         }
 
 
-# ---------- system ----------
+# ---------- centroid system ----------
 
 class CentroidSystem:
     """
@@ -134,7 +99,9 @@ class CentroidSystem:
         self._ledger = ledger
         self._centroids: Dict[str, Centroid] = {}
         self._lock = asyncio.Lock()
-        self._split_suggestions: Dict[str, Dict[int, Dict]] = {}  # centroid_id -> event_index -> suggestion payload
+        self._split_suggestions: Dict[str, Dict[int, Dict]] = {}  
+        self._executor = ThreadPoolExecutor(max_workers=4)
+        self._zero_vector_flags_file = os.path.join(DATA_DIR, "zero_vector_flags.json")
 
 
     async def _assert_ledger_ready(self) -> None:
@@ -188,9 +155,24 @@ class CentroidSystem:
                 f"Centroid ID {centroid_id} does not exist in ledger"
             )
 
+    async def persist_zero_vector_flags(self):
+    if hasattr(self, "_zero_vector_flags") and self._zero_vector_flags:
+        with open(self._zero_vector_flags_file, "w", encoding="utf-8") as f:
+            json.dump(self._zero_vector_flags, f, indent=2)
 
 
     # ----- persistence -----
+
+    def _numeric_suffix(fname: str) -> int:
+        """
+        Extract the numeric suffix from a centroid filename.
+        Example: "precentroid_10.json" -> 10
+        """
+        match = re.search(r"_(\d+)", fname)
+        if not match:
+            raise ValueError(f"Invalid centroid filename: {fname}")
+        return int(match.group(1))
+
 
     async def load_state(self) -> None:
         await self._assert_ledger_ready()
@@ -198,7 +180,8 @@ class CentroidSystem:
             self._centroids.clear()
             if not os.path.isdir(STATE_DIR):
                 return
-            for fname in sorted(os.listdir(STATE_DIR)):
+            # Sort by numeric suffix instead of lexicographic string order
+            for fname in sorted(os.listdir(STATE_DIR), key=_numeric_suffix):
                 with open(os.path.join(STATE_DIR, fname), "r") as fh:
                     payload = json.load(fh)
                 c = Centroid(payload["centroid_id"])
@@ -206,18 +189,18 @@ class CentroidSystem:
                 c.label = payload["label"]
                 c.nne = payload["nne"]
                 for s in payload["states"]:
-
                     self._assert_event_order(c, s["event_index"])
-
                     c.states.append(
                         CentroidState(
                             s["event_index"],
                             s["journal_ids"],
                             np.array(s["vector"], dtype=np.float32),
                             s.get("saajes", {}),
+                            metadata=s.get("metadata", {}),
                         )
                     )
                 self._centroids[c.centroid_id] = c
+
 
     async def _persist(self, centroid: Centroid) -> None:
         """
@@ -239,44 +222,72 @@ class CentroidSystem:
 
         os.replace(tmp_path, final_path)
 
-
-
     async def create_precentroid(self, journal_ids: List[str]) -> str:
+        """
+        Yeild to suggest_precentroid_for_journal
+        Create a new precentroid from given journal_ids.
+        - Enforces SAAJE cannot exist yet
+        - Adds default metadata for admin review
+        """
+        print("ENTER create_precentroid")
         await self._assert_ledger_ready()
-        async with self._lock:
-            suffix = await self._ledger.allocate_suffix(kind="precentroid")
-            cid = f"precentroid_{suffix:011d}"
+        # allocate a ledger-backed precentroid suffix
+        suffix = await self._ledger.allocate_suffix(kind="precentroid")
+        cid = f"precentroid_{suffix}"
 
-            await self._assert_centroid_registered(cid)
+        # NOTE: precentroid does not yet exist in ledger, skip _assert_centroid_registered
 
-            # enforce precentroid cannot have SAAJEs
-            journal_ids = sorted(journal_ids)
-            vectors = [load_embedding(j) for j in journal_ids]
-            vector = deterministic_mean(vectors)
+        # prepare deterministic embedding vector
+        journal_ids = sorted(journal_ids)
+        vectors = [load_embedding(j) for j in journal_ids]
+        vector = deterministic_mean(vectors)
 
-            event_index = await self._ledger.record_event({
-                "type": "CREATE_PRECENTROID",
-                "centroid_id": cid,
-                "journal_ids": journal_ids,
-            })
+        # record CREATE_PRECENTROID in ledger
+        event_index = await self._ledger.record_event({
+            "type": "CREATE_PRECENTROID",
+            "centroid_id": cid,
+            "journal_ids": journal_ids,
+        })
+        
+        # attach default metadata for review queue
+        metadata = {
+            "review_status": "pending",
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "human_note": "",
+            "human_labels": [],
+        }
 
-            c = Centroid(cid)
-            self._assert_event_order(c, event_index)
-            c.states.append(CentroidState(event_index, journal_ids, vector))
-            self._centroids[cid] = c
-            await self._persist(c)
-            return cid
+        
+        # create centroid instance
+        c = Centroid(cid)
+        self._assert_event_order(c, event_index)
+        c.states.append(CentroidState(event_index, journal_ids, vector, saajes=None, metadata=metadata))
+        self._centroids[cid] = c
+
+        # persist safely
+        await self._persist(c)
+
+        return cid
+
 
     async def approve_precentroid(self, precentroid_id: str, *, label: str, nne: str) -> str:
+        """
+        Approve a precentroid:
+        - Ledger-backed approval
+        - Converts to a full centroid
+        - Archives precentroid state
+        """
         await self._assert_ledger_ready()
         async with self._lock:
-            c = self._centroids.pop(precentroid_id)
+            c = self._centroids.pop(precentroid_id, None)
+            if c is None:
+                raise RuntimeError(f"Unknown precentroid {precentroid_id}")
+
             suffix = int(precentroid_id.split("_")[1])
-
-            # ledger enforces approval
             await self._ledger.approve_suffix(suffix)
-            new_id = f"centroid_{suffix:011d}"
+            new_id = f"centroid_{suffix}"
 
+            # assert new centroid is recognized by ledger
             await self._assert_centroid_registered(new_id)
 
             event_index = await self._ledger.record_event({
@@ -291,92 +302,27 @@ class CentroidSystem:
             c.label = label
             c.nne = nne
             self._assert_event_order(c, event_index)
-            c.states.append(
-                CentroidState(
-                    event_index,
-                    c.current.journal_ids,
-                    c.current.vector,
-                    c.current.saajes,
-                )
-            )
+
+            # preserve embedding & saajes, promote metadata
+            c.states.append(CentroidState(
+                event_index,
+                c.current.journal_ids,
+                c.current.vector,
+                c.current.saajes,
+                metadata=c.current.metadata  # retain metadata if needed
+            ))
 
             self._centroids[new_id] = c
             await self._persist(c)
-            os.remove(os.path.join(STATE_DIR, f"{precentroid_id}.json"))
+
+            # archive precentroid JSON safely
+            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}.json")
+            try:
+                os.remove(precentroid_path)
+            except FileNotFoundError:
+                pass
+
             return new_id
-
-    async def add_saaje(self, centroid_id: str, journal_id: str, similarity: float) -> None:
-        await self._assert_ledger_ready()
-        async with self._lock:
-            if centroid_id.startswith("precentroid_"):
-                raise RuntimeError("Cannot attach SAAJE to precentroid")
-
-            c = self._centroids[centroid_id]
-            prev = c.current
-
-            if journal_id in prev.journal_ids:
-                raise RuntimeError("Journal already member")
-
-            journal_ids = sorted(prev.journal_ids + [journal_id])
-            vectors = [load_embedding(j) for j in journal_ids]
-            vector = deterministic_mean(vectors)
-
-            saajes = dict(prev.saajes)
-            saajes[journal_id] = similarity
-
-            event_index = await self._ledger.record_event({
-                "type": "ADD_SAAJE",
-                "centroid_id": centroid_id,
-                "journal_id": journal_id,
-                "similarity": similarity,
-            })
-
-            self._assert_event_order(c, event_index)
-
-            c.states.append(CentroidState(event_index, journal_ids, vector, saajes))
-            await self._persist(c)
-    
-    async def _finalize_precentroid_rejection(
-        self,
-        *,
-        precentroid_id: str,
-        c: Centroid,
-        similarities: List[float],
-        threshold: float,
-        extra_archive: Dict | None = None,
-    ) -> None:
-        """
-        Canonical rejection finalizer.
-        Used by both plain rejection and burst rejection.
-        """
-        suffix = int(precentroid_id.split("_")[1])
-
-        await self._ledger.reject_suffix(suffix)
-
-        event_index = await self._ledger.record_event({
-            "type": "REJECT_PRECENTROID",
-            "centroid_id": precentroid_id,
-            "failed_threshold": threshold,
-        })
-
-        os.makedirs(ARCHIVE_DIR, exist_ok=True)
-
-        archive = {
-            "precentroid_id": precentroid_id,
-            "journal_ids": c.current.journal_ids,
-            "count": len(c.current.journal_ids),
-            "similarities": similarities,
-            "failed_threshold": threshold,
-            "event_index": event_index,
-        }
-
-        if extra_archive:
-            archive.update(extra_archive)
-
-        with open(os.path.join(ARCHIVE_DIR, f"{precentroid_id}.json"), "w") as f:
-            json.dump(archive, f, indent=2)
-
-        os.remove(os.path.join(STATE_DIR, f"{precentroid_id}.json"))
 
 
     async def reject_precentroid(
@@ -386,12 +332,17 @@ class CentroidSystem:
         similarities: List[float],
         threshold: float,
     ) -> None:
+        """
+        Reject a precentroid:
+        - Archives its state
+        - Records REJECT_PRECENTROID ledger event
+        - Safely removes precentroid from runtime state and disk
+        """
         await self._assert_ledger_ready()
         async with self._lock:
-            if precentroid_id not in self._centroids:
-                raise RuntimeError("Unknown precentroid")
-
-            c = self._centroids.pop(precentroid_id)
+            c = self._centroids.pop(precentroid_id, None)
+            if c is None:
+                raise RuntimeError(f"Unknown precentroid {precentroid_id}")
 
             await self._finalize_precentroid_rejection(
                 precentroid_id=precentroid_id,
@@ -400,34 +351,87 @@ class CentroidSystem:
                 threshold=threshold,
             )
 
+    async def burst_precentroid(
+        self,
+        precentroid_id: str,
+        threshold: float = 0.8
+    ) -> List[str]:
+        """
+        Burst a precentroid as a *mode of rejection*.
+        Rejection is finalized only after burst results are created.
 
- 
-    async def remove_saaje(self, centroid_id: str, journal_id: str) -> None:
+        Steps:
+        - Load the precentroid and its journal vectors.
+        - Record the BURST_PRECENTROID ledger event.
+        - If single entry, archive immediately.
+        - Otherwise, cluster journals based on cosine similarity.
+        - Create new precentroids per cluster.
+        - Assign stricter local similarity threshold to metadata.
+        - Finalize rejection and archive burst details.
+        """
         await self._assert_ledger_ready()
         async with self._lock:
-            c = self._centroids[centroid_id]
-            prev = c.current
+            if precentroid_id not in self._centroids:
+                raise RuntimeError(f"Precentroid {precentroid_id} not found")
 
-            if journal_id not in prev.saajes:
-                raise RuntimeError("SAAJE not present")
+            # Pop precentroid from runtime
+            c = self._centroids.pop(precentroid_id)
+            journal_ids = c.current.journal_ids
 
-            journal_ids = [j for j in prev.journal_ids if j != journal_id]
-            vectors = [load_embedding(j) for j in journal_ids]
-            vector = deterministic_mean(vectors)
+            # Load embeddings safely
+            vectors = np.stack([load_embedding(j) for j in journal_ids])
 
-            saajes = dict(prev.saajes)
-            del saajes[journal_id]
-
-            event_index = await self._ledger.record_event({
-                "type": "REMOVE_SAAJE",
-                "centroid_id": centroid_id,
-                "journal_id": journal_id,
+            # Record burst intent before mutation
+            await self._ledger.record_event({
+                "type": "BURST_PRECENTROID",
+                "centroid_id": precentroid_id,
+                "threshold": threshold,
             })
 
-            self._assert_event_order(c, event_index)
+            # Single-entry precentroid → archive immediately
+            if len(journal_ids) == 1:
+                await self._finalize_precentroid_rejection(
+                    precentroid_id=precentroid_id,
+                    c=c,
+                    similarities=[],
+                    threshold=threshold,
+                    extra_archive={
+                        "note": "single entry, archived without burst"
+                    },
+                )
+                return []
 
-            c.states.append(CentroidState(event_index, journal_ids, vector, saajes))
-            await self._persist(c)
+            # Cluster journals using hierarchical clustering
+            Z = linkage(vectors, method="average", metric="cosine")
+            clusters = fcluster(Z, t=1 - threshold, criterion="distance")
+
+            cluster_map: Dict[int, List[str]] = {}
+            for j_id, cl_id in zip(journal_ids, clusters):
+                cluster_map.setdefault(cl_id, []).append(j_id)
+
+            new_precentroids = []
+            for journals in cluster_map.values():
+                new_cid = await self.create_precentroid(journals)
+                new_c = self._centroids[new_cid]
+
+                # Assign stricter local threshold to metadata for audit & future review
+                new_c.states[-1].metadata["min_similarity_threshold"] = threshold
+                new_precentroids.append(new_cid)
+
+            # Finalize rejection for original precentroid
+            await self._finalize_precentroid_rejection(
+                precentroid_id=precentroid_id,
+                c=c,
+                similarities=[],
+                threshold=threshold,
+                extra_archive={
+                    "new_precentroids": new_precentroids,
+                    "burst_threshold": threshold,
+                },
+            )
+
+            return new_precentroids
+
 
     # ----- drift & split suggestion -----
 
@@ -505,43 +509,66 @@ class CentroidSystem:
     
     # ----- review projection & admin utilities -----
 
-    async def build_review_queue(self) -> List[Dict]:
+    async def build_review_queue(self) -> list[dict]:
         """
-        Build a projection of centroids requiring human review.
+        Build a projection of centroids and precentroids requiring human review.
 
-        This is a READ-ONLY projection.
-        It does not mutate state.
-        It reflects live in-memory runtime state only.
+        Returns:
+            List of review items in dict format compatible with admin frontend.
+        Notes:
+            - READ-ONLY projection: does not mutate runtime state.
+            - Includes both centroids and precentroids.
+            - Ensures metadata defaults exist for safe UI rendering.
         """
-
         await self._assert_ledger_ready()
 
         async with self._lock:
-            queue: List[Dict] = []
+            queue: list[dict] = []
 
             for centroid_id, c in self._centroids.items():
-                metadata = c.current.metadata or {}
-                review_status = metadata.get("review_status", "approved")
+                # Defensive: ensure metadata exists
+                metadata = getattr(c.current, "metadata", {})
+                if not isinstance(metadata, dict):
+                    metadata = {}
+                    c.current.metadata = metadata  # optional: patch runtime state
+
+                # Default review status for precentroids
+                review_status = metadata.get("review_status")
+                if review_status is None:
+                    review_status = "pending" if centroid_id.startswith("precentroid_") else "approved"
+                    metadata["review_status"] = review_status
 
                 if review_status != "pending":
                     continue
 
+                # Default frontend fields
+                human_note = metadata.get("human_note", "")
+                human_labels = metadata.get("human_labels", [])
+                created_at = metadata.get("created_at") or None
+                summary = metadata.get("summary") or f"{len(c.current.journal_ids)} journal(s) attached."
+
                 queue.append({
-                    "suggestion_id": f"new_{centroid_id}",
-                    "centroid_id": centroid_id,
-                    "suggestion_type": "new_centroid",
-                    "samples": [],
-                    "human_note": metadata.get("human_note", ""),
-                    "metrics": {
+                    "id": centroid_id,
+                    "type": "precentroid" if centroid_id.startswith("precentroid_") else "centroid",
+                    "summary": summary,
+                    "meta": {
                         "journal_count": len(c.current.journal_ids),
+                        "label": getattr(c, "label", None),
+                        "nne": getattr(c, "nne", None),
+                        **metadata,  # includes human_note, human_labels, created_at, etc.
                     },
-                    "human_labels": metadata.get("human_labels", []),
                     "status": review_status,
-                    "created_at": metadata.get("created_at"),
+                    "human_note": human_note,
+                    "human_labels": human_labels,
+                    "created_at": created_at,
                 })
 
+            # Optional: sort queue by creation time for deterministic ordering
+            queue.sort(key=lambda x: x.get("created_at") or "", reverse=False)
+
+            logger.info(f"Built review queue with {len(queue)} items.")
             return queue
-    
+
     async def _load_split_suggestions(self) -> None:
         """
         Preload all split suggestion artifacts from SUGGESTIONS_DIR into memory.
@@ -549,133 +576,16 @@ class CentroidSystem:
         self._split_suggestions.clear()
         os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
 
-        for path in sorted(glob.glob(os.path.join(SUGGESTIONS_DIR, "*.json"))):
+        for path in sorted(glob.glob(os.path.join(SUGGESTIONS_DIR, "*.json")), key=_numeric_suffix):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 cid = data["centroid_id"]
                 idx = data["event_index"]
                 self._split_suggestions.setdefault(cid, {})[idx] = data
 
-    async def remove_journal_globally(self, journal_id: str) -> Dict[str, List[str]]:
-        """
-        Remove a journal entry from every centroid where it exists as a SAAJE.
 
-        This method:
-        - Enforces ledger readiness
-        - Maintains locking guarantees
-        - Records proper REMOVE_SAAJE events
-        - Persists all resulting state transitions
+    # Simple helper to run blocking I/O in a thread, releasing the async lock
+    async def run_sync_in_thread(self, func: callable, *args, **kwargs):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(self._executor, functools.partial(func, *args, **kwargs))
 
-        Returns:
-            Dict[centroid_id, ["removed"]]
-        """
-
-        await self._assert_ledger_ready()
-
-        removed: Dict[str, List[str]] = {}
-
-        async with self._lock:
-            centroids_list = list(self._centroids.values())
-
-        for c in centroids_list:
-            if journal_id in c.current.saajes:
-                await self.remove_saaje(c.centroid_id, journal_id)
-                removed.setdefault(c.centroid_id, []).append("removed")
-
-        return removed
-
-    async def suggest_precentroid_for_journal(self, journal_id: str, threshold: float = 0.7) -> str | None:
-        """
-        Suggest creation of a new precentroid if the journal entry is semantically dissimilar to all existing centroids/precentroids.
-        Returns the new precentroid_id if created, None otherwise.
-        """
-        await self._assert_ledger_ready()
-        async with self._lock:
-            journal_vec = load_embedding(journal_id)
-
-            # stricter cohesion remembered for burst precentroids
-            for c in self._centroids.values():
-                local_min = c.current.metadata.get("min_similarity_threshold")
-
-                sim = cosine_similarity(journal_vec, c.current.vector)
-
-                if local_min is not None and sim < local_min:
-                    continue
-
-                if sim >= threshold:
-                    return None
-
-
-            # Compare against all current centroids and precentroids
-            for c in self._centroids.values():
-                sim = cosine_similarity(journal_vec, c.current.vector)
-                if sim >= threshold:
-                    return None  # similar enough to existing centroid/precentroid
-
-            # Dissimilar to all → create new precentroid
-            return await self.create_precentroid([journal_id])
-
-    async def burst_precentroid(
-    self,
-    precentroid_id: str,
-    threshold: float = 0.8
-) -> List[str]:
-        """
-        Burst a precentroid as a *mode of rejection*.
-        Rejection is finalized only after burst results are created.
-        """
-        await self._assert_ledger_ready()
-        async with self._lock:
-            if precentroid_id not in self._centroids:
-                raise RuntimeError(f"Precentroid {precentroid_id} not found")
-
-            c = self._centroids.pop(precentroid_id)
-            journal_ids = c.current.journal_ids
-            vectors = np.stack([load_embedding(j) for j in journal_ids])
-
-            # record burst intent before mutation
-            await self._ledger.record_event({
-                "type": "BURST_PRECENTROID",
-                "centroid_id": precentroid_id,
-                "threshold": threshold,
-            })
-
-            if len(journal_ids) == 1:
-                await self._finalize_precentroid_rejection(
-                    precentroid_id=precentroid_id,
-                    c=c,
-                    similarities=[],
-                    threshold=threshold,
-                    extra_archive={
-                        "note": "single entry, archived without burst"
-                    },
-                )
-                return []
-
-            Z = linkage(vectors, method="average", metric="cosine")
-            clusters = fcluster(Z, t=1 - threshold, criterion="distance")
-
-            cluster_map: Dict[int, List[str]] = {}
-            for j_id, cl_id in zip(journal_ids, clusters):
-                cluster_map.setdefault(cl_id, []).append(j_id)
-
-            new_precentroids = []
-            for journals in cluster_map.values():
-                new_cid = await self.create_precentroid(journals)
-                # record stricter local threshold for this semantic region
-                new_c = self._centroids[new_cid]
-                new_c.states[-1].metadata["min_similarity_threshold"] = threshold
-                new_precentroids.append(new_cid)
-
-            await self._finalize_precentroid_rejection(
-                precentroid_id=precentroid_id,
-                c=c,
-                similarities=[],
-                threshold=threshold,
-                extra_archive={
-                    "new_precentroids": new_precentroids,
-                    "burst_threshold": threshold,
-                },
-            )
-
-            return new_precentroids

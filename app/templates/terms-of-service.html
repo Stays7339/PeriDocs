@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/terms-of-service.html save-state 202602101946 #}
+{# PeriDocs-code/app/templates/terms-of-service.html save-state 202602151320 #}
 {% extends "base.html" %}
 {% block title %}Terms of Service — PeriDocs{% endblock %}
 
@@ -10,38 +10,43 @@
       <h1>PeriDocs Terms of Service</h1>
 
 
-  <p><strong>Effective Date:</strong> 10 February 2026</p>
+  <p><strong>Last Updated:</strong> 16 February 2026</p>
 
   <h2>1. Acceptance of Terms</h2>
-  <p>
-    By accessing or using PeriDocs.org, operated by PeriDocs LLC, (“PeriDocs,” “we,” “us,” or “the Service”), the individual(s) using the Service (“User,” “Users”) agree to these Terms of Service (“Terms”). 
-    This document must be read together with our  <a href="/privacy-policy">Privacy Policy</a>, which explains what personal data is processed, how it is processed, and the rights available to users under applicable data protection laws. If you do not agree with both the Privacy Policy and Terms of Service, do not use the Service.</p> 
-
+  <p> By accessing or using PeriDocs.org, operated by PeriDocs LLC, (“PeriDocs,” “we,” “us,” or “the Service”), the individual(s) using the Service (“User,” or “Users”) agree to these Terms of Service (“Terms”).</p> 
+  <p>This document must be read together with our  <a href="/privacy-policy">Privacy Policy</a>, which explains what personal data is processed, how it is processed, and the rights available to users under applicable data protection laws. <br>If you do not agree with both the Privacy Policy and the Terms of Service, do not use the Service. <br></p> 
+  <br> <br>
   <h2>2. Description of Service</h2>
   <p>
-    PeriDocs is an educational journaling and analysis platform. The Service allows Users to submit text-based journal entries for educational, reflective, and analytical purposes. 
+    PeriDocs is an educational platform focused on heuristic-based semantic analysis, heuristic-based pragmatic interpretation, relevant hyperlink retreival based on the contents of the queries ("Entry," or "Entries") submitted to the platform. The Service allows Users to submit said quieries for educational, reflective, and analytical purposes. 
     Insights are generated for personal learning and reflection only and are not a substitute for professional advice.
   </p>
-
+  <br> <br>
+<ul>
+  <li><strong>Entry</strong> – a piece of text a user submits to PeriDocs</li>
+  <li><strong>Embedding</strong> – a numeric generalization of text meaning</li>
+  <li><strong>Centroid</strong> – a group of similar Entries given an overall generalized label assigned by a human</li>
+  <li><strong>Derived Analytical Data</strong> – information computed from Entries (such as embeddings, similarity scores, or which Centroids an Entry may be most similar to)</li>
+  <li><strong>Sensitive Personal Information</strong> – data revealing things such as race, religion, political opinion, health, or sexual orientation</li>
+  <li><strong>Pseudonymized</strong> – data modified so it can’t be directly linked to a person without extra info</li>
+  <li><strong>Audit Trail</strong> – a log showing what was done to data and when</li>
+</ul>
+<br> <br>
   <h2>3. User Content, Data Processing, and Deletion</h2>
-  <p>
-    PeriDocs processes user-submitted text-based journal entries (“Entries”, "Entry") for the sole purposes of operating the Service, providing requested analyses, and maintaining system integrity.
-  </p>
-
   <h3>3.1 Data Collected</h3>
   <ul>
-    <li>Account identifiers (e.g., email address)</li>
-    <li>User-submitted text Entries</li>
-    <li>System-generated metadata required for operation (e.g., timestamps, internal identifiers)</li>
-    <li>Technical request data (including IP addresses, pseudonymized for routine operation)</li>
+    <li>-Account identifiers (e.g., email address)</li>
+    <li>-User-submitted text Entries</li>
+    <li>-System-generated metadata required for operation (e.g., timestamps, embedding vectors)</li>
+    <li>-Technical request data (including IP addresses, pseudonymized for routine operation)</li>
   </ul>
   <p>
-    IP addresses are processed transiently for network security and abuse prevention. Raw IP addresses are not retained in plaintext beyond immediate operational necessity. Encrypted incident records containing IP data may be retained only in limited circumstances involving legal compliance or credible safety escalations, accessible solely by authorized legal operations personnel. All access is logged in an auditable trail.
+    IP addresses are processed transiently for network security and abuse prevention. Raw IP addresses are not retained in plaintext beyond immediate operational necessity. Encrypted incident records containing IP data may be retained only in limited circumstances involving legal compliance, system integrity circumstances, credible safety escalations, accessible solely by authorized legal operations personnel. All access is logged in an auditable trail.
   </p>
 
   <h3>3.2 Derived and Analytical Data</h3>
   <p>
-    PeriDocs may generate internal analytical representations of Entries, including semantic embeddings and similarity indices. These are used solely to provide Service features, are never sold or licensed for advertising, and are treated as personal data when reasonably linkable to a User.
+    PeriDocs may generate internal analytical representations of Entries, including but not limited to: semantic embeddings and similarity indices. These are used solely to provide Service features, are never sold or licensed for advertising, and are treated as personal data when reasonably linkable to a User.
   </p>
 
   <h3>3.3 License Grant</h3>
@@ -49,9 +54,9 @@
     By submitting content, Users grant PeriDocs a limited, non-exclusive, worldwide, royalty-free license to process, store, and display Entries solely for:
   </p>
   <ul>
-    <li>Operating and maintaining the Service, including the right to reproduce, modify, format, and create technical derivative copies solely for operational purposes,</li>
-    <li>Providing requested analyses and features, and</li>
-    <li>Ensuring security, integrity, and lawful operation.</li>
+    <li>-Operating and maintaining the Service, including the right to reproduce, modify, format, and create technical derivative copies solely for operational purposes,</li>
+    <li>-Providing requested analyses and features, and</li>
+    <li>-Ensuring security, integrity, and lawful operation.</li>
   </ul>
   <p>
     This license is not granted for advertising, marketing, or training third-party systems. Users retain all ownership rights in their content.
@@ -63,114 +68,129 @@
     <a href="mailto:info@peridocs.org">info@peridocs.org</a>.
   </p>
   <p>
-    We delete journal content and associated embeddings upon verified deletion requests. We may retain limited pseudonymized ledger identifiers and audit records necessary to maintain system integrity, system auditability, prevent abuse, comply with legal obligations, or defend against claims. These retained records do not include journal content or embeddings. Deletion is destructive and irreversible. Deleted data cannot be restored, and deletion may permanently impair or disable features associated with the User’s account. Users do not need to supply Entry identifiers to exercise deletion rights. Limited legal records may be retained strictly as required by law.
+    We delete the plaintext content, timestamp and IP (Internet Protocol) address upon verified deletion requests. We may retain limited pseudonymized ledger identifiers, pseudonymized embeddings, and audit records necessary to maintain system integrity, system auditability, prevent abuse, comply with legal obligations, or defend against claims. These retained records do not include plaintext content of any Entry. Deletion is destructive and irreversible. Deleted data cannot be restored, and deletion may permanently impair or disable features associated with the User’s account. Limited legal records may be retained strictly as required by law.
   </p>
 
-  <h2>3A. Age Eligibility</h2>
+  <h3>3.5 Age Eligibility</h3>
   <p>
     The Service is intended solely for individuals who are at least 16 years of age, or the minimum age of digital consent in their jurisdiction, whichever is higher. If required by applicable law, parental consent may be required.
     PeriDocs does not knowingly process personal data from individuals below this age. If such data is discovered, it will be deleted without undue delay. Users represent and warrant they meet the applicable age requirement by using the Service.
   </p>
-
+  <br> <br>
   <h2>4. Prohibited Use</h2>
   <p>
-    Users may not submit content that violates laws, infringes third-party rights or intellectual property, or is intended to harm others. Submissions indicating imminent harm may trigger crisis escalation procedures. Attempts to extract, scrape, or reuse PeriDocs content outside personal or subscribed use are prohibited.
+    Users must not submit content that violates laws, infringes third-party rights or intellectual property, or is intended to harm others. Submissions indicating imminent harm may trigger crisis escalation procedures. Attempts to extract, scrape, or reuse PeriDocs content outside personal or subscribed use are prohibited. PeriDocs reserves the right to permanently ban Users who demonstrate prohibited use(s) of the Service.
   </p>
-
+  <br> <br>
   <h2>5. No Medical or Mental Health Advice</h2>
   <p>
     PeriDocs does not provide medical, clinical, mental health, or therapeutic advice. Insights are for educational and reflective purposes only.
   </p>
-
+  <br> <br>
   <h2>6. Escalations and Legal Compliance</h2>
   <p>
     In cases of flagged Entries indicating credible risk of harm or legal obligation, encrypted incident records may be stored and disclosed only to authorized legal operations personnel or law enforcement as required by law. All access is auditable. PeriDocs does not undertake a duty to monitor or intervene and does not guarantee detection of risk.
   </p>
-
+  <br> <br>
   <h2>7. Limitation of Liability</h2>
   <p>
-    (a) To the maximum extent permitted by law, PeriDocs LLC, its Members, employees, and affiliates shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising out of or relating to the use of the Service, including but not limited to (i) incidental, indirect, or consequential damages resulting from the processing, storage, or deletion of personal data, (ii) system downtime, or (iii) reliance on analytical outputs.
-    (b) Where enforceable under applicable law, the total aggregate liability of PeriDocs LLC to a User for any claim arising under or related to these Terms shall not exceed the greater of (i) the amount paid by the User to PeriDocs LLC in the 12 months preceding the claim, or (ii) $500 USD.
-    (c) Nothing in this Section is intended to limit liability to the extent prohibited by applicable law.  
+    (a) To the maximum extent permitted by law, PeriDocs LLC, its Members, employees, agents, and affiliates shall not be liable for any direct, indirect, incidental, special, consequential, or punitive damages arising out of or relating to the use of the Service, including but not limited to (i) incidental, indirect, or consequential damages resulting from the processing, storage, or deletion of personal data, (ii) system downtime, or (iii) reliance on analytical outputs.</p>
+    <p>(b) Where enforceable under applicable law, the total aggregate liability of PeriDocs LLC to a User for any claim arising under or related to these Terms shall not exceed the greater of (i) the amount paid by the User to PeriDocs LLC in the 12 months preceding the claim, or (ii) $500 USD.</p>
+    <p>(c) Nothing in this Section is intended to limit liability to the extent prohibited by applicable law.</p>  
   </p>
+  <br> <br>
+  <h2>8. Dispute Resolution, Binding Arbitration, and Class Action Waiver</h2>
+    <p>
+  <strong>Please read this section carefully. It affects your legal rights.</strong>
 
+  <p>(a). <strong>Informal Resolution First.</strong>
 
-<h2>8. Dispute Resolution, Binding Arbitration, and Class Action Waiver</h2>
+  Before filing any claim, you agree to attempt to resolve the dispute informally by contacting PeriDocs at:
+
+  <a href="mailto:info@peridocs.org">info@peridocs.org</a>.
+
+  We agree to attempt informal resolution for at least thirty (30) days before either party initiates arbitration.
+  </p>
   <p>
-PLEASE READ THIS SECTION CAREFULLY. IT AFFECTS YOUR LEGAL RIGHTS.
+  (b). <strong>Agreement to Arbitrate.</strong>
 
-(a). Informal Resolution First
+  Except for claims eligible for small claims court or claims seeking injunctive relief for intellectual property misuse, any dispute, claim, or controversy arising out of or relating to:
 
-Before filing any claim, you agree to attempt to resolve the dispute informally by contacting PeriDocs at:
+  -These Terms of Service,
+  -The Privacy Policy,
+  -Your use of the platform,
+  -Or the services provided by PeriDocs,
+  shall be resolved by binding arbitration administered by the American Arbitration Association (AAA).
 
-info@peridocs.org
+  If you are an individual user, the AAA Consumer Arbitration Rules shall apply where applicable.
+  If you are using the Services on behalf of a business entity, the AAA Commercial Arbitration Rules shall apply.
+  </p>
+  <p>
+  (c). <strong>Location and Procedure. </strong>
 
-We agree to attempt informal resolution for at least thirty (30) days before either party initiates arbitration.
+  Arbitration shall be conducted in Atlanta, Georgia, or
 
-(b). Agreement to Arbitrate
+  via remote proceedings at the election of either party, where permitted by AAA rules.
 
-Except for claims eligible for small claims court or claims seeking injunctive relief for intellectual property misuse, any dispute, claim, or controversy arising out of or relating to:
+  The arbitrator shall have exclusive authority to resolve disputes regarding the scope, enforceability, and interpretation of this arbitration provision.
+  </p>
+  <p>
+  (d). <strong>Class Action Waiver.</strong>
 
--These Terms of Service,
--The Privacy Policy,
--Your use of the platform,
--Or the services provided by PeriDocs,
-shall be resolved by binding arbitration administered by the American Arbitration Association (AAA).
+  <strong>You and PeriDocs agree that any dispute shall be solved on an individual basis only.</strong>
 
-If you are an individual user, the AAA Consumer Arbitration Rules shall apply where applicable.
-If you are using the Services on behalf of a business entity, the AAA Commercial Arbitration Rules shall apply.
+  Neither party may bring a claim as a plaintiff or class member in a class action, consolidated action, or representative proceeding.
 
-(c). Location and Procedure
+  The arbitrator may not consolidate claims or preside over any form of representative proceeding.
+  </p>
+  <p>
+  (e). <strong>Jury Trial Waiver.</strong>
 
-Arbitration shall be conducted:
+  By agreeing to arbitration, both parties waive the right to a trial by jury.
+  </p>
+  <p>
+  (f). <strong>Arbitration Costs.</strong>
 
-In Atlanta, Georgia; or
+  Payment of arbitration fees shall be governed by AAA rules.
+  PeriDocs will not seek to recover arbitration fees from an individual user unless the arbitrator determines the claim is frivolous or brought in bad faith.
+  </p>
+  <p>
+  (g). <strong>Small Claims Option.</strong>
 
-Via remote proceedings at the election of either party, where permitted by AAA rules.
+  Nothing in this section prevents either party from bringing an individual claim in small claims court where eligible.
+  </p>
+  <p>
+  (h). <strong>30-Day Opt-Out Right.</strong>
+  </p>
+  <p>
+  You may opt out of this arbitration agreement by sending written notice within thirty (30) days of first accepting these Terms.
+  </p>
+  <p>
+  The notice must include:
+  </p>
+  <ul>
+  <li>-Your full legal name,</li>
 
-The arbitrator shall have exclusive authority to resolve disputes regarding the scope, enforceability, and interpretation of this arbitration provision.
+  <li>-The email associated with your account, if applicable, and</li>
 
-(d). Class Action Waiver
-
-YOU AND PERIDOCS AGREE THAT ANY DISPUTE SHALL BE RESOLVED ON AN INDIVIDUAL BASIS ONLY.
-
-Neither party may bring a claim as a plaintiff or class member in a class action, consolidated action, or representative proceeding.
-
-The arbitrator may not consolidate claims or preside over any form of representative proceeding.
-
-(e). Jury Trial Waiver
-
-By agreeing to arbitration, both parties waive the right to a trial by jury.
-
-(f). Arbitration Costs
-
-Payment of arbitration fees shall be governed by AAA rules.
-PeriDocs will not seek to recover arbitration fees from an individual user unless the arbitrator determines the claim is frivolous or brought in bad faith.
-
-(g). Small Claims Option
-
-Nothing in this section prevents either party from bringing an individual claim in small claims court where eligible.
-
-(h). 30-Day Opt-Out Right
-
-You may opt out of this arbitration agreement by sending written notice within thirty (30) days of first accepting these Terms.
-
-The notice must include:
-
--Your name,
-
--The email associated with your account, and
-
--A clear statement that you wish to opt out of arbitration.
-
-Send notice to: 
-info@peridocs.org
-If you opt out, you will not be bound by this arbitration provision, but all other Terms remain in effect.
-
-(i). Severability
-
-This arbitration agreement survives termination of these Terms. If any portion of this arbitration provision is found unenforceable, the remaining portions shall remain in full force.
-
+  <li>-A clear statement that you wish to opt out of arbitration.</li>
+  </ul>
+  <p>
+  Send notice to: 
+  </p>
+  <p>
+  <a href="mailto:info@peridocs.org">info@peridocs.org</a>
+  </p>
+  <p>
+  If you opt out, you will not be bound by this arbitration provision, but all other Terms remain in effect.
+  </p>
+  <p></p>
+  (i). <strong>Severability.</strong>
+  </p>
+  <p>
+  This arbitration agreement survives termination of these Terms. If any portion of this arbitration provision is found unenforceable, the remaining portions shall remain in full force.
+  </p>
+  <br> <br>
   <h2>9. Payments and Refunds</h2>
   <p>
     Paid features are optional and clearly identified prior to purchase. Refunds are provided in accordance with applicable consumer protection laws. Users may exercise a right of withdrawal within the statutory period where required.
@@ -179,18 +199,28 @@ This arbitration agreement survives termination of these Terms. If any portion o
     Refund requests may be submitted via the account interface or by contacting 
     <a href="mailto:info@peridocs.org">info@peridocs.org</a>. Approved refunds are processed using the original payment method within a commercially reasonable timeframe. PeriDocs does not guarantee refunds outside legally mandated circumstances unless explicitly stated at the time of purchase.
   </p>
-
+<br> <br>
   <h2>10. Changes to Terms</h2>
   <p>
-    PeriDocs may update these Terms from time to time. Continued use constitutes acceptance of the updated Terms.
+    These Terms may be updated to reflect changes in law or system behavior. When we make material changes to these Terms, we will notify you via:</p>
+      <ul>
+        <li>-Email notification to registered users</li>
+        <li>-Prominent notice on our website</li>
+        <li>-Updating the "Last Updated" date at the top of this policy</li>
+      </ul>
+      <p>We encourage you to review these Terms periodically. Continued use of the Service after changes constitutes acceptance of the updated Terms.</p>
+      <
   </p>
-
+<br> <br>
   <h2>11. Governing Law and Jurisdiction</h2>
   <p>
     These Terms are governed by the laws of the State of Georgia, United States of America, without regard to conflict-of-law principles. Nothing in these Terms limits any rights Users may have under applicable mandatory consumer protection or data protection laws, including the GDPR where applicable.
   </p>
-
-  <h2>12. Contact</h2>
+  <br> <br>
+  <h2>12. General Provisions</h2>
+  <p>If any provision of this Agreement is held invalid or unenforceable, the remaining provisions shall remain in full force and effect.</p>
+<br> <br>
+  <h2>13. Contact</h2>
   <p>
     Questions regarding these Terms can be sent to 
     <a href="mailto:info@peridocs.org">info@peridocs.org</a>.

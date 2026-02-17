@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 202602102008
+# Save-state: 202602171311
 # ==========================================
 
 """
@@ -17,8 +17,10 @@ import os
 import json
 import logging
 import asyncio
+from datetime import datetime, timezone
 from typing import Dict, Any, List
 from pathlib import Path
+
 
 DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
 LEDGER_PATH = DATA_DIR / "ledger.json"
@@ -41,7 +43,7 @@ async def _load() -> Dict[str, Any]:
     if _ledger_cache is not None:
         return _ledger_cache
 
-    os.makedirs(os.path.dirname(LEDGER_PATH), exist_ok=True)
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.path.exists(LEDGER_PATH):
         _ledger_cache = _initial_ledger()
@@ -54,7 +56,7 @@ async def _load() -> Dict[str, Any]:
 
 
 async def _save(state: Dict[str, Any]) -> None:
-    tmp = LEDGER_PATH + ".tmp"
+    tmp = LEDGER_PATH.with_suffix(LEDGER_PATH.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)
     os.replace(tmp, LEDGER_PATH)
@@ -181,6 +183,7 @@ class IdentifierLedger:
             idx = await self._allocate_event_index_locked(ledger)
             payload = dict(payload)
             payload["event_index"] = idx
+            payload["occurred_at"] = datetime.now(timezone.utc).isoformat()
 
             # --- enforce VALID_TRANSITIONS for suffix events ---
             if event_type in {"APPROVE_SUFFIX", "REJECT_SUFFIX"}:

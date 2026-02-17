@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/journal.py
-# save-state 202512241542
+# save-state 202602171543
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -13,7 +13,7 @@ import asyncio
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
-from app.helpers.entry_similarity import compute_similarity_to_other_entries
+from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 
@@ -189,7 +189,7 @@ async def submit_success(request: Request, id: str):
     for eid, vec in embeddings_index.items():
         if eid == id:
             continue
-        sim = compute_similarity_to_other_entries(entry_vec, np.array(vec))
+        sim = cosine_similarity(entry_vec, np.array(vec))
         match_entry = next((e for e in all_entries if e.get("journal_id") == eid or e.get("id") == eid), None)
         if match_entry:
             scored_entries.append({"entry": match_entry, "score": sim})

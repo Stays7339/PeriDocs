@@ -1,5 +1,5 @@
 # ------------------------------
-# Python
+# Python Ignore-File-List
 # ------------------------------
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -24,7 +24,7 @@ pip-delete-this-directory.txt
 *.spec
 
 # ------------------------------
-# Virtual Environment
+# Virtual Environment Ignore-File-List
 # ------------------------------
 venv/
 env/
@@ -33,26 +33,26 @@ ENV/
 # you can add any other env folder you use
 
 # ------------------------------
-# VS Code
+# VS Code Ignore-File-List
 # ------------------------------
 .vscode/
 .history/
 *.code-workspace
 
 # ------------------------------
-# OS / system
+# OS / system Ignore-File-List
 # ------------------------------
 .DS_Store
 Thumbs.db
 
 # ------------------------------
-# Logs and databases
+# Logs and databases Ignore-File-List
 # ------------------------------
 *.log
 *.sqlite3
 
 # ------------------------------
-# Other common Python stuff
+# Other common Python stuff Ignore-File-List
 # ------------------------------
 __pycache__/
 *.pytest_cache/
@@ -62,21 +62,24 @@ htmlcov/
 .coverage.*
 
 # ------------------------------
-# Node.js / frontend (if you add any)
+# Node.js / frontend (if you add any) Ignore-File-List
 # ------------------------------
 node_modules/
 dist/
 build/
 
 # ------------------------------
-# Optional: ignore your data folders if you have large datasets
+# Ignore data folders, even in dev, just in case we accidentally push to production
+# Ignore-File-List
 # ------------------------------
 data/*
 !data/.gitkeep
+data/journals.json
 
 
 # ------------------------------
-# Optional: ignore your models folders if you have large datasets
+# Ignore embeddings models folders since we have large data sets
+# Ignore-File-List
 # ------------------------------
 models/*
 !models/.gitkeep
@@ -85,8 +88,6 @@ models/*
 # ignore everything in static folder
 app/static/CabineyGrotesk_Complete/*
 
-# --- data folder ---
-data/journals.json
 
 # # Ignore sensitive env files and environment variables
 .env

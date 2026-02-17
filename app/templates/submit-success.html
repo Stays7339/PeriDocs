@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 202512241346 (YYYYMMDDhhmm) #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 202602151534 (YYYYMMDDhhmm) #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
@@ -30,7 +30,7 @@
       <strong>Closest match(es) found:</strong><br>
       {% for match in top_matches %}
         <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
-          <span>{{ match.excerpt }}</span>
+          <span>{{ match.excerpt }}[...]</span>
           <span class="similarity-badge">{{ match.similarity_pct }}%</span>
         </div>
         <small>
@@ -39,6 +39,7 @@
             {{ match.entry_id }}
           </a>)
         </small><br>
+        <br>
       {% endfor %}
     </blockquote>
     {% endif %}

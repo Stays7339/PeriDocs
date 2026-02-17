@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/privacy.html save-state 202602101949  #}
+{# PeriDocs-code/app/templates/privacy.html save-state 202602161320  #}
 {% extends "base.html" %}
 {% block title %}Privacy Policy — PeriDocs{% endblock %}
 
@@ -7,100 +7,115 @@
   <div class="card">
     <div class="card-content">
       <h1>PeriDocs Privacy Policy</h1>
-      <p>Effective Date: 10 February 2026<br>
-
-      <p>PeriDocs LLC ("PeriDocs," "we," "us," or "the Service") provides an educational journaling and analysis platform. This Privacy Policy explains what personal data is processed, how it is processed, and the rights available to users under applicable data protection laws. This document must be read together with our  <a href="/terms-of-service">Terms of Service</a>, which governs licensing, acceptable use, and deletion.</p> If you do not agree with both the Privacy Policy and Terms of Service, do not use the Service.
-
-      <h2>1. Scope and Governing Principles</h2>
+      
+      <p><strong>Last Updated:</strong> 16 February 2026</p>
+      <br> <br>
+      <h2>1. Acceptance of Policy</h2>
+      <p>PeriDocs is an educational platform focused on heuristic-based semantic analysis, heuristic-based pragmatic interpretation, relevant hyperlink retreival based on the contents of the queries ("Entry," "Entries") submitted to the platform. <br> By accessing or using PeriDocs.org, operated by PeriDocs LLC, (“PeriDocs,” “we,” “us,” or “the Service”), the individual(s) using the Service (“User,” “Users”) agree to this Privacy Policy. <br> This Privacy Policy explains what personal data is processed, how it is processed, and the rights available to users under applicable data protection laws. <br> This document must be read together with our  <a href="/terms-of-service">Terms of Service</a>, which governs licensing, acceptable use, and deletion.</p> 
+      <br>
+      <p>If you do not agree with both the Privacy Policy and the Terms of Service, do not use the Service.</p> <br>
+      <br> <br>
+      <h2>2. Scope and Governing Principles</h2>
       <p>PeriDocs is designed around the principles of data minimization, determinism, auditability, and human oversight. Personal data is processed only where necessary to operate the Service, comply with legal obligations, and maintain system integrity. No personal data is processed for advertising, behavioral profiling, or resale.</p>
-      <p>Where applicable, PeriDocs processes personal data in accordance with the General Data Protection Regulation (GDPR) and the laws of the State of Georgia, United States of America. Users subject to CCPA/CPRA (California), VCDPA (Virginia), CPA (Colorado), CTDPA (Connecticut), and other applicable US state privacy legislation may have additional rights.</p>
-      <p><strong>Data Controller Identity:</strong> PeriDocs LLC is the data controller responsible for the processing of your personal data. While our company is operated from the United States (State of Georgia), all personal data, information, and intellectual property are hosted within the European Union (Germany). Where required, we implement appropriate safeguards such as Standard Contractual Clauses (SCCs). For data protection inquiries, contact our Data Protection team at info@peridocs.org.</p>
+      <br>
+      <p>Where applicable, PeriDocs aims to process personal data in accordance with the General Data Protection Regulation (GDPR) and the laws of the State of Georgia, United States of America. Users subject to CCPA/CPRA (California), VCDPA (Virginia), CPA (Colorado), CTDPA (Connecticut), and other applicable US state privacy legislation may have additional rights.</p>
+      <p><br><strong>Data Controller Identity:</strong> PeriDocs LLC is the data controller responsible for the processing of your personal data. While our company is operated from the United States (State of Georgia), all personal data, information, and intellectual property are hosted within the European Union (Germany). Where required, we implement appropriate safeguards such as Standard Contractual Clauses (SCCs). For data protection inquiries, contact our Data Protection team at <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p> <br>
+      <br> <br>
+  <p><strong>Simple English Terms:</strong></p>
+<ul>
+  <li><strong>Entry</strong> – a piece of text a user submits to PeriDocs</li>
+  <li><strong>Embedding</strong> – a numeric generalization of text meaning</li>
+  <li><strong>Centroid</strong> – a group of similar Entries given an overall generalized label assigned by a human</li>
+  <li><strong>Derived Analytical Data</strong> – information computed from Entries (such as embeddings, similarity scores, or which Centroids an Entry may be most similar to)</li>
+  <li><strong>Sensitive Personal Information</strong> – data revealing things such as race, religion, political opinion, health, or sexual orientation</li>
+  <li><strong>Pseudonymized</strong> – data modified so it can’t be directly linked to a person without extra info</li>
+  <li><strong>Audit Trail</strong> – a log showing what was done to data and when</li>
+</ul>
+<br> <br>
+      <h2>3. Categories of Data Processed</h2>
+      <h3>3.1 Account and Access Data</h3>
+      <p>PeriDocs may process basic account identifiers such as email addresses, account passwords, and internal account IDs. Authentication data is used solely to provide account access and is not shared or repurposed.</p>
+      <br>
+      <h3>3.2 User-Submitted Journal Entries</h3>
+      <p>Users may submit Entries. These Entries may contain personal or sensitive information depending on what the User chooses to write. <br> <br> <strong>PeriDocs does not require or solicit health, medical, or diagnostic information.</strong></p>
+      <br>
+      <p><strong>Sensitive Personal Information:</strong> If you choose to include sensitive personal information in your Entries (such as information revealing racial or ethnic origin, religious beliefs, mental or physical health, sexual orientation, or other categories defined as "sensitive" under applicable law), such information will be processed solely for the purpose of providing the Service. We do not use sensitive personal information for any secondary purposes, and you may request deletion of this information at any time.</p>
+      <br>
+      <h3>3.3 Derived Analytical Data</h3>
+      <p>To operate the Service, PeriDocs generates internal analytical representations of Entries, including semantic embeddings ("Embeddings"), similarity scores, centroid membership, heuristic-based query-focused pragmatic interpretations, and related metadata.</p>
+      <br>
+      <p>In accordance with applicable data protection laws, PeriDocs treats derived analytical data as pseudonymized personal data in scenarios where such derived analytical data is reasonably linkable to a user or their content.</p>
+      <br>
+      <p>Embeddings are generated once per Entry under the model version in use at the time and are not routinely recomputed except in cases of documented system migration or integrity correction. Embeddings are used solely within the scope of the PeriDocs Service, including system operation, quality assurance, and aggregate analysis, and are not repurposed for advertising, profiling, or unrelated third-party uses.</p>
 
-      <h2>2. Categories of Data Processed</h2>
-      <h3>2.1 Account and Access Data</h3>
-      <p>PeriDocs processes basic account identifiers such as email addresses, account passwords, and internal account IDs. Authentication data is used solely to provide account access and is not shared or repurposed.</p>
-
-      <h3>2.2 User-Submitted Journal Entries</h3>
-      <p>Users may submit user-generated text-based journal entries ("Entries", "Entry"). These Entries may contain personal or sensitive information depending on what the user chooses to write. PeriDocs does not require or solicit health, medical, or diagnostic information.</p>
-      <p><strong>Sensitive Personal Information:</strong> If you choose to include sensitive personal information in your Entries (such as information revealing racial or ethnic origin, religious beliefs, mental or physical health, sexual orientation, or other categories defined as "sensitive" under applicable law), such information will be processed solely for the purpose of providing the journaling service. We do not use sensitive personal information for any secondary purposes, and you may request deletion of this information at any time.</p>
-
-      <h3>2.3 Derived Analytical Data</h3>
-      <p>To operate the Service, PeriDocs generates internal analytical representations of Entries, including semantic embeddings, similarity scores, centroid membership, and related metadata.</p>
-      <p>In accordance with applicable data protection laws, PeriDocs treats derived analytical data as personal data where it is reasonably linkable to a user or their content.</p>
-      <p>Embeddings are generated once per journal entry under the model version in use at the time and are not routinely recomputed except in cases of documented system migration or integrity correction. Embeddings are used solely within the scope of the PeriDocs Service, including system operation, quality assurance, and aggregate analysis, and are not repurposed for advertising, profiling, or unrelated third-party uses.</p>
-
-      <h3>2.4 Technical and Network Data</h3>
-      <p>The Service necessarily processes network metadata such as IP addresses to deliver requests, protect against abuse, and ensure system security.</p>
+      <br>
+      <h3>3.4 Technical and Network Data</h3>
+      <p>The Service necessarily processes network metadata such as IP (Internet Protocol) addresses and timestamps to deliver requests, protect against abuse, and ensure system security.</p>
       <ul>
-        <li>Under normal operations, raw IP addresses are not visible to staff or developers and are processed only in pseudonymized form.</li>
-        <li>Routine non-routing logs store only pseudonymized IP representations using keyed HMAC.</li>
-        <li>Pseudonymized identifiers are used for rate-limiting and abuse detection only.</li>
-        <li>Raw IP addresses may be encrypted and retained only in narrowly defined legal or safety escalation scenarios, as described below.</li>
+        <li>-Under normal operations, raw IP addresses are not visible to staff or developers and are processed only in pseudonymized form.</li>
+        <li>-Routine non-routing logs store only pseudonymized IP representations.</li>
+        <li>-Pseudonymized identifiers are used for rate-limiting and abuse detection only.</li>
+        <li>-Raw IP addresses may be encrypted and retained only in defined safety escalation, system integrity, and legal circumstances, as described below.</li>
       </ul>
-
-      <h3>2.5 Cookies and Similar Technologies</h3>
+      <br>
+      <h3>3.5 Cookies and Similar Technologies</h3>
       <p>The Service uses only LocalStorage and currently does not transmit any data from the users computer beyond what is already given from routing and from explicit user action. We do not use advertising, tracking, or analytics cookies that follow you across other websites.</p>
-
-      <h2>3. Purpose of Processing</h2>
+      <br> <br>
+      <h2>4. Purpose of Processing</h2>
       <p>Personal data is processed solely for the following purposes:</p>
       <ul>
-        <li>Operating and maintaining the PeriDocs Service</li>
-        <li>Providing requested educational and reflective analyses</li>
-        <li>Maintaining rule-governed and documented, auditable system behavior</li>
-        <li>Preventing abuse, fraud, or system misuse</li>
-        <li>Complying with legal obligations</li>
+        <li>-Operating and maintaining the PeriDocs Service</li>
+        <li>-Providing requested educational and reflective analyses</li>
+        <li>-Maintaining rule-governed and documented, auditable system behavior</li>
+        <li>-Preventing abuse, fraud, or system misuse</li>
+        <li>-Complying with legal obligations</li>
       </ul>
       <p>PeriDocs does not process personal data for advertising, behavioral tracking, marketing analytics, or automated decision-making with legal or similarly significant effects.</p>
       <p><strong>Legal Basis for Processing (GDPR/UK GDPR Users):</strong> We process your personal data under the following lawful bases:</p>
       <ul>
-        <li>Contract Performance (Art. 6(1)(b)): Processing necessary to provide the Service you have requested</li>
-        <li>Legitimate Interests (Art. 6(1)(f)): Processing necessary for security, fraud prevention, and service improvement, where these interests are not overridden by your rights</li>
-        <li>Legal Obligation (Art. 6(1)(c)): Processing required to comply with applicable laws</li>
-        <li>Consent (Art. 6(1)(a)): Where we rely on consent, you may withdraw it at any time by contacting us at info@peridocs.org or through available means of deletion via website.</li>
+        <li>-Contract Performance (Art. 6(1)(b)): Processing necessary to provide the Service you have requested.</li>
+        <li>-Legitimate Interests (Art. 6(1)(f)): Processing necessary for security, fraud prevention, and service improvement, where these interests are not overridden by your rights.</li>
+        <li>-Legal Obligation (Art. 6(1)(c)): Processing required to comply with applicable laws.</li>
+        <li>-Consent (Art. 6(1)(a)): Where we rely on consent, you may withdraw it at any time by contacting us at <a href="mailto:info@peridocs.org">info@peridocs.org</a> or through available means of deletion via website.</li>
       </ul>
-
-      <h2>4. Centroids, Moderation, and Human Oversight</h2>
-      <p>Entries may be grouped into human-approved semantic clusters ("Centroids") as described in PeriDocs' published technical specification. All centroid approval, rejection, splitting, and labeling decisions require explicit human moderation.</p>
-      <p>Software-generated suggestions never create authoritative categories on their own and never override human decisions. All centroid evolution is auditable, logged, and governed by policy drafted and reviewed by humans.</p>
-      <p><strong>Automated Decision-Making:</strong> The Service uses automated processing to generate semantic embeddings and similarity analyses of your Entries. These automated processes do NOT produce decisions with legal or similarly significant effects on you. All categorization and labeling require human review before becoming authoritative. You have the right to request human intervention in any automated processing that affects you by contacting us at info@peridocs.org.</p>
-
-      <h2>5. Crisis and Legal Escalations</h2>
+      <br> <br>
+      <h2>5. Centroids, Moderation, and Human Oversight</h2>
+      <p>Entries may be grouped into human-approved semantic clusters ("Centroid," or "Centroids"). All Centroid approval, rejection, splitting, and labeling decisions require explicit human moderation.</p>
+      <p>Software-generated suggestions never create authoritative categories on their own and never override human decisions. All Centroid evolution is auditable, logged, and governed by policy drafted and reviewed by humans.</p>
+      <p><strong>Automated Decision-Making:</strong> The Service uses automated processing to generate semantic embeddings and similarity analyses of your Entries. These automated processes do not produce decisions with legal, medical, or similarly significant effects on you. All labels of groups of similar Entries require human review before becoming persisting to live groups of Entries. You have the right to request human intervention in any automated processing that affects you by contacting us at <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p>
+      <br> <br>
+      <h2>6. Crisis and Legal Escalations</h2>
       <p>PeriDocs is not a crisis response service. PeriDocs does not undertake a duty to monitor or intervene and does not guarantee detection of risk. Escalation mechanisms exist solely to comply with legal obligations or to prevent imminent harm where required by law. If a submission indicates credible risk of harm or triggers a legal obligation, the system may generate a restricted incident record.</p>
       <p>In such cases:</p>
       <ul>
-        <li>Relevant data may be copied into a secured incident file.</li>
-        <li>Raw IP addresses may be encrypted using asymmetric encryption.</li>
-        <li>Access is limited to authorized legal operations personnel.</li>
-        <li>Every access, decryption, or disclosure is logged with timestamp, reason, and actor.</li>
-        <li>Incident records are retained only as long as necessary to resolve the escalation or satisfy legal retention requirements.</li>
+        <li>-Relevant data may be copied into a secured incident file.</li>
+        <li>-Raw IP (Internet Protocol) addresses may be encrypted using asymmetric encryption.</li>
+        <li>-Access is limited to authorized legal operations personnel.</li>
+        <li>-Every access, decryption, or disclosure is logged with timestamp, reason, and actor.</li>
+        <li>-Incident records are retained only as long as necessary to resolve the escalation or satisfy legal retention requirements.</li>
       </ul>
-
-      <h2>6. Data Retention</h2>
-      <p>Data retention follows strict minimization rules:</p>
+      <br> <br>
+      <h2>7. Data Retention</h2>
+      <p>Data retention follows these minimization rules:</p>
       <ul>
-        <li>Pseudonymized operational logs are retained for up to 30 days</li>
-        <li>Encrypted escalation records are retained only as legally required</li>
-        <li>Entries and derived analytical data persist until deletion is requested or required by law</li>
+        <li>-Pseudonymized operational logs are retained for up to 30 days.</li>
+        <li>-Account data is retained for the duration of your account plus 30 days after deletion request.</li>
+        <li>-Plaintext Content of Entries is retained until you request deletion.</li>
+        <li>-Operational logs are retained for 30 days.</li>
+        <li>-Escalation/incident records: As required by applicable law (typically 7 years)</li>
+        <li>-Offline backup data: Removed from active backups within 90 days of deletion request</li>
       </ul>
-      <p>Specific Retention Periods:</p>
-      <ul>
-        <li>Account data: Retained for the duration of your account plus 30 days after deletion request</li>
-        <li>Entries and embeddings: Until you request deletion</li>
-        <li>Operational logs: 30 days</li>
-        <li>Escalation/incident records: As required by applicable law (typically 7 years)</li>
-        <li>Offline backup data: Removed from active backups within 90 days of deletion request</li>
-      </ul>
-
-      <h2>7. Data Subject Rights</h2>
-      <p>Users may request deletion of their personal data through the available means via website or by contacting info@peridocs.org.</p>
+      <br> <br>
+      <h2>8. Data Subject Rights</h2>
+      <p>Users may request deletion of their personal data through the available means via website or by contacting <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p>
       <p>Upon a verified deletion request, PeriDocs will permanently delete:</p>
       <ul>
-        <li>Applicable user Entries</li>
-        <li>Embeddings derived directly from the plaintext content of each applicable Entry</li>
-        <li>Centroid associations directly attributable to the user</li>
-        <li>Related metadata, except where retention is legally required</li>
+        <li>-Plaintext Content of applicable Entries, except where retention is legally required.</li>
+        <li>-Timestamp and IP (Internet Protocol) address of applicable Entries, except where retention is legally required.</li>
+        <li>-Centroid associations directly attributable to applicable Entries.</li>
       </ul>
-      <p>We delete journal content and associated embeddings upon verified deletion requests. We may retain limited pseudonymized ledger identifiers and audit records necessary to maintain system integrity, system auditability, prevent abuse, comply with legal obligations, or defend against claims. These retained records do not include journal content or embeddings. Deletion is irreversible and may permanently disable features associated with the user's account. PeriDocs does not require users to supply journal entry identifiers to exercise deletion rights.</p>
+      <p>We delete journal content upon verified deletion requests. We may retain limited pseudonymized ledger identifiers, pseudonymized embeddings, anonymized embeddings, and audit records necessary to maintain system integrity, system auditability, prevent abuse, comply with legal obligations, or defend against claims.</p>
+      <p>These retained records do not include journal content or embeddings. Deletion is irreversible and may permanently disable features associated with the user's account. PeriDocs does not require users to supply journal entry identifiers to exercise deletion rights.</p>
       <p>Depending on your jurisdiction, you may have the following additional rights:</p>
       <p><strong>For EU/UK GDPR Users:</strong></p>
       <ul>
@@ -136,57 +151,57 @@
       </ul>
       <p>To Exercise Your Rights: Submit requests via:</p>
       <ul>
-        <li>Email: info@PeriDocs.org</li>
+        <li>Email: <a href="mailto:info@peridocs.org">info@peridocs.org</a></li>
       </ul>
       <p>We will respond to verifiable requests within 30 calendar days. We may need to verify your identity before processing your request.</p>
-
-      <h2>8. Local Storage and Sessions</h2>
+      <br> <br>
+      <h2>9. Local Storage and Sessions</h2>
       <p>The Service uses minimal browser storage for session management and interface preferences. Session tokens are short-lived and are not used for tracking across services.</p>
-
-      <h2>9. Third-Party Sharing and Disclosure</h2>
+      <br> <br>
+      <h2>10. Third-Party Sharing and Disclosure</h2>
       <p>We do not sell your personal information. We do not share your personal information for cross-context behavioral advertising.</p>
       <p>We may disclose personal information to the following categories of third parties, solely for the purposes described:</p>
       <ul>
-        <li>Service Providers: Companies that help us operate our Service (e.g., hosting providers, payment processors, security services) under strict contractual obligations to protect your data.</li>
-        <li>Legal Requirements: When required by law, court order, or government request.</li>
-        <li>Safety: To protect the rights, safety, or property of PeriDocs, our users, or others.</li>
-        <li>Business Transfers: In connection with a merger, acquisition, or sale of assets (users with email addresses registered with PeriDocs will be notified of any such change).</li>
+        <li>-Service Providers: Companies that help us operate our Service (e.g., hosting providers, payment processors, security services) under strict contractual obligations to protect your data.</li>
+        <li>-Legal Requirements: When required by law, court order, or government request.</li>
+        <li>-Safety: To protect the rights, safety, or property of PeriDocs, our users, or others.</li>
+        <li>-Business Transfers: In connection with a merger, acquisition, or sale of assets (users with email addresses registered with PeriDocs will be notified of any such change).</li>
       </ul>
       <p>Categories of personal information disclosed in the past 12 months:</p>
       <ul>
-        <li>Identifiers (e.g., email address): Disclosed to service providers</li>
-        <li>Internet activity information: Disclosed to security service providers</li>
+        <li>Identifiers: Disclosed to service providers</li>
+        <li>Internet activity information for this domain only: Disclosed to security service providers</li>
       </ul>
-      <p>We do NOT sell personal information. We have NOT sold personal information in the preceding 12 months.</p>
-
-      <h2>10. International Data Transfers</h2>
+      <p>We do not sell personal information. We have not sold personal information in the preceding 12 months.</p>
+      <br> <br>
+      <h2>11. International Data Transfers</h2>
       <p>PeriDocs is operated from the United States (State of Georgia). However, all personal data from Users is stored and processed exclusively within the European Union (Germany). Where required, we implement appropriate safeguards such as Standard Contractual Clauses (SCCs).</p>
       <p>For Users Outside the EU: If you are located outside the European Union, please be aware that your personal data will be transferred to and stored in Germany (EU). The EU has been recognized as providing an adequate level of data protection by various jurisdictions.</p>
       <p>For US Operations: While our company is based in the United States, we operate data servers in the EU. Any operational access to data from the US is conducted under appropriate safeguards, including Standard Contractual Clauses (SCCs) approved by the European Commission.</p>
       <p>For Australian Users: Your personal information will be stored in Germany (EU). Germany is subject to the GDPR, which provides strong privacy protections. Before any disclosure of personal information overseas, we take reasonable steps to ensure the overseas recipient handles your information in accordance with the Australian Privacy Principles.</p>
       <p>You may request a copy of the safeguards we use for any data transfers by contacting us.</p>
-
-      <h2>11. Children's Privacy</h2>
+      <br> <br>
+      <h2>12. Children's Privacy</h2>
       <p>Our Service is not directed to children under the applicable age of consent for data processing in their jurisdiction. We do not knowingly collect personal information from children under the applicable age.</p>
       <p>PeriDocs has implemented a minimum age requirement of 16 years to provide enhanced protection for minors and to comply with the strictest applicable standards under the GDPR and other data protection laws.</p>
       <p>If we become aware that we have collected personal information from a user under the applicable age without appropriate consent, we will take steps to delete that information promptly.</p>
-      <p>If you believe we have collected information from a child under the applicable age, please contact us immediately at info@peridocs.org.</p>
-
-      <h2>12. "Do Not Track" Signals</h2>
+      <p>If you believe we have collected information from a child under the applicable age, please contact us immediately at <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p>
+      <br> <br>
+      <h2>13. "Do Not Track" Signals</h2>
       <p>Some browsers include a "Do Not Track" (DNT) feature that signals to websites that you do not want to be tracked. Because there is no accepted standard for how to respond to DNT signals, our Service does not currently respond to DNT browser signals. However, we do not engage in tracking across third-party websites.</p>
       <p>California Users: We honor Global Privacy Control (GPC) signals as a valid opt-out request under CCPA/CPRA.</p>
-
-      <h2>13. Changes to This Policy</h2>
-      <p>This Privacy Policy may be updated to reflect changes in law or system behavior. When we make material changes to this Privacy Policy, we will notify you by:</p>
+      <br> <br>
+      <h2>14. Changes to This Policy</h2>
+      <p>This Privacy Policy may be updated to reflect changes in law or system behavior. When we make material changes to this Privacy Policy, we will notify you via:</p>
       <ul>
-        <li>Email notification to registered users</li>
-        <li>Prominent notice on our website</li>
-        <li>Updating the "Last Updated" date at the top of this policy</li>
+        <li>-Email notification to registered users</li>
+        <li>-Prominent notice on our website</li>
+        <li>-Updating the "Last Updated" date at the top of this policy</li>
       </ul>
       <p>We encourage you to review this Privacy Policy periodically. Continued use of the Service after changes constitutes acceptance of the updated policy.</p>
-
-      <h2>14. Contact</h2>
-      <p>Privacy or data protection inquiries, and all general inquiries, may be directed to info@peridocs.org.</p>
+      <br> <br>
+      <h2>15. Contact</h2>
+      <p>Privacy or data protection inquiries, and all general inquiries, may be directed to <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p>
       <p>For EU Users - Supervisory Authority:</p>
       <p>You have the right to lodge a complaint with your local data protection authority. As our data is processed in Germany, you may also contact:</p>
       <ul>
@@ -195,32 +210,33 @@
       <p>A list of all EU Data Protection Authorities can be found at: <a href="https://edpb.europa.eu/about-edpb/about-edpb/members_en">https://edpb.europa.eu/about-edpb/about-edpb/members_en</a></p>
       <p>For UK Users - Information Commissioner's Office:Website: <a href="https://ico.org.uk">https://ico.org.uk</a>Phone: 0303 123 1113</p>
       <p>For Australian Users - Office of the Australian Information Commissioner:Website: <a href="https://www.oaic.gov.au">https://www.oaic.gov.au</a>Phone: 1300 363 992</p>
-
-      <h2>15. California-Specific Disclosures</h2>
+      <br> <br>
+      <h2>16. California-Specific Disclosures</h2>
       <p>This section provides additional disclosures required under California law (CCPA/CPRA):</p>
       <p>Categories of Personal Information Collected (in the past 12 months):</p>
       <ul>
-        <li>Identifiers: Email address, account ID, IP address (pseudonymized)</li>
-        <li>Internet or network activity: Log data, usage patterns, browsing history within our Service</li>
-        <li>Inferences: Semantic embeddings and analytical metadata derived from Entries</li>
+        <li>-Identifiers: Email address, account ID, IP (Internet Protocol) address (pseudonymized)</li>
+        <li>-Inferences: Semantic embeddings and analytical metadata derived from Entries</li>
       </ul>
       <p>Sources of Personal Information:</p>
       <ul>
-        <li>Directly from you (e.g. account registration, content from Entries, etc.)</li>
-        <li>Automatically from your device (network data, cookies, metadata from Entries)</li>
+        <li>-Directly from you (e.g. account registration, content from Entries, etc.)</li>
+        <li>-Automatically from your device (network data, cookies, metadata from Entries)</li>
       </ul>
       <p>Business or Commercial Purpose for Collection:</p>
       <ul>
-        <li>Providing and improving the Service</li>
-        <li>Security and fraud prevention</li>
-        <li>Legal compliance</li>
+        <li>-Providing and improving the Service</li>
+        <li>-Security and fraud prevention</li>
+        <li>-Legal compliance</li>
       </ul>
-      <p>Sale/Sharing of Personal Information: We do NOT sell your personal information. We do NOT share your personal information for cross-context behavioral advertising.</p>
-      <p>Sensitive Personal Information: If you include sensitive information in journal entries, we use it only to provide the journaling service. We do NOT use sensitive personal information for purposes beyond those authorized by the CCPA.</p>
+      <p>Sale/Sharing of Personal Information: We do not sell your personal information. We do nor share your personal information for cross-context behavioral advertising.</p>
+      <p>Sensitive Personal Information: If you include sensitive information in journal entries, we use it only to provide the journaling service. We do not use sensitive personal information for purposes beyond those authorized by the GDPR, CCPA, CPRA, and other applicable legislation regarding data.</p>
       <p>Financial Incentives: We do not offer financial incentives for the collection, sale, or deletion of personal information.</p>
-      <h2>16. Limitation of Liability</h2>
+      <br> <br>
+      <h2>17. Limitation of Liability</h2>
       <p>By using the Service, Users acknowledge and agree that any limitations of liability, disclaimers, and remedies for claims relating to personal data, privacy, or the use of the Service are governed by the Terms of Service. For avoidance of doubt, all provisions in the Terms of Service concerning limitation of liability, indemnification, and dispute resolution apply to any claims arising under or in connection with this Privacy Policy. Users should review the Terms of Service to understand the scope and effect of these limitations.</p>
-
+      <h2>18. General Provisions</h2>
+      <p>If any provision of this Agreement is held invalid or unenforceable, the remaining provisions shall remain in full force and effect.</p>
     </div>
     {% include 'includes/footer.html' %}
   </div>

@@ -1,123 +1,7 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 202602041325 (YYYYMMDDhhmm)
+# Save-state: 202602151513 (YYYYMMDDhhmm)
 # ==========================================
-
-"""
-Mapping Runtime Bootstrap for PeriDocs
-=======================================
-
-This module defines the *single shared runtime instance* of:
-
-    - IdentifierLedger
-    - CentroidSystem
-
-Why this file exists
---------------------
-
-The CentroidSystem is stateful:
-    - It holds in-memory centroid objects
-    - It maintains an asyncio lock
-    - It persists state to disk
-    - It must remain consistent across the entire process
-
-If multiple CentroidSystem instances were created,
-the application would:
-    - Lose deterministic behavior
-    - Corrupt event ordering
-    - Break replay guarantees
-    - Introduce race conditions
-
-Therefore:
-
-    There must be exactly ONE runtime instance.
-
-This file provides that instance.
-
-
-Design Principles
------------------
-
-1. No work happens at import time.
-   Importing this file does NOT:
-       - Load the ledger
-       - Load centroid state
-       - Touch disk
-
-   That must be done explicitly via `initialize_runtime()`.
-
-2. Deterministic startup.
-   Ledger loads first.
-   Centroid state loads second.
-
-3. Safe for:
-       - FastAPI
-       - CLI tools
-       - Background workers
-       - Unit tests
-
-4. No circular imports.
-   This module only imports:
-       - IdentifierLedger
-       - CentroidSystem
-
-   Nothing inside ledger.py or centroids.py imports this file.
-
-
-How to Use in FastAPI
----------------------
-
-In your app startup:
-
-    from core.map.mapping_runtime import initialize_runtime
-
-    @app.on_event("startup")
-    async def startup():
-        await initialize_runtime()
-
-Then anywhere in the codebase:
-
-    from core.map.mapping_runtime import centroid_system
-
-This guarantees a single shared system.
-
-
-Lifecycle Overview
-------------------
-
-1. Ledger is loaded into memory.
-2. CentroidSystem loads persisted centroid JSON files.
-3. System is ready for:
-       - create_precentroid
-       - approve_precentroid
-       - add_saaje
-       - remove_saaje
-       - drift analysis
-       - burst logic
-
-
-Threading / Concurrency Model
------------------------------
-
-CentroidSystem owns:
-    - an asyncio.Lock
-    - in-memory state
-
-All mutation must occur through CentroidSystem methods.
-Never mutate internal state directly.
-
-This module does NOT expose any raw mutable state.
-
-
-Production Guarantees
----------------------
-
-- Single authoritative ledger instance
-- Single authoritative centroid system
-- Deterministic replay capability
-- Explicit initialization
-- No hidden side effects
-"""
 
 import logging
 from typing import Optional
@@ -136,7 +20,6 @@ _ledger: IdentifierLedger = IdentifierLedger()
 _centroid_system: CentroidSystem = CentroidSystem(_ledger)
 
 _initialized: bool = False
-
 
 
 ledger = _ledger
