@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202602171921
+# Save-state: 202602172248
 # ==========================================
 
 import os
@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from app.helpers.entry_similarity import (
     cosine_similarity,
     deterministic_mean,
-    safe_load_embedding as load_embedding,
+    safe_load_embedding,
 )
 
 
@@ -162,7 +162,7 @@ class CentroidSystem:
 
 
     # ----- persistence -----
-
+    @staticmethod
     def _numeric_suffix(fname: str) -> int:
         """
         Extract the numeric suffix from a centroid filename.
@@ -229,18 +229,18 @@ class CentroidSystem:
         - Enforces SAAJE cannot exist yet
         - Adds default metadata for admin review
         """
-        print("ENTER create_precentroid")
+        logger.debug(f"[CREATE_PRECENTROID] Called with journal_ids={journal_ids}")
         await self._assert_ledger_ready()
         # allocate a ledger-backed precentroid suffix
         suffix = await self._ledger.allocate_suffix(kind="precentroid")
         cid = f"precentroid_{suffix}"
-
-        # NOTE: precentroid does not yet exist in ledger, skip _assert_centroid_registered
+        logger.debug(f"[CREATE_PRECENTROID] Allocated centroid_id={cid}")
 
         # prepare deterministic embedding vector
         journal_ids = sorted(journal_ids)
-        vectors = [load_embedding(j) for j in journal_ids]
+        vectors = [safe_load_embedding(j) for j in journal_ids]
         vector = deterministic_mean(vectors)
+        logger.debug(f"[CREATE_PRECENTROID] Deterministic mean vector shape: {vector.shape if hasattr(vector,'shape') else 'scalar'}")
 
         # record CREATE_PRECENTROID in ledger
         event_index = await self._ledger.record_event({
@@ -248,6 +248,7 @@ class CentroidSystem:
             "centroid_id": cid,
             "journal_ids": journal_ids,
         })
+        logger.debug(f"[CREATE_PRECENTROID] Ledger event_index={event_index}")
         
         # attach default metadata for review queue
         metadata = {
@@ -260,6 +261,7 @@ class CentroidSystem:
         
         # create centroid instance
         c = Centroid(cid)
+        logger.debug(f"[CREATE_PRECENTROID] _centroids keys now: {list(self._centroids.keys())}")
         self._assert_event_order(c, event_index)
         c.states.append(CentroidState(event_index, journal_ids, vector, saajes=None, metadata=metadata))
         self._centroids[cid] = c
@@ -379,7 +381,7 @@ class CentroidSystem:
             journal_ids = c.current.journal_ids
 
             # Load embeddings safely
-            vectors = np.stack([load_embedding(j) for j in journal_ids])
+            vectors = np.stack([safe_load_embedding(j) for j in journal_ids])
 
             # Record burst intent before mutation
             await self._ledger.record_event({
@@ -586,6 +588,7 @@ class CentroidSystem:
 
     # Simple helper to run blocking I/O in a thread, releasing the async lock
     async def run_sync_in_thread(self, func: callable, *args, **kwargs):
+        if not callable(func):
+            raise TypeError(f"Expected a callable, got {type(func)}: {func}")
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self._executor, functools.partial(func, *args, **kwargs))
-
+        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))

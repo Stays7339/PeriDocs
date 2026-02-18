@@ -1,6 +1,6 @@
 # ==========================================
 # app/core/map/admin_review_helpers.py
-# Fully merged, save-state: 202602151509
+# Fully merged, save-state: 202602172017
 # ==========================================
 
 """
@@ -17,7 +17,8 @@ This module:
 import asyncio
 import logging
 from typing import List, Dict, Any
-from core.map.centroids import cosine_similarity, load_embedding
+from core.map.centroids import cosine_similarity
+from app.helpers.entry_similarity import safe_load_embedding
 from core.map.mapping_runtime import centroid_system
 
 
@@ -61,7 +62,7 @@ async def reject_precentroid(*, precentroid_id: str, threshold: float) -> None:
         c = centroid_system._centroids.get(precentroid_id)
         if not c:
             raise RuntimeError(f"Unknown precentroid {precentroid_id}")
-        vectors = [load_embedding(j) for j in c.current.journal_ids]
+        vectors = [safe_load_embedding(j) for j in c.current.journal_ids]
         sims = [
             cosine_similarity(vectors[i], vectors[j])
             for i in range(len(vectors))

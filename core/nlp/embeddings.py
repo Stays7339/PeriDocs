@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 202602171601
+# save-state updated 202602172221
 # ------------------------------------------
 
 from __future__ import annotations
@@ -104,21 +104,23 @@ async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | 
         results.append(emb)
 
     # ---------------- Logging ----------------
+    """
     try:
         await _log_embedding_call(journal_id)
     except Exception as e:
         logger.warning(f"Failed to log embedding call: {e}")
+    """
 
     return results[0] if single_input else results
 
 # ---------------- Async Logging Helper ----------------
 # _EMBEDDINGS_LOG_FILE = Path(PROJECT_ROOT) / "data" / "embeddings_run_log.jsonl"
-
+"""
 async def _log_embedding_call(journal_id: str | None = None):
-    """
+   
     Asynchronously logs embedding function call to a persistent JSONL file.
     Captures timestamp, caller function, caller file, caller line, and optional journal_id.
-    """
+    
     import aiofiles
 
     # Inspect caller
@@ -142,6 +144,7 @@ async def _log_embedding_call(journal_id: str | None = None):
     _EMBEDDINGS_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
     async with aiofiles.open(_EMBEDDINGS_LOG_FILE, "a", encoding="utf-8") as f:
         await f.write(json.dumps(log_entry) + "\n")
+"""
 
 # ---------------- Encryption ----------------
 def encrypt_text(text: str) -> str:

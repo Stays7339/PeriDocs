@@ -148,9 +148,10 @@ ADMIN_TOKEN=your-admin-token
 
 For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
- You **should** put a file simply titled `.gitignore` directly within the first level of the root folder, `PeriDocs-code`.
- The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
+You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs-code`
+The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
+# Important: check what is *CRUCIAL* to add into .gitignore before continuing
 <details>
 <summary>Click to reveal Crucial Data Leak Prevention List: `.gitignore`</summary>
 # ------------------------------
@@ -246,7 +247,9 @@ app/static/CabineyGrotesk_Complete/*
 
 # # Ignore sensitive env files and environment variables
 .env
+</details>
 
+# ^ ! ^ ! ^
 
 ---
 
@@ -284,12 +287,14 @@ You now have PeriDocs running locally.
 
 1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
 2. Open the PeriDocs-code folder in VS Code.
-</details>
+
 
 ---
 
+# Canonical Project Directory 
+
 <details>
-<summary>Click to expand canonical project structure</summary>
+<summary>Click to expand canonical project directory</summary>
 ## Canonical Project Directory as of 17 February 2026 (202602171516 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
@@ -452,6 +457,10 @@ PeriDocs-code/                         # Root project folder
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 ```
 </details>
+
+
+# ^ ! ^ ! ^
+
 ---
 
 ## Notes
