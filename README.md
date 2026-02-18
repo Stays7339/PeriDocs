@@ -1,7 +1,7 @@
-# PeriDocs
+# PeriDocs.org
 
-Curated, paraphrased discussions and public journal links about neurological well-being.
-Early-stage prototype.
+An ad-free free-to-the-public platform which systematically indexes and cites research that focuses on mixing anecdotes & recurring collective experiences with applied philosophy. PeriDocs avoids applied psychology, and PeriDocs avoids claiming professionalism of any kind; at the same time, PeriDocs believes that there is a lot of public good that can be done unto many people by reducing the friction of searching for non-paywalled rigorous sources. PeriDocs plans to do this via deterministic fine-tuning around the specific search query that the user sends to us.
+Users may actively choose to rigorously describe their perspective of the world, and they would get more-relevant results as a process. They would also be able to opt-in to keep their search query as its own perpetual public entry on the platform, so it, too, can contribute to the way people described lived experiences in ways that often go unarticulated. 
 
 ---
 
@@ -13,7 +13,7 @@ Early-stage prototype.
 
 1. Install Homebrew (if not already installed):
 
-   ```bash
+   ```bash (Terminal)
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
@@ -21,7 +21,7 @@ Official site: [https://brew.sh](https://brew.sh)
 
 2. Install Python 3.12.7 and Git (pyenv recommended for exact version):
 
-   ```bash
+   ```bash (Terminal)
    brew install pyenv git
    pyenv install 3.12.7
    pyenv global 3.12.7
@@ -29,7 +29,7 @@ Official site: [https://brew.sh](https://brew.sh)
 
 3. Verify installations:
 
-   ```bash
+   ```bash (Terminal)
    python3 --version
    git --version
    ```
@@ -89,11 +89,12 @@ git clone https://github.com/Stays7339/PeriDocs.git
 cd PeriDocs-code
 ```
 
-> Note: This repository is private. Only collaborators with access can clone it or pull from it.
+> Note: This repository should remain set to private. Only collaborators with access can clone it or pull from it.
 
 ---
 
 ### Step 2. Create a Virtual Environment
+Activating the virtual environment ensures packages are installed locally and not system-wide.
 
 #### macOS / Linux
 
@@ -144,7 +145,106 @@ ADMIN_TOKEN=your-admin-token
 ```
 
 > Do **not** commit `.env` to GitHub.
+
 > For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
+
+> You **should** put a file simply titled `.gitignore` directly within the first level of the root folder, `PeriDocs-code`.
+> The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
+
+# ------------------------------
+# Python Ignore-File-List
+# ------------------------------
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# PyInstaller
+*.manifest
+*.spec
+
+# ------------------------------
+# Virtual Environment Ignore-File-List
+# ------------------------------
+venv/
+env/
+ENV/
+.venv/
+# you can add any other env folder you use
+
+# ------------------------------
+# VS Code Ignore-File-List
+# ------------------------------
+.vscode/
+.history/
+*.code-workspace
+
+# ------------------------------
+# OS / system Ignore-File-List
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Logs and databases Ignore-File-List
+# ------------------------------
+*.log
+*.sqlite3
+
+# ------------------------------
+# Other common Python stuff Ignore-File-List
+# ------------------------------
+__pycache__/
+*.pytest_cache/
+*.mypy_cache/
+*.coverage
+htmlcov/
+.coverage.*
+
+# ------------------------------
+# Node.js / frontend (if you add any) Ignore-File-List
+# ------------------------------
+node_modules/
+dist/
+build/
+
+# ------------------------------
+# Ignore data folders, even in dev, just in case we accidentally push to production
+# Ignore-File-List
+# ------------------------------
+data/*
+!data/.gitkeep
+data/journals.json
+
+
+# ------------------------------
+# Ignore embeddings models folders since we have large data sets
+# Ignore-File-List
+# ------------------------------
+models/*
+!models/.gitkeep
+
+
+# ignore everything in static folder
+app/static/CabineyGrotesk_Complete/*
+
+
+# # Ignore sensitive env files and environment variables
+.env
+
 
 ---
 
@@ -153,7 +253,7 @@ ADMIN_TOKEN=your-admin-token
 Run this command inside the project folder:
 
 ```bash
-uvicorn app.routes:app --reload
+uvicorn app.routes:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 You should see output similar to:
@@ -185,7 +285,8 @@ You now have PeriDocs running locally.
 
 ---
 
-
+<details>
+<summary>Click to expand canonical project structure</summary>
 ## Canonical Project Directory as of 17 February 2026 (202602171516 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
@@ -346,6 +447,7 @@ PeriDocs-code/                         # Root project folder
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+</details>
 
 ```
 
