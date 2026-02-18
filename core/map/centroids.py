@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202602171634
+# Save-state: 202602171921
 # ==========================================
 
 import os
@@ -156,9 +156,9 @@ class CentroidSystem:
             )
 
     async def persist_zero_vector_flags(self):
-    if hasattr(self, "_zero_vector_flags") and self._zero_vector_flags:
-        with open(self._zero_vector_flags_file, "w", encoding="utf-8") as f:
-            json.dump(self._zero_vector_flags, f, indent=2)
+        if hasattr(self, "_zero_vector_flags") and self._zero_vector_flags:
+            with open(self._zero_vector_flags_file, "w", encoding="utf-8") as f:
+                json.dump(self._zero_vector_flags, f, indent=2)
 
 
     # ----- persistence -----
@@ -181,7 +181,7 @@ class CentroidSystem:
             if not os.path.isdir(STATE_DIR):
                 return
             # Sort by numeric suffix instead of lexicographic string order
-            for fname in sorted(os.listdir(STATE_DIR), key=_numeric_suffix):
+            for fname in sorted(os.listdir(STATE_DIR), key=self._numeric_suffix):
                 with open(os.path.join(STATE_DIR, fname), "r") as fh:
                     payload = json.load(fh)
                 c = Centroid(payload["centroid_id"])
@@ -576,7 +576,7 @@ class CentroidSystem:
         self._split_suggestions.clear()
         os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
 
-        for path in sorted(glob.glob(os.path.join(SUGGESTIONS_DIR, "*.json")), key=_numeric_suffix):
+        for path in sorted(glob.glob(os.path.join(SUGGESTIONS_DIR, "*.json")), key=self._numeric_suffix):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 cid = data["centroid_id"]

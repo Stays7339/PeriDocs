@@ -146,13 +146,15 @@ ADMIN_TOKEN=your-admin-token
 
 > Do **not** commit `.env` to GitHub.
 
-> For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
+For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
-> You **should** put a file simply titled `.gitignore` directly within the first level of the root folder, `PeriDocs-code`.
-> The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
+ You **should** put a file simply titled `.gitignore` directly within the first level of the root folder, `PeriDocs-code`.
+ The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
+<details>
+<summary>Click to reveal Crucial Data Leak Prevention List: `.gitignore`</summary>
 # ------------------------------
-# Python Ignore-File-List
+# PeriDocs Crucial Data Leak Prevention List: Ignore-File-List - Python
 # ------------------------------
 # Byte-compiled / optimized / DLL files
 __pycache__/
@@ -282,6 +284,7 @@ You now have PeriDocs running locally.
 
 1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
 2. Open the PeriDocs-code folder in VS Code.
+</details>
 
 ---
 
@@ -447,10 +450,8 @@ PeriDocs-code/                         # Root project folder
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
-</details>
-
 ```
-
+</details>
 ---
 
 ## Notes
