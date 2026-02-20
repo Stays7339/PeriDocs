@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/orthography.py
-# updated 20251217131355
+# updated 202602201139
 # ==========================================
 
 import re
@@ -13,7 +13,7 @@ def clean_text(text: str) -> str:
     Normalize input text by trimming leading/trailing whitespace
     and collapsing all internal whitespace to single spaces.
     
-    This is safe for storage, indexing, and user interface display.
+    This should be safe for storage, indexing, and user interface display.
 
     Parameters:
     -----------

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 202602171311
+# Save-state: 202602192258
 # ==========================================
 
 """
@@ -162,14 +162,14 @@ class IdentifierLedger:
             "ISSUE_SUFFIX": {"suffix", "kind"},
             "APPROVE_SUFFIX": {"suffix"},
             "REJECT_SUFFIX": {"suffix"},
-            "CREATE_PRECENTROID": {"centroid_id", "journal_ids"},
+            "CREATE_PRECENTROID": {"centroid_id", "entry_ids"},
             "APPROVE_PRECENTROID": {"from", "to", "label", "nne"},
-            "ADD_SAAJE": {"centroid_id", "journal_id", "similarity"},
-            "REMOVE_SAAJE": {"centroid_id", "journal_id"},
+            "ADD_SAAJE": {"centroid_id", "entry_id", "similarity"},
+            "REMOVE_SAAJE": {"centroid_id", "entry_id"},
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
             "BURST_PRECENTROID": {"centroid_id", "threshold"},
             "SUGGEST_SPLIT": {"centroid_id", "threshold", "min_similarity"},
-            "DELETE_JOURNAL": {"journal_id"},
+            "DELETE_entry": {"entry_id"},
             # Extend as needed
         }
 
@@ -234,14 +234,15 @@ class IdentifierLedger:
         suffix = int(identifier.split("_")[1])
         return str(suffix) in ledger["issued_suffixes"]
 
-    def get_suffix_state(self, suffix: int) -> str:
-        """Return 'allocated' or 'approved' for prefix checking."""
-        record = _ledger_cache["issued_suffixes"].get(str(suffix))
+    async def get_suffix_state(self, suffix: int) -> str:
+        ledger = await _load()
+        record = ledger["issued_suffixes"].get(str(suffix))
         if not record:
             raise RuntimeError(f"Suffix {suffix} unknown")
         if record["approved"]:
             return "approved"
         return "allocated"
+
     
     async def verify_runtime_state(self, centroids: "CentroidSystem") -> None:
         """

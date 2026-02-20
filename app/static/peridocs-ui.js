@@ -1,4 +1,4 @@
-// peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/journal, privacy toast 
+// peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
 // save-state 202512261131 (YYYYMMDDhhmm)
 // ==========================================
 
@@ -15,7 +15,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const reportBtns = document.querySelectorAll(".report-parse-btn");
   const cancelBtn = document.getElementById("cancel-feedback");
   const feedbackForm = document.querySelector("#feedback-form");
-  const journalForm = document.querySelector('#journal-form');
+  const entryForm = document.querySelector('#entry-form');
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
@@ -185,21 +185,21 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------------- Journal Form Submission ---------------------- //
-  if (journalForm) {
-    journalForm.addEventListener('submit', async e => {
+  // ---------------------- entry Form Submission ---------------------- //
+  if (entryForm) {
+    entryForm.addEventListener('submit', async e => {
       e.preventDefault();
-      if (!canSubmit('journal')) return;
+      if (!canSubmit('entry')) return;
 
-      const formData = new FormData(journalForm);
+      const formData = new FormData(entryForm);
       const payload = Object.fromEntries(formData.entries());
       try {
-        const res = await fetch(journalForm.action, { method:journalForm.method||'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
+        const res = await fetch(entryForm.action, { method:entryForm.method||'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
         if (!res.ok) throw new Error('Network response not ok');
         const data = await res.json();
         if (data.status==='ok') { 
-          showToast(data.message||'Journal submitted!', 'success'); 
-          journalForm.reset();
+          showToast(data.message||'entry submitted!', 'success'); 
+          entryForm.reset();
 
           // ---------------------- Progress toast using general-toast style ---------------------- //
           const spinnerToast = document.createElement('div');

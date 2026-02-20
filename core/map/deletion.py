@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602111102
+# Save-state: 202602201439
 # ==========================================
 
 """
@@ -58,10 +58,10 @@ class DeletionManager:
         self,
         *,
         centroid_id: str,
-        journal_id: str,
+        entry_id: str,
     ) -> None:
         """
-        Remove a journal from a specific centroid.
+        Remove an entry from a specific centroid.
 
         Ledger-backed.
         Lock-coherent.
@@ -77,27 +77,27 @@ class DeletionManager:
             c = self._centroids._centroids[centroid_id]
             prev = c.current
 
-            if journal_id not in prev.saajes:
+            if entry_id not in prev.saajes:
                 raise RuntimeError("SAAJE not present")
 
             # recompute membership
-            journal_ids = [j for j in prev.journal_ids if j != journal_id]
+            entry_ids = [j for j in prev.entry_ids if j != entry_id]
 
-            if not journal_ids:
+            if not entry_ids:
                 raise RuntimeError(
-                    f"Cannot remove last journal from centroid {centroid_id}"
+                    f"Cannot remove last entry from centroid {centroid_id}"
                 )
 
-            vectors = [load_embedding(j) for j in journal_ids]
+            vectors = [load_embedding(j) for j in entry_ids]
             vector = deterministic_mean(vectors)
 
             saajes = dict(prev.saajes)
-            del saajes[journal_id]
+            del saajes[entry_id]
 
             event_index = await self._ledger.record_event({
                 "type": "REMOVE_SAAJE",
                 "centroid_id": centroid_id,
-                "journal_id": journal_id,
+                "entry_id": entry_id,
             })
 
             self._centroids._assert_event_order(c, event_index)
@@ -105,7 +105,7 @@ class DeletionManager:
             c.states.append(
                 type(prev)(
                     event_index,
-                    sorted(journal_ids),
+                    sorted(entry_ids),
                     vector,
                     saajes,
                 )
@@ -114,16 +114,16 @@ class DeletionManager:
             await self._centroids._persist(c)
 
     # ------------------------------------------------------------
-    # GLOBAL JOURNAL REMOVAL (CENTROID LAYER)
+    # GLOBAL entry REMOVAL (CENTROID LAYER)
     # ------------------------------------------------------------
 
-    async def remove_journal_globally(
+    async def remove_entry_globally(
         self,
         *,
-        journal_id: str,
+        entry_id: str,
     ) -> Dict[str, List[str]]:
         """
-        Remove journal from every centroid where it exists.
+        Remove entry from every centroid where it exists.
 
         Idempotent.
         Returns affected centroids.
@@ -137,10 +137,10 @@ class DeletionManager:
             centroids_list = list(self._centroids._centroids.values())
 
         for c in centroids_list:
-            if journal_id in c.current.journal_ids:
-                await self._remove_journal_from_centroid(
+            if entry_id in c.current.entry_ids:
+                await self._remove_entry_from_centroid(
                     centroid_id=c.centroid_id,
-                    journal_id=journal_id,
+                    entry_id=entry_id,
                     reason=reason,
                     initiated_by=initiated_by,
                 )
@@ -161,7 +161,7 @@ Embeddings are retained for deterministic replay and ledger integrity.
     async def delete_embedding_from_dumps(
         self,
         *,
-        journal_id: str,
+        entry_id: str,
         data_dir: str,
     ) -> None:
         """
@@ -172,7 +172,7 @@ Embeddings are retained for deterministic replay and ledger integrity.
         Idempotent.
         """
 
-        pattern = os.path.join(data_dir, "journals_embeddings_dump*.json")
+        pattern = os.path.join(data_dir, "entries_embeddings_dump*.json")
         dump_files = sorted(glob.glob(pattern))
 
         async def process_file(path: str):
@@ -180,10 +180,10 @@ Embeddings are retained for deterministic replay and ledger integrity.
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
 
-                if journal_id not in data:
+                if entry_id not in data:
                     return
 
-                del data[journal_id]
+                del data[entry_id]
 
                 tmp = path + ".tmp"
                 with open(tmp, "w", encoding="utf-8") as f:
@@ -202,22 +202,22 @@ Embeddings are retained for deterministic replay and ledger integrity.
 return
 
     # ------------------------------------------------------------
-    # FULL JOURNAL DELETION ORCHESTRATION
+    # FULL entry DELETION ORCHESTRATION
     # ------------------------------------------------------------
 
-    async def delete_journal(
+    async def delete_entry(
         self,
         *,
-        journal_id: str,
+        entry_id: str,
         data_dir: str,
         initiated_by: Optional[str] = None,
         reason: str = "user_request",
     ) -> Dict[str, List[str]]:
         """
-        Canonical journal deletion sequence.
+        Canonical entry deletion sequence.
 
         Order:
-        1. Record DELETE_JOURNAL ledger event
+        1. Record DELETE_entry ledger event
         2. Remove from centroids
         3. Delete embeddings from disk
 
@@ -229,25 +229,25 @@ return
 
         # --- Ledger first ---
         await self._ledger.record_event({
-            "type": "DELETE_JOURNAL",
-            "journal_id": journal_id,
+            "type": "DELETE_entry",
+            "entry_id": entry_id,
             "initiated_by": initiated_by,
             "reason": reason,
         })
 
         # --- Remove centroid membership ---
-        affected = await self.remove_journal_globally(
-            journal_id=journal_id
+        affected = await self.remove_entry_globally(
+            entry_id=entry_id
         )
 
         # --- Remove embeddings ---
         await self.delete_embedding_from_dumps(
-            journal_id=journal_id,
+            entry_id=entry_id,
             data_dir=data_dir,
         )
 
         logger.info(
-            f"Journal {journal_id} deleted. Affected centroids: {list(affected.keys())}"
+            f"entry {entry_id} deleted. Affected centroids: {list(affected.keys())}"
         )
 
         return affected

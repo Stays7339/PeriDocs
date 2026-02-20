@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/clause_utils.py
-# save-state: 202512172107
+# save-state: 202602201134
 # ==========================================
 
 import re
@@ -15,21 +15,53 @@ def split_into_clauses(text: str) -> List[str]:
     import re
     return [cl.strip() for cl in re.findall(CLAUSE_RE, text) if cl.strip()]
 
-def sliding_window_clauses(clauses: List[str], max_words: int = 100) -> List[str]:
+def sliding_window_clauses(clauses: List[str], max_words: int = 90) -> List[str]:
     """
-    Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
+    Merge clauses into windows of <= max_words.
+    Hard-splits any single clause that exceeds max_words.
+    Guarantees no window exceeds max_words.
+    Deterministic and replay-safe.
+
+    NOTE: this uses word count as a proxy for token count. 
+    That is still technically approximate, but its safe at 90 words per auto-window.
+    With RoBERTa truncating at 128 word pieces, 90 words is conservative enough that entries 
+    will not realistically hit truncation unless the text is extremely fragment-heavy.
+    If the software developers ever want absolute certainty, they’d need to count tokenizer tokens before embedding.
+    But that introduces model dependency and weakens replay determinism unless tokenizer version is frozen.
+    We're choosing to not over-complicate things by keeping it here.
     """
-    windows = []
-    current = []
+    windows: List[str] = []
+    current: List[str] = []
     current_len = 0
+
     for cl in clauses:
-        n_words = len(cl.split())
-        if current_len + n_words > max_words and current:
+        words = cl.split()
+        n_words = len(words)
+
+        # ---- HARD SPLIT LONG CLAUSES ----
+        if n_words > max_words:
+            # flush current window first
+            if current:
+                windows.append(" ".join(current))
+                current = []
+                current_len = 0
+
+            # chunk the long clause deterministically
+            for i in range(0, n_words, max_words):
+                chunk = words[i:i + max_words]
+                windows.append(" ".join(chunk))
+            continue
+
+        # ---- NORMAL WINDOW MERGE ----
+        if current_len + n_words > max_words:
             windows.append(" ".join(current))
             current = []
             current_len = 0
+
         current.append(cl)
         current_len += n_words
+
     if current:
         windows.append(" ".join(current))
+
     return windows

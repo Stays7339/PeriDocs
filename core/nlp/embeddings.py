@@ -59,7 +59,7 @@ def _find_snapshot_folder(base_path: Path) -> Path:
     raise RuntimeError(f"No valid model snapshot found under {base_path}")
 
 # ---------------- Embedding ----------------
-async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | None = None) -> np.ndarray | list[np.ndarray]:
+async def get_embedding_async(text_or_texts: str | list[str], entry_id: str | None = None) -> np.ndarray | list[np.ndarray]:
     """
     Compute embedding(s) for input text or list of texts.
     - If a single string is provided, returns np.ndarray.
@@ -68,7 +68,7 @@ async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | 
     Does NOT normalize; downstream code should normalize for cosine similarity, centroids, etc.
     Uses caching if TOKEN_EMBED_PRECOMPUTE=True.
 
-    Logs each call with timestamp, caller info, and optional journal_id.
+    Logs each call with timestamp, caller info, and optional entry_id.
     """
     if isinstance(text_or_texts, str):
         texts = [text_or_texts]
@@ -106,7 +106,7 @@ async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | 
     # ---------------- Logging ----------------
     """
     try:
-        await _log_embedding_call(journal_id)
+        await _log_embedding_call(entry_id)
     except Exception as e:
         logger.warning(f"Failed to log embedding call: {e}")
     """
@@ -116,10 +116,10 @@ async def get_embedding_async(text_or_texts: str | list[str], journal_id: str | 
 # ---------------- Async Logging Helper ----------------
 # _EMBEDDINGS_LOG_FILE = Path(PROJECT_ROOT) / "data" / "embeddings_run_log.jsonl"
 """
-async def _log_embedding_call(journal_id: str | None = None):
+async def _log_embedding_call(entry_id: str | None = None):
    
     Asynchronously logs embedding function call to a persistent JSONL file.
-    Captures timestamp, caller function, caller file, caller line, and optional journal_id.
+    Captures timestamp, caller function, caller file, caller line, and optional entry_id.
     
     import aiofiles
 
@@ -138,7 +138,7 @@ async def _log_embedding_call(journal_id: str | None = None):
     log_entry = {
         "timestamp": datetime.utcnow().isoformat(),
         "caller": caller_info,
-        "journal_id": journal_id
+        "entry_id": entry_id
     }
 
     _EMBEDDINGS_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)

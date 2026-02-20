@@ -1,12 +1,12 @@
 # ===========================
 # core/nlp/__init__.py
-# save-state updated 202512201837
+# save-state updated 202602201446
 # ===========================
 """
 Async-only NLP pipeline interface for PeriDocs.
 
 Exposes:
-- process_entry_async: full async journal entry processing (PII, embeddings, repetition, SHA8, emotions)
+- process_entry_async: full async entry processing (PII, embeddings, repetition, SHA8, emotions)
 - tokenize_text, clean_text: minimal text processing
 - redact_pii, COMMON_NAMES: PII utilities
 - check_crisis_phrases, crisis_notification: crisis detection

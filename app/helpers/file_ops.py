@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/file_ops.py
-# save-state updated 202512231723
+# save-state updated 202602201527
 # ==========================================
 
 import json
@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 from datetime import datetime
 from app.helpers.json_safe import json_safe  # updated import
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/journals.json')
+DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/entries.json')
 
 def load_data(file_path: str = DATA_FILE) -> List[Dict[str, Any]]:
     """Safely load JSON data, return empty list if file missing or invalid"""
@@ -39,9 +39,9 @@ def save_data(entries: List[Dict[str, Any]], file_path: str = DATA_FILE) -> None
         raise RuntimeError(f"Failed to save data to {file_path}: {e}")
 
 def append_entry(entry: Dict[str, Any], file_path: str = DATA_FILE) -> None:
-    # Hard stop: never journal crisis entries
-    # IMPORTANT:Crisis-flagged entries must never be written to journals.json.
-    # They are recorded exclusively via crisis_recorder.py.
+    # Hard stop: NEVER persist to memory ANY crisis entries
+    # IMPORTANT:Crisis-flagged entries must never be written to entries.json
+    # Crises shall be recorded exclusively via crisis_recorder.py.
 
     if entry.get("crisis_flag") is True:
         return

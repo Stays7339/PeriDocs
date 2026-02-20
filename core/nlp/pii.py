@@ -1,12 +1,13 @@
 """
-core/nlp/pii.py
+# core/nlp/pii.py
+Save-state 202602201448
 
 PeriDocs PII Redaction Module
 -----------------------------
 
 Purpose:
     Centralized handling of Personally Identifiable Information (PII) detection
-    and redaction across the system. Designed for safe storage of journal entries
+    and redaction across the system. Designed for safe storage of entries
     and other textual content while maintaining privacy.
 
 Features:

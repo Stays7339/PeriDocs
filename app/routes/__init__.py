@@ -44,7 +44,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # ---------------- Import app-bound routes (side effects only) ----------------
 from app.routes import info_navigation
-from app.routes import journal
+from app.routes import entry
 from app.routes import feedback
 
 # ---------------- Include router-based routes ----------------

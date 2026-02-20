@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_recorder.py
-# save-state updated 202512201520
+# save-state updated 202602201525
 # ==========================================
 
 from __future__ import annotations
@@ -29,14 +29,16 @@ def _encrypt_sensitive_fields(record: Dict[str, Any]) -> None:
 
 
 def _load_existing_records() -> List[Dict[str, Any]]:
-    """Load existing records or raise if NPZ file is corrupted."""
+    """Load existing records safely from NPZ (no pickling)."""
     if not CRISIS_FILE.exists():
         return []
     try:
-        with np.load(CRISIS_FILE, allow_pickle=True) as data:
+        with np.load(CRISIS_FILE, allow_pickle=False) as data:
             if "records" not in data:
                 raise ValueError(f"{CRISIS_FILE} missing 'records' key; file may be corrupted")
-            records = data["records"].tolist()
+            # Decode JSON strings back to dicts
+            json_records = data["records"].tolist()
+            records = [json.loads(r) for r in json_records]
             if not isinstance(records, list):
                 raise ValueError(f"{CRISIS_FILE} contents not a list; file may be corrupted")
             return records
@@ -45,8 +47,10 @@ def _load_existing_records() -> List[Dict[str, Any]]:
 
 
 def _write_records_atomic(records: List[Dict[str, Any]]) -> None:
-    """Write records atomically to NPZ file using tempfile to guarantee correct path."""
+    """Write records atomically to NPZ as JSON strings (no pickling)."""
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    # Convert each dict to JSON string
+    json_records = [json.dumps(r, ensure_ascii=False) for r in records]
     with tempfile.NamedTemporaryFile(
         dir=DATA_DIR,
         prefix=f"{CRISIS_FILE.stem}_",
@@ -54,7 +58,7 @@ def _write_records_atomic(records: List[Dict[str, Any]]) -> None:
         delete=False
     ) as tmp:
         tmp_path = Path(tmp.name)
-        np.savez_compressed(tmp_path, records=np.array(records, dtype=object))
+        np.savez_compressed(tmp_path, records=np.array(json_records, dtype=str))
     os.replace(tmp_path, CRISIS_FILE)  # atomic move
 
 

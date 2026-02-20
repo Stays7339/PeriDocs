@@ -1,6 +1,6 @@
 # PeriDocs.org
 
-An ad-free free-to-the-public platform which systematically indexes and cites research that focuses on mixing anecdotes & recurring collective experiences with applied philosophy. PeriDocs avoids applied psychology, and PeriDocs avoids claiming professionalism of any kind; at the same time, PeriDocs believes that there is a lot of public good that can be done unto many people by reducing the friction of searching for non-paywalled rigorous sources. PeriDocs plans to do this via deterministic fine-tuning around the specific search query that the user sends to us.
+An ad-free free-to-the-public platform which systematically indexes and cites writing passages which focus on mixing anecdotes & recurring collective experiences with applied philosophy. PeriDocs avoids applied psychology, and PeriDocs avoids claiming professionalism of any kind; at the same time, PeriDocs believes that there is a lot of public good that can be done unto many people by reducing the friction of searching for non-paywalled rigorous sources. PeriDocs plans to do this via deterministic fine-tuning around the specific search query that the user sends to us.
 Users may actively choose to rigorously describe their perspective of the world, and they would get more-relevant results as a process. They would also be able to opt-in to keep their search query as its own perpetual public entry on the platform, so it, too, can contribute to the way people described lived experiences in ways that often go unarticulated. 
 
 ---
@@ -230,7 +230,7 @@ build/
 # ------------------------------
 data/*
 !data/.gitkeep
-data/journals.json
+data/entries.json
 
 
 # ------------------------------
@@ -317,7 +317,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ admin_routing.py              # "/admin*"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
-│  │  ├─ journal.py                    # "/submit", "/submit-success"
+│  │  ├─ entry.py                    # "/submit", "/submit-success"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
@@ -326,7 +326,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ favicon.png
 │  │  ├─ peridocs-logo-v1-white.png
 │  │  ├─ peridocs-logo-v1.png
-│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/journal 
+│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -378,9 +378,9 @@ PeriDocs-code/                         # Root project folder
 ├─ data/                                  # Local data storage
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure
-│  ├─ journals_embeddings_dump20251216_3.json       # Storage for embeddings to keep the main entries much more readable by humans.
-│  ├─ [journals_embeddings_dumpYYYYMMDD_[0-3].json file(s)]
-│  ├─ journals.json                       # Stored journal entries
+│  ├─ entries_embeddings_dump20251216_3.json       # Storage for embeddings to keep the main entries much more readable by humans.
+│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)]
+│  ├─ entries.json                        # Stored entries
 │  ├─ names_au.json                       # Common-enough first names and last names from Australia.
 │  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
 │  ├─ names_ie.json                       # Common-enough first names and last names from Ireland.
@@ -466,7 +466,7 @@ PeriDocs-code/                         # Root project folder
 ## Notes
 
 * The `--reload` flag automatically restarts the server when code changes.
-* `data/journals.json` is intentionally ignored by Git for local journaling data.
+* `data/entries.json` is intentionally ignored by Git for local user data.
 * Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
 
 ## Miscellaneous FAQ

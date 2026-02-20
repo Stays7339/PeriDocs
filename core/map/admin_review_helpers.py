@@ -1,13 +1,13 @@
 # ==========================================
 # app/core/map/admin_review_helpers.py
-# Fully merged, save-state: 202602172017
+# Fully merged, save-state: 202602201439
 # ==========================================
 
 """
 Admin review helpers for PeriDocs.
 
 This module:
-- Automatically scans for journals that might belong best in a precentroid
+- Automatically scans for entries that might belong best in a precentroid
 - Builds the review queue from ledger/centroid state
 - Coordinates human moderation actions
 - Never mutates centroid state directly
@@ -62,7 +62,7 @@ async def reject_precentroid(*, precentroid_id: str, threshold: float) -> None:
         c = centroid_system._centroids.get(precentroid_id)
         if not c:
             raise RuntimeError(f"Unknown precentroid {precentroid_id}")
-        vectors = [safe_load_embedding(j) for j in c.current.journal_ids]
+        vectors = [safe_load_embedding(j) for j in c.current.entry_ids]
         sims = [
             cosine_similarity(vectors[i], vectors[j])
             for i in range(len(vectors))
@@ -81,9 +81,9 @@ async def request_centroid_split_analysis(*, centroid_id: str, threshold: float)
     await centroid_system.analyze_and_suggest_split(centroid_id, threshold)
 
 
-async def remove_journal_everywhere(*, journal_id: str) -> Dict[str, List[str]]:
+async def remove_entry_everywhere(*, entry_id: str) -> Dict[str, List[str]]:
     """
-    Remove a journal from all centroids where it is attached.
+    Remove an entry from all centroids where it is attached.
     Delegates fully to runtime authority.
     """
-    return await centroid_system.remove_journal_globally(journal_id)
+    return await centroid_system.remove_entry_globally(entry_id)

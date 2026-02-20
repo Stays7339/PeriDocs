@@ -1,12 +1,12 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 202602172257
+# Save-state: 202602201446
 # ==========================================
 """
 Entry Membership Sequencer.
 
 This module orchestrates:
-- automatic assignment of journal entries into centroids (link_entry)
+- automatic assignment of entries into centroids (link_entry)
 - candidate/precentroid assignment for human review
 - ledger-backed, deterministic state updates
 - full auditability, full precision
@@ -40,16 +40,16 @@ class CandidateDecision:
 
 
 async def evaluate_centroid_candidates(
-    journal_id: str,
+    entry_id: str,
     *,
     min_similarity: float,
     max_affiliations: int | None = None,
 ) -> List[CandidateDecision]:
     """
-    Evaluate journal entry against all existing centroids.
+    Evaluate entry against all existing centroids.
     Returns list of CandidateDecision objects sorted by similarity.
     """
-    journal_vec = safe_load_embedding(journal_id)
+    entry_vec = safe_load_embedding(entry_id)
     system = centroid_system
 
     decisions: List[CandidateDecision] = []
@@ -62,18 +62,18 @@ async def evaluate_centroid_candidates(
 
     for c in centroids:
         try:
-            sim = cosine_similarity(journal_vec, c.current.vector)
+            sim = cosine_similarity(entry_vec, c.current.vector)
         except ValueError:
             system._zero_vector_flags = getattr(system, "_zero_vector_flags", [])
             system._zero_vector_flags.append({
-                "journal_id": journal_id,
+                "entry_id": entry_id,
                 "centroid_id": c.centroid_id,
                 "vector": c.current.vector.tolist(),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
             })
             logger.warning(
-                "Zero vector detected: journal=%s centroid=%s -- flagged for review",
-                journal_id, c.centroid_id
+                "Zero vector detected: entry=%s centroid=%s -- flagged for review",
+                entry_id, c.centroid_id
             )
             continue
 
@@ -89,7 +89,7 @@ async def evaluate_centroid_candidates(
 
 
 async def link_entry(
-    journal_id: str,
+    entry_id: str,
     *,
     min_similarity: float = 0.8,
     max_affiliations: int | None = None,
@@ -106,20 +106,20 @@ async def link_entry(
 
     # --- Step 1: Centroids ---
     centroid_candidates = await evaluate_centroid_candidates(
-        journal_id,
+        entry_id,
         min_similarity=min_similarity,
         max_affiliations=max_affiliations,
     )
 
     for cand in centroid_candidates:
         try:
-            await system.add_saaje(cand.centroid_id, journal_id, cand.similarity)
+            await system.add_saaje(cand.centroid_id, entry_id, cand.similarity)
             applied.append((cand.centroid_id, cand.similarity))
         except Exception as e:
             logger.warning(
-                "Failed to link entry to centroid: centroid=%s journal=%s err=%s",
+                "Failed to link entry to centroid: centroid=%s entry=%s err=%s",
                 cand.centroid_id,
-                journal_id,
+                entry_id,
                 e,
             )
 
@@ -128,17 +128,17 @@ async def link_entry(
         return applied
 
     # --- Step 2: Precentroids ---
-    precentroid_id = await suggest_precentroid_for_journal(journal_id, threshold=min_similarity)
+    precentroid_id = await suggest_precentroid_for_entry(entry_id, threshold=min_similarity)
     if precentroid_id:
         try:
             logger.debug(
-                "[LINK_ENTRY] Appending journal %s to precentroid %s",
-                journal_id, precentroid_id
+                "[LINK_ENTRY] Appending entry %s to precentroid %s",
+                entry_id, precentroid_id
             )
             event_index = await system._ledger.record_event({
                 "type": "LINK_CANDIDATE_PRECENTROID",
                 "centroid_id": precentroid_id,
-                "journal_id": journal_id,
+                "entry_id": entry_id,
                 "similarity": min_similarity,
             })
             logger.debug("[LINK_ENTRY] Ledger event_index=%d", event_index)
@@ -146,37 +146,37 @@ async def link_entry(
             
             c = system._centroids[precentroid_id]
             logger.debug(
-                "[LINK_ENTRY] Current journal_ids in %s: %s",
-                precentroid_id, c.current.journal_ids
+                "[LINK_ENTRY] Current entry_ids in %s: %s",
+                precentroid_id, c.current.entry_ids
             )
 
-            new_journal_ids = sorted(c.current.journal_ids + [journal_id])
-            vectors = [safe_load_embedding(j) for j in new_journal_ids]
+            new_entry_ids = sorted(c.current.entry_ids + [entry_id])
+            vectors = [safe_load_embedding(j) for j in new_entry_ids]
             vector = deterministic_mean(vectors)
             logger.debug(
-                "[LINK_ENTRY] New journal_ids: %s, vector shape: %s",
-                new_journal_ids, vector.shape if hasattr(vector,'shape') else 'scalar'
+                "[LINK_ENTRY] New entry_ids: %s, vector shape: %s",
+                new_entry_ids, vector.shape if hasattr(vector,'shape') else 'scalar'
             )
             c.states.append(
                 CentroidState(
                     event_index=event_index,
-                    journal_ids=new_journal_ids,
+                    entry_ids=new_entry_ids,
                     vector=vector,
                     saajes=None,
                     metadata=c.current.metadata.copy()
                 )
             )
             logger.info(
-                "[LINK_ENTRY] Appended journal %s to precentroid %s, total states=%d",
-                journal_id, precentroid_id, len(c.states)
+                "[LINK_ENTRY] Appended entry %s to precentroid %s, total states=%d",
+                entry_id, precentroid_id, len(c.states)
             )
             await system._persist(c)
             logger.debug("[LINK_ENTRY] Persisted precentroid %s to disk", precentroid_id)
             
         except Exception as e:
             logger.error(
-                "[LINK_ENTRY] Failed linking journal %s to precentroid %s: %s",
-                journal_id, precentroid_id, e
+                "[LINK_ENTRY] Failed linking entry %s to precentroid %s: %s",
+                entry_id, precentroid_id, e
             )
             raise  # propagate loudly
 
@@ -187,22 +187,22 @@ async def link_entry(
 
 
 async def unlink_entry(
-    journal_id: str,
+    entry_id: str,
     centroid_id: str,
 ) -> None:
     """
-    Explicit removal of a journal entry from a centroid.
+    Explicit removal of an entry from a centroid.
     Ledger-backed, audit-safe.
     """
     try:
-        await centroid_system.remove_saaje(centroid_id, journal_id)
-        logger.info("Entry %s unlinked from centroid %s", journal_id, centroid_id)
+        await centroid_system.remove_saaje(centroid_id, entry_id)
+        logger.info("Entry %s unlinked from centroid %s", entry_id, centroid_id)
     except Exception as e:
-        logger.error("Failed to unlink entry: journal=%s centroid=%s err=%s", journal_id, centroid_id, e)
+        logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)
         raise
 
 
-async def suggest_precentroid_for_journal(journal_id: str, threshold: float = 0.7) -> str | None:
+async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -> str | None:
     """
     Suggests an existing precentroid for the entry.
     Returns precentroid_id if matched, else None.
@@ -211,13 +211,13 @@ async def suggest_precentroid_for_journal(journal_id: str, threshold: float = 0.
     system = centroid_system
 
     try:
-        journal_vec = await system.run_sync_in_thread(safe_load_embedding, journal_id)
+        entry_vec = await system.run_sync_in_thread(safe_load_embedding, entry_id)
 
         async with system._lock:
             if not system._centroids:
-                return await centroid_system.create_precentroid([journal_id])
+                return await centroid_system.create_precentroid([entry_id])
             for c in system._centroids.values():
-                sim = cosine_similarity(journal_vec, c.current.vector)
+                sim = cosine_similarity(entry_vec, c.current.vector)
                 local_min = c.current.metadata.get("min_similarity_threshold")
                 if local_min is not None and sim < local_min:
                     continue
@@ -227,7 +227,7 @@ async def suggest_precentroid_for_journal(journal_id: str, threshold: float = 0.
                     else:
                         return None
 
-            return await centroid_system.create_precentroid([journal_id])
+            return await centroid_system.create_precentroid([entry_id])
     except Exception as e:
-        logger.error("Error in suggest_precentroid_for_journal: journal=%s err=%s", journal_id, e)
+        logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
         raise  # fail loudly

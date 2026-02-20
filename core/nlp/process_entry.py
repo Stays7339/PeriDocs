@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202602171615 (YYYYMMDDhhmm)
+# save-state 202602201156 (YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
@@ -28,12 +28,12 @@ from core.map import entry_membership_sequencer
 now = datetime.now(timezone.utc)
 window = now.hour // 6
 BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
-JOURNALS_EMBED_FILE = f"data/journals_embeddings_dump{BACKUP_TIMESTAMP}.json"
-JOURNALS_CLAUSE_EMBED_FILE = f"data/journals_embeddings_dump{BACKUP_TIMESTAMP}_clauses.json"
+entries_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}.json"
+entries_CLAUSE_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}_clauses.json"
 
 # Glob for existing embeddings (to validate file location / expected path)
-existing_embed_files = sorted(glob("data/journals_embeddings_dump*.json"))
-existing_clause_embed_files = sorted(glob("data/journals_embeddings_dump*_clauses.json"))
+existing_embed_files = sorted(glob("data/entries_embeddings_dump*.json"))
+existing_clause_embed_files = sorted(glob("data/entries_embeddings_dump*_clauses.json"))
 
 async def process_entry_async(
     text: str,
@@ -84,7 +84,7 @@ async def process_entry_async(
 
     # ---------------- CONSTRUCT ENTRY ----------------
     entry: Dict[str, Any] = {
-        "journal_id": sha8,
+        "entry_id": sha8,
         "timestamp": timestamp,
         "ip_salt": ip_salt,
         "encrypted_raw_ip": encrypted_raw_ip,
@@ -94,9 +94,9 @@ async def process_entry_async(
         "centroid_id": None, # handled downstream by core/map/*
         "centroid_distance": None, # handled downstream by core/map/*
         "embedding": None if crisis_msg else doc_embedding.tolist(),
-        "embedding_file": None if crisis_msg else JOURNALS_EMBED_FILE,
+        "embedding_file": None if crisis_msg else entries_EMBED_FILE,
         "clause_embeddings": [] if crisis_msg else [e.tolist() for e in clause_embeddings],
-        "clause_embedding_file": None if crisis_msg else JOURNALS_CLAUSE_EMBED_FILE
+        "clause_embedding_file": None if crisis_msg else entries_CLAUSE_EMBED_FILE
     }
 
     append_crisis_record(entry)  # store exactly what will be returned
@@ -106,37 +106,79 @@ async def process_entry_async(
     if not crisis_msg:
         Path("data").mkdir(exist_ok=True)
 
-        # load existing journal embeddings
-        if Path(JOURNALS_EMBED_FILE).exists():
-            with open(JOURNALS_EMBED_FILE, "r", encoding="utf-8") as f:
-                journal_dump = json.load(f)
+        # --- Persist document embeddings as .npz ---
+        npz_path = entries_EMBED_FILE.replace(".json", ".npz")
+
+        if Path(npz_path).exists():
+            # load safely, NO pickling
+            loaded = dict(np.load(npz_path, allow_pickle=False))
+
+            # validate keys
+            for k in loaded.keys():
+                if not isinstance(k, str) or len(k) != 8 or not all(c in "0123456789abcdef" for c in k.lower()):
+                    raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
+
+            npz_dump = loaded
         else:
-            journal_dump = {}
+            npz_dump = {}
 
-        journal_dump[sha8] = doc_embedding.tolist()
-        with open(JOURNALS_EMBED_FILE, "w", encoding="utf-8") as f:
-            json.dump(journal_dump, f, indent=2)
+        npz_dump[sha8] = doc_embedding
+        np.savez_compressed(npz_path, **npz_dump)
 
-        # load existing clause embeddings
+       
         """
-        if Path(JOURNALS_CLAUSE_EMBED_FILE).exists():
-            with open(JOURNALS_CLAUSE_EMBED_FILE, "r", encoding="utf-8") as f:
-                clause_dump = json.load(f)
+         # load existing clause embeddings for the sake of saving it permanently. 
+         # As long as this is commented out, per clause embeddings are disabled.
+         # That's good for storage space, but not good for preserving the best quality of the final embeddings that actually lives on.
+        npz_clause_path = entries_CLAUSE_EMBED_FILE.replace(".json", ".npz")
+        if Path(npz_clause_path).exists():
+            clause_dump = dict(np.load(npz_clause_path, allow_pickle=False))
         else:
             clause_dump = {}
 
-        clause_dump[sha8] = [e.tolist() for e in clause_embeddings]
-        with open(JOURNALS_CLAUSE_EMBED_FILE, "w", encoding="utf-8") as f:
-            json.dump(clause_dump, f, indent=2)
+        clause_dump[sha8] = np.stack(clause_embeddings)
+        np.savez_compressed(npz_clause_path, **clause_dump)
         """
 
     report_progress()  # 7 / total_steps
 
     # ---------------- CENTROID / PRECENTROID ASSIGNMENT ----------------
-    precentroid_id = await entry_membership_sequencer.suggest_precentroid_for_journal(entry["journal_id"])
-    entry["centroid_id"] = precentroid_id or None
-    report_progress()  # 8 / total_steps
+    applied = await entry_membership_sequencer.link_entry(entry["entry_id"])
 
+    if applied:
+        # Sort defensively by similarity descending (link_entry already does this,
+        # but we do not assume ordering across future changes)
+        applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+
+        centroid_links = []
+        precentroid_link = None
+
+        for cid, similarity in applied_sorted:
+            if cid.startswith("precentroid_"):
+                # Only allow a single precentroid per entry
+                if precentroid_link is None:
+                    precentroid_link = {
+                        "centroid_id": cid,
+                        "similarity": similarity
+                    }
+            else:
+                centroid_links.append({
+                    "centroid_id": cid,
+                    "similarity": similarity
+                })
+
+        # Centroids take priority over precentroids
+        if centroid_links:
+            entry["centroids"] = centroid_links
+            entry["precentroid"] = None
+        else:
+            entry["centroids"] = []
+            entry["precentroid"] = precentroid_link
+    else:
+        entry["centroids"] = []
+        entry["precentroid"] = None
+
+    report_progress()  # 8 / total_steps
     return entry
 
 # ---------------- Sync Wrapper (meaning not asynchronous) ----------------
