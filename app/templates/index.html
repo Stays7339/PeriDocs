@@ -1,4 +1,4 @@
-{# index.html - homepage, extends base.html save-state 202602172022 #}
+{# index.html - homepage, extends base.html save-state 20260232259 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org - Alpha{% endblock %}
@@ -10,10 +10,42 @@
     <h3>We are a safe, transparent way for you to explore what your writing reveals. <br> See our <a href="/about">elaborated philosophy</a> for more.</h3>
 
     <form id="entry-form" action="/submit" method="post">
-      <textarea name="entry_text" rows="10" placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."></textarea>
-      <div class="meta" style="margin-top:12px;">
-        <button type="submit" class="btn primary">Analyze &amp; Search</button>
+
+      <div id="entry-wrapper" class="entry-wrapper" data-locked="false">
+
+        <textarea 
+          name="entry_text" 
+          rows="10"
+          placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."
+          disabled
+        ></textarea>
+
+        <div class="entry-overlay" aria-hidden="true">
+          <div class="overlay-content">
+            <button 
+              type="button"
+              id="consent-toggle"
+              role="switch"
+              aria-checked="false"
+              data-state="off"
+              class="consent-toggle"
+            >
+              <span class="toggle-knob"></span>
+              <span class="toggle-label"></span>
+            </button>
+            <p class="overlay-message">
+              This toggle allows PeriDocs to process any information you decide to share. <br> You may use the service without revealing sensitive or personally identifying details. <br> See our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages to learn more. 
+            </p>
+          </div>
+        </div>
+      <div class="entry-overlay-streaks" aria-hidden="true"></div>
+
       </div>
+
+      <div class="meta" style="margin-top:12px;">
+        <button type="submit" class="btn primary" disabled>Analyze &amp; Search</button>
+      </div>
+
     </form>
 
   </div>

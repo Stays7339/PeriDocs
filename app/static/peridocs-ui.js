@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 202512261131 (YYYYMMDDhhmm)
+// save-state 202602240812  (YYYYMMDDhhmm)
 // ==========================================
 
 /* Notes:
@@ -16,6 +16,80 @@ document.addEventListener("DOMContentLoaded", () => {
   const cancelBtn = document.getElementById("cancel-feedback");
   const feedbackForm = document.querySelector("#feedback-form");
   const entryForm = document.querySelector('#entry-form');
+
+  /* ================================
+     Consent Lock Feature (Production)
+  ================================ */
+  const entryWrapper = document.getElementById("entry-wrapper");
+  const consentToggle = document.getElementById("consent-toggle");
+  const textarea = entryForm?.querySelector("textarea");
+  const submitBtn = entryForm?.querySelector('button[type="submit"]');
+
+  const CONSENT_SESSION_KEY = "PeriDocs_ConsentGranted";
+  const OVERLAY_SHOWN_KEY = "PeriDocs_ConsentOverlayShown";
+
+  // Initial consent state
+  let consentGranted = sessionStorage.getItem(CONSENT_SESSION_KEY) === "true";
+
+  // Streaks element
+  const streaks = entryWrapper?.querySelector(".entry-overlay-streaks");
+
+  // ---------------------- Apply Consent State ---------------------- //
+  function applyConsentState(granted) {
+    consentGranted = granted;
+    const overlayAlreadyShown = sessionStorage.getItem(OVERLAY_SHOWN_KEY) === "true";
+    const overlay = entryWrapper?.querySelector(".entry-overlay");
+
+    if (entryWrapper) {
+      if (granted) {
+        if (!overlayAlreadyShown) {
+          // First-time opt-in: show overlay for 2s
+          entryWrapper.setAttribute("data-locked", "true"); // overlay fully visible
+          sessionStorage.setItem(OVERLAY_SHOWN_KEY, "true");
+
+          setTimeout(() => {
+            entryWrapper.setAttribute("data-locked", "false"); // fade overlay (and streaks together)
+          }, 2000);
+        } else {
+          // Already opted-in previously: hide overlay immediately
+          entryWrapper.setAttribute("data-locked", "false");
+        }
+      } else {
+        // Opt-out: overlay stays visible (locked)
+        entryWrapper.setAttribute("data-locked", "true");
+      }
+    }
+
+    // Enable/disable textarea & submit
+    if (textarea) textarea.disabled = !granted;
+    if (submitBtn) submitBtn.disabled = !granted;
+
+    // Update toggle pill
+    if (consentToggle) {
+      consentToggle.setAttribute("data-state", granted ? "on" : "off");
+      consentToggle.setAttribute("aria-checked", granted ? "true" : "false");
+      const label = consentToggle.querySelector(".toggle-label");
+      if (label) label.textContent = granted ? " Consent Given" : "Consent Requested";
+    }
+
+    // Persist consent
+    sessionStorage.setItem(CONSENT_SESSION_KEY, granted ? "true" : "false");
+  }
+  /* --- Initialize --- */
+  applyConsentState(consentGranted);
+
+  /* --- Consolidated Event Listener --- */
+  if (consentToggle) {
+    consentToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Disable toggle for 3 seconds to prevent accidental double-click
+      consentToggle.disabled = true;
+      setTimeout(() => {
+        consentToggle.disabled = false;
+      }, 3000);
+      applyConsentState(!consentGranted);
+    });
+  }
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');

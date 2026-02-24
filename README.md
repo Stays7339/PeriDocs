@@ -295,7 +295,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 17 February 2026 (202602171516 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 20 February 2026 (202602201539 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -377,9 +377,8 @@ PeriDocs-code/                         # Root project folder
 │
 ├─ data/                                  # Local data storage
 │  ├─ feedback.json                       # Stored feedback and report inquiries
-│  ├─ high-profile-addresses.json         # Prevents PII exposure
-│  ├─ entries_embeddings_dump20251216_3.json       # Storage for embeddings to keep the main entries much more readable by humans.
-│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)]
+│  ├─ high-profile-addresses.json         # Prevents PII exposure     
+│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
 │  ├─ entries.json                        # Stored entries
 │  ├─ names_au.json                       # Common-enough first names and last names from Australia.
 │  ├─ names_ca.json                       # Common-enough first names and last names from Canada.

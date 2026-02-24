@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602201022 (YYYYMMDDhhmm) ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602240813(YYYYMMDDhhmm) ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -154,7 +154,7 @@ a:active:not(.brand-link) {
 /* ---------------------- Header/logo ---------------------- */
 header.site-wordmark{position:absolute;top:1.25rem;left:1.5rem;display:flex;align-items:center;gap:.6rem;font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:1.6rem;color:var(--text);opacity:.95;user-select:none;pointer-events:auto;}
 .brand-link{display:flex;align-items:center;text-decoration:none;color:inherit;}
-.brand-logo{height:3.9rem;width:auto;display:block;filter:none;}
+.brand-logo{height:3.9rem;width:auto;display:block;filter:none;  transform: scaleX(1); transform-origin: center}
 html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9);}
 .brand-text{line-height:1;}
 header.site-wordmark .brand-link{color:inherit;text-decoration:none;}
@@ -346,4 +346,207 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
     border-radius: 0;       /* optional, flush with edges */
     padding: 1rem;          /* adjust padding as needed */
   }
+}
+
+/* ==========================================
+   Entry Wrapper / Textarea
+========================================== */
+.entry-wrapper {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.entry-wrapper textarea {
+  width: 100%;
+  resize: vertical;
+  position: relative;
+  z-index: 1; /* ensure overlay is above */
+  background: inherit;
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+
+/* ==========================================
+   Aero Glass Overlay
+========================================== */
+.entry-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10; /* above textarea & streaks */
+  pointer-events: auto;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  background-color: rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(1.5px) saturate(120%);
+  -webkit-backdrop-filter: blur(1.5px) saturate(120%);
+
+  border-radius: inherit;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+
+  opacity: 0;
+  transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.entry-wrapper[data-locked="true"] .entry-overlay {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Desktop hover intensifies blur + contrast */
+@media (hover: hover) {
+  .entry-wrapper[data-locked="true"]:hover .entry-overlay {
+    backdrop-filter: blur(2px) saturate(140%);
+    -webkit-backdrop-filter: blur(2px) saturate(140%);
+  }
+}
+
+/* Mobile press feedback */
+.entry-wrapper[data-locked="true"]:active .entry-overlay {
+  backdrop-filter: blur(2.5px) saturate(160%);
+}
+
+/* ----------------------------------------
+   Consent Toggle Pill + Knob
+---------------------------------------- */
+.consent-toggle {
+  position: relative;
+  width: 250px;
+  height: 36px;
+  border-radius: 999px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center; /* centers label */
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.consent-toggle .toggle-knob {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fff, #f2f2f2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.4);
+  left: 4px;
+  top: 4px;
+  transition: transform 0.3s ease;
+  z-index: 2;
+}
+
+.consent-toggle .toggle-label {
+  position: relative;
+  z-index: 1; /* above background but below knob if overlapping */
+  font-weight: 600;
+  text-align: center;
+  pointer-events: none; /* avoids accidental click interference */
+}
+
+.consent-toggle[data-state="on"] {
+  background: var(--accent);
+  color: var(--white);
+}
+
+.consent-toggle[data-state="on"] .toggle-knob {
+  transform: translateX(214px); /* pill width minus knob width minus padding */
+}
+
+/* Overlay fades out after consent */
+.entry-wrapper[data-locked="true"] .entry-overlay {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity 0.6s ease, backdrop-filter 0.3s ease;
+}
+
+.entry-wrapper[data-locked="false"] .entry-overlay {
+  opacity: 0;
+  pointer-events: none;
+  z-index: 5; /* below textarea for proper focus */
+}
+
+/* Overlay content centered */
+.entry-overlay .overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  padding: 16px 24px;
+}
+/* ==========================================
+   Overlay Streaks
+========================================== */
+.entry-overlay-streaks {
+  position: absolute;
+  inset: 0;
+  z-index: 7; /* behind overlay content */
+  pointer-events: none;
+  border-radius: inherit;
+  filter: blur(1024px);
+
+  /* Light mode streaks */
+  background: rgba(255,255,255,0.8);
+  mask-image: repeating-linear-gradient(
+    13deg,
+    rgba(0,0,0,0) 0px,
+    black 24px,
+    black 33px,
+    rgba(0,0,0,0) 50px
+  );
+  -webkit-mask-image: repeating-linear-gradient(
+    13deg,
+    rgba(0,0,0,0) 0px,
+    black 24px,
+    black 33px,
+    rgba(0,0,0,0) 50px
+  );
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
+}
+
+/* Dark mode streaks */
+[data-theme="dark"] .entry-overlay-streaks {
+  background: rgba(255, 255, 255, 0.05);
+  filter: blur(0.8px);
+
+  mask-image: repeating-linear-gradient(
+    13deg,
+    rgba(255,255,255,0) 0px,
+    rgba(255,255,255,0.5) 24px,
+    rgba(255,255,255,0.5) 33px,
+    rgba(255,255,255,0) 50px
+  );
+  -webkit-mask-image: repeating-linear-gradient(
+    13deg,
+    rgba(255,255,255,0) 0px,
+    rgba(255,255,255,0.5) 24px,
+    rgba(255,255,255,0.5) 33px,
+    rgba(255,255,255,0) 50px
+  );
+  mask-repeat: repeat;
+  -webkit-mask-repeat: repeat;
+}
+
+/* ==========================================
+   Streaks initial hidden state
+========================================== */
+.entry-overlay-streaks {
+  opacity: 0;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
+}
+
+.entry-wrapper[data-locked="true"] .entry-overlay-streaks {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.6s ease, visibility 0s;
 }
