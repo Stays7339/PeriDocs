@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/about.html save-state 202601052137 #}
+{# PeriDocs-code/app/templates/about.html save-state 202602241220 #}
 {% extends "base.html" %}
 {% block title %}About PeriDocs - PeriDocs{% endblock %}
 
@@ -28,38 +28,45 @@
 
       <h2>How analysis works</h2>
       <p>
-        Imagine PeriDocs as a sprawling city built entirely from ideas, words, and emotions. Each journal entry you submit is like a new citizen arriving in this city, carrying a unique combination of thoughts, feelings, and expressions. The system’s first task is to understand what your citizen seem to be, in abstract terms; your words are transformed into thousands of numeric coordinates called <em>embedding vectors</em>. Think of these vectors as the  practically non-reversible anonymized versions character traits of the ideas within your writing. Embedding Vectors capture the meaning, tone, and subtle relationships between words and phrases, so the system can compare them to everyone else in the city.
+        Imagine PeriDocs as a sprawling city built entirely from ideas, words, and emotions. Each entry you submit is like a new citizen arriving in this city, carrying a unique combination of thoughts, feelings, and expressions. The system’s first task is to understand what your citizen seem to be, in abstract terms; your words are transformed into thousands of numeric coordinates called <em>embedding vectors</em>. <br> <br> Think of these vectors as the  practically non-reversible anonymized versions character traits of the ideas within your writing. Embedding Vectors capture the meaning, tone, and subtle relationships between words and phrases, so the system can compare them to everyone else in the city.
       </p>
+      <br>
       <p>
-        These citizens don’t wander randomly. These written-journal-entry "citizens" are guided into neighborhoods called <strong>centroids</strong>, which are like areas of the city where similar ideas live nearby each other. Centroids keep and track the identity that its residents and commuters give it, meaning the neighborhood remembers its history and evolves carefully over time as more entries arrive. We like to use shorthand to remember this idea: <strong>neighborhood of nuance emotion (NNE) </strong>. Before a new NNE is officially recognized, it exists in a probationary stage called a <em>precentroid</em>, which allows the system to test its boundaries and determine if it truly represents a unique cluster of thought.
+        These citizens don’t wander randomly around the city; they're guided into groups commonly called <strong>centroids</strong>, which are like areas of the city where similar ideas live nearby each other. Centroids keep and track the identity that its residents and commuters give it, meaning the neighborhood remembers its history and evolves carefully over time as more entries arrive. We like to use shorthand to remember this idea: <strong>neighborhood of nuance emotion (NNE) </strong>. Before a new NNE is officially recognized, it exists in a probationary stage called a <em>precentroid</em>, which allows the system to test its boundaries and determine if it truly represents a unique cluster of thought.
       </p>
+      <br>
       <p>
         To help with placement, the system uses <strong>Software-auto-added journal entries (SAAJEs)</strong> as a way to suggest "addresses” for new "citizens". A SAAJE is not the literal words from your journal entry; rather, a SAAJE is a fingerprint derived from your entry’s embedding vectors that shows which centroids your ideas align with most closely. Think of it like a postal system: your mail (entry) is sorted by the relation of words to one another, not by the verbatim words themselves. This supports real-world privacy within the PeriDocs system while still guiding your thoughts into the right neighborhood. SAAJEs are subject to in-house human review where applicable for quality and moderation. This helps us with our goal of making sure neighborhoods grow in a meaningful, coherent way.
       </p>
+      <br>
       <p>
         Once in a NNE, each citizen contributes to the evolving story of the neighborhood. The PeriDocs system continuously monitors these clusters, and if a neighborhood becomes too large or far spread out from citizen-to-citizen, the PeriDocs system may suggest splitting and properly establishing each NNE, much like a city adjusting its district as the population changes. Every large-level change is logged in a permanent internal audit trail, so the "city’s" big-picture history is never lost, and relationships between ideas remain transparent and traceable.
       </p>
-
+      <br>
       <h2>Your saved entry</h2>
       <p>
-        Every citizen (journal entry) in the PeriDocs city receives a public, unique 8-character ID based on SHA256 hashing (for example, <code>5edae32d</code>). This is your key to accessing your entry later, while also reducing the amount and intensity of personally identifiable about you. Your citizen is stored securely and can only be viewed by authorized staff for moderation, safety review, or research into how the city grows and functions. Raw text is never shared publicly.
+        Every citizen (an entry) in the PeriDocs city receives a public, unique 8-character ID based on SHA256 hashing (for example, <code>5edae32d</code>). This is your key to accessing your entry later, while also reducing the amount and intensity of personally identifiable information about you. Raw text from your entry is never shared publicly; instead PeriDocs automatically removes any personally identifiable information that it detects for moderation, safety review, or research into how the city grows and functions.
       </p>
+      <br>
       <p>
         When the system finds a similar citizen already living in the city, it provides a <strong>matched excerpt and source ID</strong>. These matches are paraphrased summaries to preserve privacy, highlighting semantic relationships without exposing raw words. This lets you see where your entry fits within the larger community, giving insight into recurring ideas or emotional patterns.
       </p>
+      <br>
       <p>
-        Behind the scenes, the embedding vectors are kept intact. These allow PeriDocs to detect nuanced relationships between entries across the entire city, providing semantic linking for reflection, pattern recognition, and educational insight, all consistently performing some redaction PII (personally indentifiable information); vectors are never flattened, truncated, or shared publicly.
+        Behind the scenes, the embedding vectors are kept intact. These allow PeriDocs to detect nuanced relationships between entries/citizens across the entire city, providing semantic linking for reflection, pattern recognition, and educational insight, all while consistently performing some redaction on personally indentifiable information so that its never stored in the vector in the first place; other than that, vectors are never flattened, truncated, or shared publicly.
       </p>
 
       <h2>Emotion and sentiment features</h2>
       <p>
-        Every citizen brings emotions with them, and PeriDocs maps these emotional footprints across the city. The system uses embeddings from open-source models to detect subtle shades of feeling, recognizing context, intensity, and recurring emotional patterns in your writing. This is not about generating advice or altering your words—it’s about showing you a detailed emotional map of your expression over time.
+        Every citizen brings emotions with them, and PeriDocs maps these emotional footprints across the city. The system uses embeddings from open-source models to detect subtle shades of feeling, recognizing context, intensity, and recurring emotional patterns in your writing. PeriDocs doesn't generate advice or alter your words. <strong>The system focuses on showing you how the way you express yourself in long-form writing relates to the writing that's already out there on the open internet.</strong>
       </p>
+      <br>
       <p>
-        Each entry’s emotional signature is connected to centroids, which act like “emotional neighborhoods.” For example, a district might represent recurring feelings of frustration or joy, or complex combinations that appear repeatedly across entries. By linking your post to these centroids, the system helps you recognize patterns in the writing you submitted, offering a bird’s-eye view of how moods, intensities, and thought clusters ebb and flow—without ever exposing your literal text or using generative AI.
+        Each entry’s contextual signature is connected to these neighborhoods of nuanced emotion. For example, a district might represent recurring feelings of frustration or joy, or complex combinations that appear repeatedly across entries. When the system links your post to these centroids, it helps you recognize patterns in the writing you submitted, offering a bird’s-eye view of how common life-experiences and thought clusters ebb and flow. All of this happens without without ever using generative AI.
       </p>
+      <br>
       <p>
-        This mapping lets you explore the "City of PeriDocs" and its well-labeled archived of ideas and moods and thoughts in a way that is richly detailed in whats oberserved in the writing of the entry users have submitted. Over time, you can see how your journal entries interact with <strong>neighborhoods of nuance emotion (NNEs) </strong>, track changes, and reflect on the evolving landscape of thoughts and apparent moods from journal entries across time and across the open internet!
+        This mapping lets you explore the "City of PeriDocs" and its well-labeled archived of ideas and anecdotes and thoughts in a way that is richly detailed in whats oberserved in the writing of the entry users have submitted. Over time, you can see how your journal entries interact with neighborhoods of nuance emotion (NNEs) and reflect on the evolving landscape of thoughts and apparent themes from writing across time and across the open internet!
       </p>
 
 

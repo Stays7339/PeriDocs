@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_recorder.py
-# save-state updated 202602201525
+# save-state updated 202602241053
 # ==========================================
 
 from __future__ import annotations
@@ -71,9 +71,12 @@ def append_crisis_record(record: Dict[str, Any]) -> None:
     """
     _encrypt_sensitive_fields(record)
 
+    # make JSON-safe copy
+    record_safe = _make_json_safe(record)
+
     with FileLock(str(LOCK_FILE)):
         existing = _load_existing_records()
-        existing.append(record)
+        existing.append(record_safe)
         _write_records_atomic(existing)
 
 
@@ -107,3 +110,14 @@ def load_crisis_records(decrypt_sensitive: bool = True) -> List[Dict[str, Any]]:
         result.append(rec_copy)
 
     return result
+
+def _make_json_safe(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Return a copy of record with NumPy arrays converted or removed for JSON."""
+    safe_record = {}
+    for k, v in record.items():
+        if isinstance(v, np.ndarray):
+            # remove the embedding for crisis logging
+            continue
+        else:
+            safe_record[k] = v
+    return safe_record

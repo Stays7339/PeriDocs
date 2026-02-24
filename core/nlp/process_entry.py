@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202602201156 (YYYYMMDDhhmm)
+# save-state 202602241405(YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
@@ -12,6 +12,9 @@ from pathlib import Path
 from glob import glob
 import json
 import numpy as np
+import secrets
+import hashlib
+
 
 from .embeddings import encrypt_text, get_embedding_async
 from .pii import redact_pii
@@ -21,19 +24,17 @@ from .crisis_recorder import append_crisis_record
 from .clause_utils import split_into_clauses, sliding_window_clauses
 from core.map.mapping_runtime import centroid_system
 from core.map import entry_membership_sequencer
-
+from app.helpers.file_ops import load_data
 
 
 # ---- BACKUP / TIMESTAMPED EMBEDDINGS ----
 now = datetime.now(timezone.utc)
 window = now.hour // 6
 BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
-entries_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}.json"
-entries_CLAUSE_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}_clauses.json"
+entries_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}.npz"
 
 # Glob for existing embeddings (to validate file location / expected path)
-existing_embed_files = sorted(glob("data/entries_embeddings_dump*.json"))
-existing_clause_embed_files = sorted(glob("data/entries_embeddings_dump*_clauses.json"))
+existing_embed_files = sorted(glob("data/entries_embeddings_dump*.npz"))
 
 async def process_entry_async(
     text: str,
@@ -50,7 +51,7 @@ async def process_entry_async(
     encrypted_raw_text = encrypt_text(text)
 
     # ---------------- DYNAMIC PROGRESS LOADING STATUS SETUP ----------------
-    steps = ["safe_text", "clause_split", "generate_embedding", "id_generation", "crisis_check", "construct_entry","persist_embedding_only_if_no_crisis","centroid_or_precentroid_linking"]
+    steps = ["safe_text", "clause_split", "generate_embedding", "id_generation", "crisis_check", "construct_entry","persist_embedding_only_if_no_crisis","centroid_or_precentroid_linking", "logic_for_delete_token"]
     #the labels in steps are purely descriptive for tracking which logical step is happening; they aren’t pulled from anywhere else in the repo.
     total_steps = len(steps)
     current_step = 0
@@ -72,11 +73,20 @@ async def process_entry_async(
 
     # ---------------- GENERATE EMBEDDING ----------------
     clause_embeddings = await get_embedding_async(windows)
-    doc_embedding = np.mean(clause_embeddings, axis=0)
+    doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
     report_progress()  # 3 / total_steps
 
     # ---------------- ID GENERATION ----------------
     sha8 = sha8_hash(safe_text)
+
+    # Compute full SHA256 first
+    full_sha256 = hashlib.sha256(safe_text.encode("utf-8")).hexdigest()
+
+    # Now compute truncated SHA8
+    sha8 = full_sha256[:8]
+
+    # Log both
+    print(f"[DEBUG] Full SHA256: {full_sha256} | SHA8: {sha8}")
     report_progress()  # 4 / total_steps
     # ---------------- CRISIS CHECK ----------------
     crisis_msg = await crisis_notification_async(text)
@@ -93,13 +103,18 @@ async def process_entry_async(
         "safe_text": "" if crisis_msg else safe_text,
         "centroid_id": None, # handled downstream by core/map/*
         "centroid_distance": None, # handled downstream by core/map/*
-        "embedding": None if crisis_msg else doc_embedding.tolist(),
         "embedding_file": None if crisis_msg else entries_EMBED_FILE,
-        "clause_embeddings": [] if crisis_msg else [e.tolist() for e in clause_embeddings],
-        "clause_embedding_file": None if crisis_msg else entries_CLAUSE_EMBED_FILE
+        "embedding": None if crisis_msg else doc_embedding
     }
 
-    append_crisis_record(entry)  # store exactly what will be returned
+    # --------------------- CRISIS SHORT-CIRCUIT ---------------------
+    if crisis_msg:
+        # Record crisis entry safely
+        append_crisis_record(entry)
+        report_progress()  # 6 / total_steps
+        # Return immediately so we skip embeddings/centroids
+        return entry
+
     report_progress()  # 6 / total_steps
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
@@ -107,7 +122,7 @@ async def process_entry_async(
         Path("data").mkdir(exist_ok=True)
 
         # --- Persist document embeddings as .npz ---
-        npz_path = entries_EMBED_FILE.replace(".json", ".npz")
+        npz_path = entries_EMBED_FILE
 
         if Path(npz_path).exists():
             # load safely, NO pickling
@@ -179,7 +194,24 @@ async def process_entry_async(
         entry["precentroid"] = None
 
     report_progress()  # 8 / total_steps
-    return entry
+
+    # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
+    entries_file = "data/entries.json"
+    all_entries = load_data(entries_file)
+    existing_texts = {e.get("safe_text", "") for e in all_entries}
+
+    if safe_text not in existing_texts:
+        # Only generate token if safe_text is new
+        delete_token = secrets.token_hex(32)
+        delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
+        entry["delete_token_hash"] = delete_token_hash
+    else:
+        delete_token = None  # Safe_text already exists; no token issued
+
+    report_progress()  # 9 / total_steps
+
+    # ---------------- RETURN ENTRY + TOKEN ---------------------
+    return {**entry, "delete_token": delete_token}  # pass token to caller
 
 # ---------------- Sync Wrapper (meaning not asynchronous) ----------------
 def process_entry(text: str, user_ip: str, max_clause_words: int = 100) -> Dict[str, Any]:

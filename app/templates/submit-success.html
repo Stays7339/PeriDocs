@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 202602151534 (YYYYMMDDhhmm) #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 202602241515 (YYYYMMDDhhmm) #}
 {% extends "base.html" %}
 {% block title %}Entry saved — PeriDocs{% endblock %}
 
@@ -12,13 +12,35 @@
 
     <!-- Privacy note -->
     <p class="privacy-summary">
-      Your submission is stored securely and visible only to authorized PeriDocs staff for moderation and safety review.
+      Your submission is stored securely. All data other than timestamp, pseudonymized text, and affiliations to centroids remains only visible to authorized PeriDocs staff for moderation and safety review.
       See our <a href="/privacy-policy">privacy and data policy</a>.
     </p>
 
     <!-- Full text submission, PII-redacted -->
     <div class="excerpt">{{ safe_text }}</div>
 
+    <!-- ---------------- Delete Token ---------------- -->
+    {% if delete_token %}
+    <div class="delete-token-box" style="margin-top: 1rem; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;">
+      <h2>Your Delete Token</h2>
+      <div style="display:flex; gap:0.5rem;">
+        <input type="text" value="{{ delete_token }}" readonly id="deleteTokenField" style="flex:1;">
+        <button type="button" onclick="copyDeleteToken()">Copy</button>
+      </div>
+      <p style="font-size:0.85rem;"> This token only appears once and it is the only way to delete your entry besides contacting support; Save it somewhere safe.</p>
+    </div>
+
+    <script>
+    function copyDeleteToken() {
+      const field = document.getElementById("deleteTokenField");
+      field.select();
+      field.setSelectionRange(0, 99999); // mobile support
+      document.execCommand("copy");
+      alert("Delete token copied to clipboard!");
+    }
+    </script>
+    {% endif %}
+    <br>
     <!-- Metrics summary -->
     <ul class="metrics">
       <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>

@@ -1,0 +1,34 @@
+{# PeriDocs-code/app/templates/delete.html — save-state 202602241632 (YYYYMMDDhhmm) #}
+{% extends 'base.html' %}
+
+{% block title %}Delete Entry | PeriDocs{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-content">
+    <h1>Delete Your Entry</h1>
+    <p>To permanently delete your entry, please enter your deletion token below. This token was provided to you when your entry was created. Deletion cannot be undone.</p>
+
+    <form id="delete-form" method="POST" action="/delete">
+      <div class="entry-wrapper" id="delete-wrapper">
+        <textarea 
+          name="delete_token" 
+          placeholder="Enter your deletion token..." 
+          required 
+          rows="3"
+        ></textarea>
+      </div>
+
+      <button type="submit" class="btn primary" id="delete-submit">Delete Entry</button>
+    </form>
+  </div>
+  {% include 'includes/footer.html' %}
+</div>
+
+{% if message %}
+  <div data-delete-message style="display:none;">{{ message }}</div>
+{% endif %}
+{% if error %}
+  <div data-delete-error style="display:none;">{{ error }}</div>
+{% endif %}
+{% endblock %}

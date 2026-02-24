@@ -295,7 +295,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 20 February 2026 (202602201539 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 24 February 2026 (202602241322 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -305,7 +305,7 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
-│  │  ├─ entry_similarity.py           # # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
 │  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
@@ -315,9 +315,9 @@ PeriDocs-code/                         # Root project folder
 ├─ routes/
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ admin_routing.py              # "/admin*"
+│  │  ├─ entry.py                      # "/submit", "/submit-success"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
-│  │  ├─ entry.py                    # "/submit", "/submit-success"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
@@ -326,7 +326,12 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ favicon.png
 │  │  ├─ peridocs-logo-v1-white.png
 │  │  ├─ peridocs-logo-v1.png
+│  │  ├─ peridocs-logo-v2.png
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
+│  │  ├─ peridocs-wordmark-202602232127.svg
+│  │  ├─ peridocs-wordmark-and-logo-202602232100.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -355,9 +360,9 @@ PeriDocs-code/                         # Root project folder
 │   │   ├─ admin_review_helpers.py        # The Moderation Layer - logic for creating a dashboard for human administrators at PeriDocs.
 │   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
+│   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
-│   │   ├─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
-│   │   └─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism..
+│   │   └─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
 │   │
 │   │
 │   │
@@ -366,7 +371,7 @@ PeriDocs-code/                         # Root project folder
 │      ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
 │      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
 │      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
-│      ├─ embeddings.py                   # Manages SentenceTransformer model, embedding computation, caching, and encryption.
+│      ├─ embeddings.py                   # Manages all encryption, SentenceTransformer model, embedding computation, and caching.
 │      ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
 │      ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
 │      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
@@ -376,10 +381,10 @@ PeriDocs-code/                         # Root project folder
 │
 │
 ├─ data/                                  # Local data storage
-│  ├─ feedback.json                       # Stored feedback and report inquiries
-│  ├─ high-profile-addresses.json         # Prevents PII exposure     
 │  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
 │  ├─ entries.json                        # Stored entries
+│  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ high-profile-addresses.json         # Prevents PII exposure     
 │  ├─ names_au.json                       # Common-enough first names and last names from Australia.
 │  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
 │  ├─ names_ie.json                       # Common-enough first names and last names from Ireland.
@@ -389,8 +394,8 @@ PeriDocs-code/                         # Root project folder
 │  ├─ names_uk.json                       # Common-enough first names and last names from United Kingdom.
 │  ├─ names_us.json                       # Common-enough first names and last names from United States.
 │  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
-│  ├─ recorded_crises.lock                 # The dev is currently not completely sure why .lock file stays around after the software is done writing data.
-│  ├─ recorded_crises.npz                # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
+│  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
+│  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 │

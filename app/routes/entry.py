@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 202602201551
+# save-state 202602241628(YYYYMMDDhhmm)
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -10,29 +10,35 @@ from glob import glob
 import json
 import numpy as np
 import asyncio
+import hashlib
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
 from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
+from core.map.deletion import DeletionManager
 
 templates = Jinja2Templates(directory="app/templates")
 entries_FILE = "data/entries.json"
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
-for path_str in sorted(glob("data/entries_embeddings_dump*.json")):
+for path_str in sorted(glob("data/entries_embeddings_dump*.npz")):
     path = Path(path_str)
     if path.exists():
-        with open(path, "r", encoding="utf-8") as f:
-            embeddings_index.update(json.load(f))
+        npz_data = np.load(path, allow_pickle=False)
+        for k in npz_data.keys():
+            embeddings_index[k] = np.array(npz_data[k], dtype=np.float32)
 
 # ---------------- In-memory progress tracker ----------------
 progress_dict: dict[str, float] = {}  # key: entry_id, value: 0.0-1.0
 
 # ---------------- Temp ID → real entry_id mapping ----------------
 temp_to_real_entry_id: dict[str, str] = {}  # key: temp_id, value: real entry_id
+
+# ---------------- In-memory delete token store ----------------
+delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_token
 
 # ---------------- Active WebSocket connections ----------------
 active_ws_connections: dict[str, WebSocket] = {}
@@ -47,6 +53,13 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
         user_ip=user_ip,
         progress_callback=wrapped_progress
     )
+    # Map temp ID → real entry_id
+    real_entry_id = example_variable["entry_id"]
+    temp_to_real_entry_id[entry_id] = real_entry_id
+
+    # Store delete_token in memory if it exists
+    if example_variable.get("delete_token"):
+        delete_tokens_memory[real_entry_id] = example_variable["delete_token"]
 
     # ---------------- Option A: push crisis immediately ----------------
     if example_variable.get("crisis_flag"):
@@ -69,16 +82,27 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
     entry_for_journal = example_variable.copy()
     entry_for_journal.pop("embedding", None)
     entry_for_journal.pop("clause_embeddings", None)
+    entry_for_journal.pop("delete_token", None)  # token not persisted
     append_entry(entry_for_journal, entries_FILE)
 
-    # ---------------- Update embeddings_index ----------------
-    if example_variable.get("embedding"):
-        embeddings_index[example_variable["entry_id"]] = example_variable["embedding"]
-        embed_path = example_variable.get("embedding_file")
-        if embed_path:
-            Path(embed_path).parent.mkdir(parents=True, exist_ok=True)
-            with open(embed_path, "w", encoding="utf-8") as f:
-                json.dump(embeddings_index, f, ensure_ascii=False, indent=2)
+    # ---------------- Update embeddings_index and persist to NPZ ----------------
+    if example_variable.get("embedding") is not None:
+        eid = example_variable["entry_id"]
+        emb = example_variable["embedding"]
+
+        # Update in-memory index
+        embeddings_index[eid] = emb.tolist()  # convert to list for JSON-safe storage
+
+        # Persist to .npz
+        npz_path = example_variable.get("embedding_file")
+        if npz_path:
+            Path(npz_path).parent.mkdir(parents=True, exist_ok=True)
+            if Path(npz_path).exists():
+                loaded = dict(np.load(npz_path, allow_pickle=False))
+            else:
+                loaded = {}
+            loaded[eid] = emb
+            np.savez_compressed(npz_path, **loaded)
 
     # ---------------- Mark progress as complete ----------------
     progress_dict[entry_id] = 1.0
@@ -183,7 +207,12 @@ async def submit_success(request: Request, id: str):
         )
 
     # Similarity search
-    entry_vec = np.array(embeddings_index.get(id, np.zeros(1024)))
+    entry_vec = embeddings_index.get(id)
+    if entry_vec is None:
+        # fallback to avoid zero vector crash
+        entry_vec = np.zeros(1024, dtype=np.float32)
+    else:
+        entry_vec = np.array(entry_vec, dtype=np.float32)
     scored_entries = []
 
     for eid, vec in embeddings_index.items():
@@ -203,6 +232,9 @@ async def submit_success(request: Request, id: str):
         for e in sorted(scored_entries, key=lambda x: x["score"], reverse=True)[:20]
     ]
 
+
+    delete_token = delete_tokens_memory.pop(entry.get("entry_id", entry.get("id")), None)
+
     return templates.TemplateResponse(
         "submit-success.html",
         {
@@ -210,5 +242,43 @@ async def submit_success(request: Request, id: str):
             "entry_id": entry.get("entry_id", entry.get("id")),
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,
+            "delete_token": delete_token
         },
     )
+
+
+# GET -> render delete page
+@app.get("/delete", response_class=HTMLResponse)
+async def delete_entry_page(request: Request):
+    return templates.TemplateResponse(
+        "delete.html",
+        {"request": request}
+    )
+
+# POST -> process delete token
+@app.post("/delete", response_class=HTMLResponse)
+async def delete_entry_api(request: Request, delete_token: str = Form(...)):
+    token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
+    all_entries = load_data(entries_FILE)
+    entry = next((e for e in all_entries if e.get("delete_token_hash") == token_hash), None)
+
+    if not entry:
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "error": "Invalid deletion token."}
+        )
+
+    entry_id = entry.get("entry_id") or entry.get("id")
+
+    try:
+        dm = DeletionManager(ledger=ledger, centroids=centroids)
+        await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR)
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "message": "Entry successfully deleted."}
+        )
+    except Exception as e:
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "error": f"Deletion failed: {str(e)}"}
+        )

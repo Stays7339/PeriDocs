@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 202602240812  (YYYYMMDDhhmm)
+// save-state 202602241643  (YYYYMMDDhhmm)
 // ==========================================
 
 /* Notes:
@@ -272,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (!res.ok) throw new Error('Network response not ok');
         const data = await res.json();
         if (data.status==='ok') { 
-          showToast(data.message||'entry submitted!', 'success'); 
+          showToast(data.message||'Entry submitted!', 'success'); 
           entryForm.reset();
 
           // ---------------------- Progress toast using general-toast style ---------------------- //
@@ -392,4 +392,57 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Expose globally
   window.copySafeTextToClipboard = copySafeTextToClipboard;
-});
+  
+
+
+  // ---------------------- Delete Entry Form Submission ---------------------- //
+  const deleteForm = document.getElementById("delete-form");
+  const deleteSubmit = document.getElementById("delete-submit");
+
+  if (deleteForm && deleteSubmit) {
+    deleteForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      if (typeof canSubmit !== "function") {
+        console.error("canSubmit is not defined!");
+        return;
+      }
+
+      if (!canSubmit("delete")) return; // optional cooldown like entry/feedback
+
+      const formData = new FormData(deleteForm);
+      const payload = new URLSearchParams(formData); // x-www-form-urlencoded
+
+      deleteSubmit.disabled = true;
+
+      try {
+        const res = await fetch(deleteForm.action, {
+          method: deleteForm.method || "POST",
+          body: payload,
+        });
+
+        const htmlText = await res.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlText, "text/html");
+
+        const messageEl = doc.querySelector("[data-delete-message]");
+        const errorEl = doc.querySelector("[data-delete-error]");
+
+        if (messageEl) {
+          showToast(messageEl.textContent, "success");
+          deleteForm.reset();
+          setTimeout(() => {
+            window.location.href = "/";
+          }, 1500);
+        }
+        if (errorEl) showToast(errorEl.textContent, "error");
+
+      } catch (err) {
+        console.error(err);
+        showToast("Network error. Please try again.", "error");
+      } finally {
+        deleteSubmit.disabled = false;
+      }
+  }); // end deleteForm submit listener
+    }
+}); // end DOMContentLoaded

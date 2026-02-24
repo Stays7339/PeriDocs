@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602201439
+# Save-state: 202602201608
 # ==========================================
 
 """
@@ -23,11 +23,11 @@ from typing import Dict, List, Optional
 import numpy as np
 
 from core.map.ledger import IdentifierLedger
-from core.map.centroids import (
-    CentroidSystem,
+from app.helpers.entry_similarity import (
     deterministic_mean,
-    load_embedding,
+    safe_load_embedding,
 )
+from core.map.centroids import CentroidSystem
 
 logger = logging.getLogger("peridocs.deletion")
 
@@ -88,7 +88,7 @@ class DeletionManager:
                     f"Cannot remove last entry from centroid {centroid_id}"
                 )
 
-            vectors = [load_embedding(j) for j in entry_ids]
+            vectors = [safe_load_embedding(j) for j in entry_ids]
             vector = deterministic_mean(vectors)
 
             saajes = dict(prev.saajes)
@@ -147,59 +147,6 @@ class DeletionManager:
                 removed.setdefault(c.centroid_id, []).append("removed")
 
         return removed
-
-    # ------------------------------------------------------------
-    # EMBEDDING FILE DELETION
-    # ------------------------------------------------------------
-"""
-Embedding deletion intentionally disabled.
-
-Data Governance Agreement Article 6.2:
-"The Company may retain only ... the associated embedding vector..."
-Embeddings are retained for deterministic replay and ledger integrity.
-
-    async def delete_embedding_from_dumps(
-        self,
-        *,
-        entry_id: str,
-        data_dir: str,
-    ) -> None:
-        """
-        Remove embedding from all dump files.
-
-        Atomic per-file.
-        Async via thread offloading.
-        Idempotent.
-        """
-
-        pattern = os.path.join(data_dir, "entries_embeddings_dump*.json")
-        dump_files = sorted(glob.glob(pattern))
-
-        async def process_file(path: str):
-            def _mutate():
-                with open(path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-
-                if entry_id not in data:
-                    return
-
-                del data[entry_id]
-
-                tmp = path + ".tmp"
-                with open(tmp, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=2)
-                    f.flush()
-                    os.fsync(f.fileno())
-
-                os.replace(tmp, path)
-
-            await asyncio.to_thread(_mutate)
-
-        for path in dump_files:
-            await process_file(path)
-
-"""
-return
 
     # ------------------------------------------------------------
     # FULL entry DELETION ORCHESTRATION

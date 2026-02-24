@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 202602201320
+# Save-state: 202602240843
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -44,37 +44,56 @@ def deterministic_mean(vectors: Sequence[np.ndarray]) -> np.ndarray:
     return stacked.mean(axis=0)
 
 def safe_load_embedding(entry_id: str, data_dir: str = "data") -> np.ndarray:
-    """
-    Deterministically load embedding from entry dumps.
-    Supports .npz format (preferred) and falls back to JSON for legacy files.
-    Throws loudly if duplicates or missing.
-    """
     import os, glob, json
     npz_files = sorted(glob.glob(os.path.join(data_dir, "entries_embeddings_dump*.npz")))
     json_files = sorted(glob.glob(os.path.join(data_dir, "entries_embeddings_dump*.json")))
 
     found = None
+    found_in_file = None
 
     # --- Try NPZ first ---
     for f in npz_files:
-        with np.load(f, allow_pickle=False) as data:  # <-- Pickle OFF, which is CRUCIAL for avoiding malware.
-            # Only accept keys that are 8-char hex sha8
+        with np.load(f, allow_pickle=False) as data:
             for k in data.keys():
                 if not isinstance(k, str) or len(k) != 8 or not all(c in "0123456789abcdef" for c in k.lower()):
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
+
             if entry_id in data:
+                logger.warning(
+                    "Embedding key match in NPZ file: entry_id=%s file=%s total_keys=%d",
+                    entry_id, f, len(data.keys())
+                )
+
                 if found is not None:
+                    logger.error(
+                        "Duplicate embedding detected: entry_id=%s first_file=%s second_file=%s",
+                        entry_id, found_in_file, f
+                    )
                     raise RuntimeError(f"Duplicate embedding found across dumps for {entry_id}")
+
                 found = data[entry_id].astype(np.float32)
+                found_in_file = f
 
     # --- Fallback to JSON ---
     for f in json_files:
         with open(f, "r", encoding="utf-8") as fh:
             data = json.load(fh)
+
         if entry_id in data:
+            logger.warning(
+                "Embedding key match in JSON file: entry_id=%s file=%s total_keys=%d",
+                entry_id, f, len(data.keys())
+            )
+
             if found is not None:
+                logger.error(
+                    "Duplicate embedding detected: entry_id=%s first_file=%s second_file=%s",
+                    entry_id, found_in_file, f
+                )
                 raise RuntimeError(f"Duplicate embedding found across dumps for {entry_id}")
+
             found = np.array(data[entry_id], dtype=np.float32)
+            found_in_file = f
 
     if found is None:
         raise RuntimeError(f"Embedding not found for entry_id {entry_id}")
