@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 202602201446
+# Save-state: 202602251930
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -150,7 +150,23 @@ async def link_entry(
                 precentroid_id, c.current.entry_ids
             )
 
-            new_entry_ids = sorted(c.current.entry_ids + [entry_id])
+            
+            # ------------------ FIX: skip duplicate append ------------------
+            if entry_id in c.current.entry_ids:
+                logger.warning(
+                    "Entry %s already exists in precentroid %s, skipping append.",
+                    entry_id, precentroid_id
+                )
+                applied.append((precentroid_id, min_similarity))  # still mark as applied
+                return applied  # <-- return early, do NOT append a new CentroidState
+                
+            seen = set()
+            new_entry_ids = []
+            for eid in c.current.entry_ids + [entry_id]:       
+                if eid not in seen:                              
+                    new_entry_ids.append(eid)                   
+                    seen.add(eid)                                
+                
             vectors = [safe_load_embedding(j) for j in new_entry_ids]
             vector = deterministic_mean(vectors)
             logger.debug(

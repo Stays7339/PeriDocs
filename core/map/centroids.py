@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 202602201601
+# Save-state: 202602202046
 # ==========================================
 
 import os
@@ -249,23 +249,22 @@ class CentroidSystem:
                 for s in payload.get("states", []):
                     self._assert_event_order(c, s["event_index"])
                     entry_ids = s.get("entry_ids", [])
-                    
-                    # Build vector for this state
-                    if entry_ids:
-                        # If multiple entry_ids, keys in NPZ might have _idx suffix
-                        vector_arrays = []
-                        for idx, eid in enumerate(entry_ids):
-                            key = eid if len(entry_ids) == 1 else f"{eid}_{idx}"
-                            vec_array = vectors.get(key)
-                            if vec_array is None:
-                                logger.warning(
-                                    "[load_state] Vector missing for key %s in centroid %s, using zero vector",
-                                    key, centroid_id
-                                )
-                                vec_array = np.zeros(1024, dtype=np.float32)  # Adjust embedding dim as needed
-                            vector_arrays.append(vec_array)
-                        # Deterministic mean for multi-entry state
-                        state_vector = deterministic_mean(vector_arrays)
+
+                    # MODIFIED: Build vector for this state by fetching entry embeddings
+                    vector_arrays = []
+                    for eid in entry_ids:
+                        try:
+                            vec_array = safe_load_embedding(eid, data_dir=DATA_DIR)  # MODIFIED
+                        except Exception:
+                            logger.warning(
+                                "[load_state] Missing embedding for entry_id %s in centroid %s, using zero vector",
+                                eid, centroid_id
+                            )
+                            vec_array = np.zeros(1024, dtype=np.float32)  # MODIFIED
+                        vector_arrays.append(vec_array)
+
+                    if vector_arrays:
+                        state_vector = deterministic_mean(vector_arrays)  # MODIFIED
                     else:
                         logger.warning("[load_state] State has no entry_ids in centroid %s, using zero vector", centroid_id)
                         state_vector = np.zeros(1024, dtype=np.float32)
@@ -294,7 +293,7 @@ class CentroidSystem:
         tmp_npz = npz_path.replace(".npz", ".tmp.npz")
         tmp_json = json_path + ".tmp"
 
-        # --- Prepare NPZ dump ---
+        # MODIFIED: Only store one vector per state (mean/cached)
         npz_dump = {}
         for state_idx, state in enumerate(centroid.states):
             if state.vector is None or not isinstance(state.vector, np.ndarray):
@@ -303,16 +302,10 @@ class CentroidSystem:
             else:
                 state_vector = state.vector
 
-            if not state.entry_ids:
-                logger.warning("[_persist] State %d in %s has no entry_ids, using default key", state_idx, centroid.centroid_id)
-                npz_dump[f"{centroid.centroid_id}_state{state_idx}"] = state_vector
-                continue
+            # MODIFIED: Use single key per state
+            key = f"{centroid.centroid_id}_state{state_idx}"  # MODIFIED
+            npz_dump[key] = state_vector  # MODIFIED
 
-            for idx, eid in enumerate(state.entry_ids):
-                key = eid if len(state.entry_ids) == 1 else f"{eid}_{idx}"
-                npz_dump[key] = state_vector
-
-        # Ensure at least one vector exists
         if not npz_dump:
             logger.info("[_persist] Centroid %s has no valid vectors, writing single zero vector", centroid.centroid_id)
             npz_dump["empty"] = np.zeros(1024, dtype=np.float32)
@@ -330,11 +323,9 @@ class CentroidSystem:
 
         # --- JSON summary ---
         summary_payload = centroid.serialize()
-        for s in summary_payload["states"]:
-            s["saajes"] = dict(s.get("saajes", {}))
+        for s_idx, s in enumerate(summary_payload["states"]):
             s["metadata"] = dict(s.get("metadata", {}))
-            vec = s.get("vector")
-            s["vector"] = f"<np.ndarray shape={vec.shape} dtype={vec.dtype}>" if isinstance(vec, np.ndarray) else "<no vector>"
+            s["vector"] = f"{npz_path} (state_index={s_idx})"  # MODIFIED: persist NPZ path instead of per-entry vector
 
         try:
             with open(tmp_json, "w", encoding="utf-8") as f:
@@ -361,8 +352,17 @@ class CentroidSystem:
         cid = f"precentroid_{suffix}"
         logger.debug(f"[CREATE_PRECENTROID] Allocated centroid_id={cid}")
 
+
+        # --- FIXED: Deduplicate while preserving first-seen order ---
+        seen = set()
+        entry_ids_unique = []
+        for eid in entry_ids:                          
+            if eid not in seen:                        
+                entry_ids_unique.append(eid)           
+                seen.add(eid)                          
+        entry_ids = entry_ids_unique                    
+
         # prepare deterministic embedding vector
-        entry_ids = sorted(entry_ids)
         vectors = [safe_load_embedding(j) for j in entry_ids]
         vector = deterministic_mean(vectors)
         logger.debug(f"[CREATE_PRECENTROID] Deterministic mean vector shape: {vector.shape if hasattr(vector,'shape') else 'scalar'}")

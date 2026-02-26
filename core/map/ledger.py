@@ -169,7 +169,7 @@ class IdentifierLedger:
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
             "BURST_PRECENTROID": {"centroid_id", "threshold"},
             "SUGGEST_SPLIT": {"centroid_id", "threshold", "min_similarity"},
-            "DELETE_entry": {"entry_id"},
+            "DELETE_ENTRY": {"entry_id"},
             # Extend as needed
         }
 

@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 202602241643  (YYYYMMDDhhmm)
+// save-state 202602252057  (YYYYMMDDhhmm)
 // ==========================================
 
 /* Notes:
@@ -372,28 +372,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------------- Copy Safe Text to Clipboard ---------------------- //
-  function copySafeTextToClipboard(safeText) {
-    if (!safeText) return;
-    navigator.clipboard.writeText(safeText).then(() => {
-      showToast("Safe text copied to clipboard!", "success");
-    }).catch(err => {
-      console.error("Clipboard copy failed:", err);
-      showToast("Failed to copy safe text.", "error");
-    });
-  }
+  // ---------------------- Copy Text to Clipboard ---------------------- //
+function copySafeTextToClipboard(safeText) {
+  if (!safeText) return;
+  navigator.clipboard.writeText(safeText).then(() => {
+    showToast("Copy to clipboard successful!", "success");
+  }).catch(err => {
+    console.error("Clipboard copy failed:", err);
+    showToast("Copy to clipboard failed. Please contact support.", "error");
+  });
+}
 
-  // ---------------------- Copy Safe Text Button Binding ---------------------- //
-  const copyBtn = document.getElementById("copy-entry-btn");
-  if (copyBtn) {
-    const safeText = copyBtn.dataset.safeText; // read from data attribute
-    copyBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
-  }
+// ---------------------- Copy Entry Button Binding ---------------------- //
+const copyEntryBtn = document.getElementById("copy-entry-btn");
+if (copyEntryBtn) {  // FIXED: check the correct variable
+  const safeText = copyEntryBtn.dataset.safeText; // read from data attribute
+  copyEntryBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
+}
 
-  // Expose globally
-  window.copySafeTextToClipboard = copySafeTextToClipboard;
-  
+// ---------------------- Copy Delete Token Button Binding ---------------------- //
+const copyDeleteTokenBtn = document.getElementById("copy-delete-token-btn");
+if (copyDeleteTokenBtn) {  // FIXED: check the correct variable
+  const safeText = copyDeleteTokenBtn.dataset.safeText; // read from data attribute
+  copyDeleteTokenBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
+}
 
+// Expose globally
+window.copySafeTextToClipboard = copySafeTextToClipboard;
 
   // ---------------------- Delete Entry Form Submission ---------------------- //
   const deleteForm = document.getElementById("delete-form");

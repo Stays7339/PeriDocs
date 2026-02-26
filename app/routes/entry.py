@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 202602241628(YYYYMMDDhhmm)
+# save-state 202602251908(YYYYMMDDhhmm)
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -11,6 +11,8 @@ import json
 import numpy as np
 import asyncio
 import hashlib
+import os
+import logging
 
 from app.routes import app
 from app.helpers.file_ops import load_data, append_entry
@@ -18,9 +20,14 @@ from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, 
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 from core.map.deletion import DeletionManager
+from core.map.mapping_runtime import ledger, centroid_system 
+
+
 
 templates = Jinja2Templates(directory="app/templates")
 entries_FILE = "data/entries.json"
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
+logger = logging.getLogger("peridocs.entry-routing")
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
@@ -265,20 +272,23 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
     if not entry:
         return templates.TemplateResponse(
             "delete.html",
-            {"request": request, "error": "Invalid deletion token."}
+            {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
         )
 
     entry_id = entry.get("entry_id") or entry.get("id")
 
     try:
-        dm = DeletionManager(ledger=ledger, centroids=centroids)
+        dm = DeletionManager(ledger=ledger, centroids=centroid_system)
         await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR)
         return templates.TemplateResponse(
             "delete.html",
-            {"request": request, "message": "Entry successfully deleted."}
+            {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
         )
     except Exception as e:
+        # Log the full exception server-side
+        logger.exception(f"Deletion failed for entry {entry_id}")
+        # Return a generic error page to the user
         return templates.TemplateResponse(
             "delete.html",
-            {"request": request, "error": f"Deletion failed: {str(e)}"}
+            {"request": request, "error": "Deletion failed. Please contact support."}
         )

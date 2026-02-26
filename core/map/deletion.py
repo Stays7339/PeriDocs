@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602201608
+# Save-state: 202602251850
 # ==========================================
 
 """
@@ -114,7 +114,7 @@ class DeletionManager:
             await self._centroids._persist(c)
 
     # ------------------------------------------------------------
-    # GLOBAL entry REMOVAL (CENTROID LAYER)
+    # GLOBAL ENTRY REMOVAL (CENTROID LAYER)
     # ------------------------------------------------------------
 
     async def remove_entry_globally(
@@ -141,15 +141,13 @@ class DeletionManager:
                 await self._remove_entry_from_centroid(
                     centroid_id=c.centroid_id,
                     entry_id=entry_id,
-                    reason=reason,
-                    initiated_by=initiated_by,
                 )
                 removed.setdefault(c.centroid_id, []).append("removed")
 
         return removed
 
     # ------------------------------------------------------------
-    # FULL entry DELETION ORCHESTRATION
+    # FULL ENTRY DELETION ORCHESTRATION
     # ------------------------------------------------------------
 
     async def delete_entry(
@@ -157,8 +155,6 @@ class DeletionManager:
         *,
         entry_id: str,
         data_dir: str,
-        initiated_by: Optional[str] = None,
-        reason: str = "user_request",
     ) -> Dict[str, List[str]]:
         """
         Canonical entry deletion sequence.
@@ -166,7 +162,6 @@ class DeletionManager:
         Order:
         1. Record DELETE_entry ledger event
         2. Remove from centroids
-        3. Delete embeddings from disk
 
         Crash-safe.
         Replay-consistent.
@@ -178,23 +173,109 @@ class DeletionManager:
         await self._ledger.record_event({
             "type": "DELETE_entry",
             "entry_id": entry_id,
-            "initiated_by": initiated_by,
-            "reason": reason,
         })
 
         # --- Remove centroid membership ---
-        affected = await self.remove_entry_globally(
-            entry_id=entry_id
-        )
-
-        # --- Remove embeddings ---
-        await self.delete_embedding_from_dumps(
-            entry_id=entry_id,
-            data_dir=data_dir,
-        )
+        affected = await self.remove_entry_globally(entry_id=entry_id)
 
         logger.info(
             f"entry {entry_id} deleted. Affected centroids: {list(affected.keys())}"
         )
 
+        await self._purge_entry_metadata(entry_id=entry_id, data_dir=data_dir)
+
         return affected
+
+    async def _purge_entry_metadata(
+        self,
+        *,
+        entry_id: str,
+        data_dir: str,
+    ) -> None:
+        """
+        Strip a single entry down to only minimal surviving fields:
+        entry_id, embedding_file, crisis_flag.
+        All other fields are removed from this entry only.
+        Other entries in the file are untouched.
+        """
+
+        path = os.path.join(data_dir, "entries.json")
+
+        if not os.path.exists(path):
+            # Nothing to do if the file does not exist
+            return
+
+        # --- Load all entries ---
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                entries = json.load(f)
+            except json.JSONDecodeError:
+                logger.error("entries.json is corrupted, cannot purge metadata.")
+                return
+
+        if not isinstance(entries, list):
+            logger.error("entries.json must contain a list of entries.")
+            return
+
+        # --- Locate the target entry ---
+        target = None
+        for entry in entries:
+            if entry.get("entry_id") == entry_id or entry.get("id") == entry_id:
+                target = entry
+                break
+
+        if not target:
+            logger.warning(f"Entry {entry_id} not found in entries.json for metadata purge.")
+            return
+
+        # --- Strip all fields except minimal surviving ones ---
+        stripped = {
+            "entry_id": target.get("entry_id") or target.get("id"),
+            "embedding_file": target.get("embedding_file"),
+            "crisis_flag": target.get("crisis_flag"),
+        }
+
+        # Replace the original entry with stripped version
+        index = entries.index(target)
+        entries[index] = stripped
+
+        # --- Write back full entries list safely ---
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(entries, f, ensure_ascii=False, indent=2)
+
+        logger.info(f"Entry {entry_id} metadata purged successfully, only minimal fields remain.")
+    
+    async def _remove_entry_from_centroid(
+        self,
+        *,
+        centroid_id: str,
+        entry_id: str,
+    ) -> None:
+        """
+        Remove an entry from a centroid safely.
+        """
+        try:
+            async with self._centroids._lock:
+                c = self._centroids._centroids.get(centroid_id)
+                if not c:
+                    logger.warning(f"Centroid {centroid_id} not found")
+                    return
+
+                prev = c.current
+                entry_ids = [e for e in prev.entry_ids if e != entry_id]
+
+                if not entry_ids:
+                    logger.warning(f"Cannot remove last entry from centroid {centroid_id}")
+                    return
+
+                vectors = [safe_load_embedding(e) for e in entry_ids]
+                vector = deterministic_mean(vectors)
+
+                c.states.append(
+                    type(prev)(prev.event_index + 1, entry_ids, vector)
+                )
+
+                await self._centroids._persist(c)
+
+        except Exception as e:
+            logger.exception(f"Failed to remove {entry_id} from centroid {centroid_id}: {e}")

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 202602041326 (YYYYMMDDhhmm)
+# save-state 202602251734 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -12,6 +12,10 @@ from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
 
 
+# ------------------- logging setup -------------------
+logger = logging.getLogger("peridocs.startup")
+# -----------------------------------------------------
+
 # ------------------- static file logging filter -------------------
 class FilterStatic(logging.Filter):
     def filter(self, record):
@@ -20,23 +24,25 @@ class FilterStatic(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(FilterStatic())
 # -------------------------------------------------------------------
 
-app = FastAPI()
-print(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 
 # ********* app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None) is important for not leaving the backend publicly exposed *********
+app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 
 
 @app.on_event("startup")
-async def preload_embedding_model():
-    print("Preloading SentenceTransformer model (all-roberta-large-v1)...")
+async def startup_sequence():
+    logger.info("Starting application initialization sequence...")
+
+    logger.info("1. Preloading embedding model...")
     await _load_model()
-    print("Model preloaded and ready!")
+    logger.info("Embedding model loaded.")
 
-@app.on_event("startup")
-async def load_mapping_runtime():
-    print("Initializing mapping runtime...")
+    logger.info("2. Initializing mapping runtime...")
     await initialize_runtime(verify=True)
-    print("Mapping runtime initialization complete.")
+    logger.info("Mapping runtime initialized.")
+
+    logger.info("Startup sequence complete.")
 
 
 # ---------------- Static Files ----------------

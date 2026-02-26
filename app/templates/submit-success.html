@@ -1,6 +1,6 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 202602241515 (YYYYMMDDhhmm) #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 202602252055 (YYYYMMDDhhmm) #}
 {% extends "base.html" %}
-{% block title %}Entry saved — PeriDocs{% endblock %}
+{% block title %}Entry saved | PeriDocs{% endblock %}
 
 {% block content %}
 <div class="card">
@@ -21,24 +21,22 @@
 
     <!-- ---------------- Delete Token ---------------- -->
     {% if delete_token %}
-    <div class="delete-token-box" style="margin-top: 1rem; padding: 0.5rem; border: 1px solid #ccc; border-radius: 6px;">
-      <h2>Your Delete Token</h2>
-      <div style="display:flex; gap:0.5rem;">
-        <input type="text" value="{{ delete_token }}" readonly id="deleteTokenField" style="flex:1;">
-        <button type="button" onclick="copyDeleteToken()">Copy</button>
+    <div class="matched-snippet" style="margin-top: 1rem; padding: 0.75rem;">
+      <strong>Your Delete Token</strong>
+      <div style="display:flex; gap:0.5rem; margin-top:0.25rem;">
+        <input type="text" value="{{ delete_token }}" readonly id="deleteTokenField" style="flex:1; border-radius:4px; border:1px solid #ccc; padding:0.25rem 0.5rem;">
+        <button 
+          class="btn primary" 
+          type="button" 
+          id="copy-delete-token-btn"
+          data-safe-text="{{ delete_token }}">
+            Copy
+      </button>
       </div>
-      <p style="font-size:0.85rem;"> This token only appears once and it is the only way to delete your entry besides contacting support; Save it somewhere safe.</p>
+      <p style="font-size:0.85rem; margin-top:0.5rem;">
+        This token only appears once and it is the only way to delete your entry besides contacting support. Save it somewhere safe.
+      </p>
     </div>
-
-    <script>
-    function copyDeleteToken() {
-      const field = document.getElementById("deleteTokenField");
-      field.select();
-      field.setSelectionRange(0, 99999); // mobile support
-      document.execCommand("copy");
-      alert("Delete token copied to clipboard!");
-    }
-    </script>
     {% endif %}
     <br>
     <!-- Metrics summary -->
@@ -79,7 +77,7 @@
           type="button" 
           id="copy-entry-btn"
           data-safe-text="{{ safe_text | e }}">
-            Save this entry privately
+            Copy this entry to clipboard
       </button>
       <a class="btn ghost" href="/">Return</a>
     </div>
