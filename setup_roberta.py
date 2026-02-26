@@ -68,6 +68,15 @@ else:
     print("Snapshot already present. Skipping download.")
 
 # ==========================================================
+# Step 1b — Create symlink for app compatibility
+# ==========================================================
+
+roberta_link = MODEL_FOLDER / "roberta-large"
+if not roberta_link.exists():
+    roberta_link.symlink_to(SNAPSHOT_DIR)
+    print(f"Created symlink: {roberta_link} -> {SNAPSHOT_DIR}")
+
+# ==========================================================
 # Step 2 — Force Offline Mode
 # ==========================================================
 
