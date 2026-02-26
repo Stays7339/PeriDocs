@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602240813(YYYYMMDDhhmm) ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602250053(YYYYMMDDhhmm) ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -154,7 +154,7 @@ a:active:not(.brand-link) {
 /* ---------------------- Header/logo ---------------------- */
 header.site-wordmark{position:absolute;top:1.25rem;left:1.5rem;display:flex;align-items:center;gap:.6rem;font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:1.6rem;color:var(--text);opacity:.95;user-select:none;pointer-events:auto;}
 .brand-link{display:flex;align-items:center;text-decoration:none;color:inherit;}
-.brand-logo{height:3.9rem;width:auto;display:block;filter:none;  transform: scaleX(1); transform-origin: center}
+.brand-logo{height:2.5rem;width:auto;display:block;filter:none;  transform: scaleX(1); transform-origin: center}
 html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9);}
 .brand-text{line-height:1;}
 header.site-wordmark .brand-link{color:inherit;text-decoration:none;}
