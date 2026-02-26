@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202602241405(YYYYMMDDhhmm)
+# save-state 202602261152(YYYYMMDDhhmm)
 # ==========================================
 
 from __future__ import annotations
@@ -74,6 +74,7 @@ async def process_entry_async(
     # ---------------- GENERATE EMBEDDING ----------------
     clause_embeddings = await get_embedding_async(windows)
     doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
+    print("DOC EMBEDDING NORM:", np.linalg.norm(doc_embedding))
     report_progress()  # 3 / total_steps
 
     # ---------------- ID GENERATION ----------------
