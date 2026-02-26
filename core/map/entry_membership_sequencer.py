@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 202602251930
+# Save-state: 202602261138
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -217,7 +217,6 @@ async def unlink_entry(
         logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)
         raise
 
-
 async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -> str | None:
     """
     Suggests an existing precentroid for the entry.
@@ -229,14 +228,26 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -
     try:
         entry_vec = await system.run_sync_in_thread(safe_load_embedding, entry_id)
 
+        # ---- DEBUG: print entry norm ----
+        import numpy as np
+        print("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
+
         async with system._lock:
             if not system._centroids:
                 return await centroid_system.create_precentroid([entry_id])
+
             for c in system._centroids.values():
+
+                # ---- DEBUG: print centroid norm ----
+                centroid_norm = np.linalg.norm(c.current.vector)
+                print("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
+
                 sim = cosine_similarity(entry_vec, c.current.vector)
+
                 local_min = c.current.metadata.get("min_similarity_threshold")
                 if local_min is not None and sim < local_min:
                     continue
+
                 if sim >= threshold:
                     if c.centroid_id.startswith("precentroid_"):
                         return c.centroid_id
@@ -244,6 +255,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -
                         return None
 
             return await centroid_system.create_precentroid([entry_id])
+
     except Exception as e:
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
-        raise  # fail loudly
+        raise
