@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 202602261134(YYYYMMDDhhmm)
+# save-state 202602261423(YYYYMMDDhhmm)
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -113,27 +113,6 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
 
     # ---------------- Mark progress as complete ----------------
     progress_dict[entry_id] = 1.0
-
-# ---------------- Debugging for Zero Vector Centroids ----------------
-@app.get("/debug/centroid-zero-check")
-async def debug_centroid_zero_check():
-    from core.map.mapping_runtime import centroid_system
-    import numpy as np
-
-    results = []
-
-    async with centroid_system._lock:
-        for cid, c in centroid_system._centroids.items():
-            vec = c.current.vector
-            norm = float(np.linalg.norm(vec))
-            if norm == 0:
-                results.append({
-                    "centroid_id": cid,
-                    "norm": norm,
-                    "entry_count": len(c.current.entry_ids)
-                })
-
-    return {"zero_centroids": results}
 
 
 # ---------- Submit entry ----------

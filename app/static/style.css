@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602261340(YYYYMMDDhhmm) ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602261427(YYYYMMDDhhmm) ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -13,7 +13,7 @@
 /* ---------------------- Color Variables ---------------------- */
 :root{
   /* Base palette */
-  --bg: #BFC1DD;
+  --bg: #7F86B0;
   --card: #F0F0EB;
   --muted: #BFC8CC;
   --accent: #7F86B0;
