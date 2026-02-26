@@ -1,85 +1,45 @@
-{# PeriDocs-code/app/templates/about.html save-state 202602241220 #}
+{# PeriDocs-code/app/templates/about.html save-state 202602261342 #}
 {% extends "base.html" %}
-{% block title %}About PeriDocs - PeriDocs{% endblock %}
+{% block title %}About | PeriDocs.org{% endblock %}
 
 {% block content %}
 <div class="wrap">
   <div class="card">
-    <div class="card-content">
-      <h1>About PeriDocs - updated 5 January 2026</h1>
-      <h2>Ethical and design philosophy</h2>
-      <p>
-        PeriDocs’ name is inspired by Polanyi’s Paradox: much human knowledge is tacit and cannot be fully formalized. 
-        PeriDocs bridges algorithmic detection and nuanced understanding without pretending to replace human judgment.
-        PeriDocs itself is intended to serve as an intentional, accessible, and easily navigable space for users to explore our database and find  actionable, <strong>AND</strong> situationally-relevant information 
-        that effectively applies to their unique struggles and experiences. At PeriDocs, we recognize and deeply admire the collective effort 
-        put in by the multitude of individuals and groups aiming to foster wellbeing regardless of personal affiliation. It is our mission to uplift their hard work by suggesting relevant discussions to the people who might want to see them, while avoiding chasing algorithm engagement.
-        PeriDocs prioritizes transparency and ethical reflection. The interface tries to avoid addictive engagement patterns and encourages careful exploration, reflection, and depth.
-        Our inspectable software encourages user privacy while providing meaningful educational insights. 
-        The platform does <strong>not</strong> generate therapeutic advice or diagnoses. Instead, it analyzes submitted text and finds relevant, previously verified material to help users interpret or contextualize their own writing.
-      </p>
+    <div class="card-content about-content">
+      <h1 class="center">About PeriDocs.org</h1>
+      <p class="left">There is a scene in <strong>The Princess Bride</strong> in which Westley (“Aaaaaaas youuuuuuu wiiiiiiish” dude) and Vizzini (“incOnCEivaBLe” dude) are “battling” each other through a gambling-like game that tests both men’s wits. Westley presents a choice to Vizzini:</p><br>
 
-      <h2>System limitations</h2>
-      <p>
-        PeriDocs is <strong>not</strong> a mental health service and does not replace professional care. 
-        Analysis operates only on the text you submit and cannot infer context outside the words written. Similarity, sentiment, and entity detection are algorithmic and intended for educational reflection only. 
-        Results should <strong>never</strong> be relied upon for clinical or urgent decisions. Algorithms may be fallible and reflect patterns in your writing rather than absolute truths.
-      </p>
+      <p class="center">Before us are two glasses of wine, one on your side and one on my side. I also have here an extremely deadly poison. One of the glasses has the poison, and the other does not. There is absolutely no physical way to tell the difference. You must choose whether or not to drink out of my cup or yours.</p><br>
 
-      <h2>How analysis works</h2>
-      <p>
-        Imagine PeriDocs as a sprawling city built entirely from ideas, words, and emotions. Each entry you submit is like a new citizen arriving in this city, carrying a unique combination of thoughts, feelings, and expressions. The system’s first task is to understand what your citizen seem to be, in abstract terms; your words are transformed into thousands of numeric coordinates called <em>embedding vectors</em>. <br> <br> Think of these vectors as the  practically non-reversible anonymized versions character traits of the ideas within your writing. Embedding Vectors capture the meaning, tone, and subtle relationships between words and phrases, so the system can compare them to everyone else in the city.
-      </p>
-      <br>
-      <p>
-        These citizens don’t wander randomly around the city; they're guided into groups commonly called <strong>centroids</strong>, which are like areas of the city where similar ideas live nearby each other. Centroids keep and track the identity that its residents and commuters give it, meaning the neighborhood remembers its history and evolves carefully over time as more entries arrive. We like to use shorthand to remember this idea: <strong>neighborhood of nuance emotion (NNE) </strong>. Before a new NNE is officially recognized, it exists in a probationary stage called a <em>precentroid</em>, which allows the system to test its boundaries and determine if it truly represents a unique cluster of thought.
-      </p>
-      <br>
-      <p>
-        To help with placement, the system uses <strong>Software-auto-added journal entries (SAAJEs)</strong> as a way to suggest "addresses” for new "citizens". A SAAJE is not the literal words from your journal entry; rather, a SAAJE is a fingerprint derived from your entry’s embedding vectors that shows which centroids your ideas align with most closely. Think of it like a postal system: your mail (entry) is sorted by the relation of words to one another, not by the verbatim words themselves. This supports real-world privacy within the PeriDocs system while still guiding your thoughts into the right neighborhood. SAAJEs are subject to in-house human review where applicable for quality and moderation. This helps us with our goal of making sure neighborhoods grow in a meaningful, coherent way.
-      </p>
-      <br>
-      <p>
-        Once in a NNE, each citizen contributes to the evolving story of the neighborhood. The PeriDocs system continuously monitors these clusters, and if a neighborhood becomes too large or far spread out from citizen-to-citizen, the PeriDocs system may suggest splitting and properly establishing each NNE, much like a city adjusting its district as the population changes. Every large-level change is logged in a permanent internal audit trail, so the "city’s" big-picture history is never lost, and relationships between ideas remain transparent and traceable.
-      </p>
-      <br>
-      <h2>Your saved entry</h2>
-      <p>
-        Every citizen (an entry) in the PeriDocs city receives a public, unique 8-character ID based on SHA256 hashing (for example, <code>5edae32d</code>). This is your key to accessing your entry later, while also reducing the amount and intensity of personally identifiable information about you. Raw text from your entry is never shared publicly; instead PeriDocs automatically removes any personally identifiable information that it detects for moderation, safety review, or research into how the city grows and functions.
-      </p>
-      <br>
-      <p>
-        When the system finds a similar citizen already living in the city, it provides a <strong>matched excerpt and source ID</strong>. These matches are paraphrased summaries to preserve privacy, highlighting semantic relationships without exposing raw words. This lets you see where your entry fits within the larger community, giving insight into recurring ideas or emotional patterns.
-      </p>
-      <br>
-      <p>
-        Behind the scenes, the embedding vectors are kept intact. These allow PeriDocs to detect nuanced relationships between entries/citizens across the entire city, providing semantic linking for reflection, pattern recognition, and educational insight, all while consistently performing some redaction on personally indentifiable information so that its never stored in the vector in the first place; other than that, vectors are never flattened, truncated, or shared publicly.
-      </p>
+      <p class="left">Vizzini is a boastful, arrogant man, and goes on a long tangent trying to show off his intelligence; his narrative switches back and forth between which glass the poison is most likely to be in based on many arbitrary, ridiculous conclusions (e.g., “Iocaine [the poison] comes from Australia, as everyone knows, and Australia is entirely filled with criminals…”).</p><br>
 
-      <h2>Emotion and sentiment features</h2>
-      <p>
-        Every citizen brings emotions with them, and PeriDocs maps these emotional footprints across the city. The system uses embeddings from open-source models to detect subtle shades of feeling, recognizing context, intensity, and recurring emotional patterns in your writing. PeriDocs doesn't generate advice or alter your words. <strong>The system focuses on showing you how the way you express yourself in long-form writing relates to the writing that's already out there on the open internet.</strong>
-      </p>
-      <br>
-      <p>
-        Each entry’s contextual signature is connected to these neighborhoods of nuanced emotion. For example, a district might represent recurring feelings of frustration or joy, or complex combinations that appear repeatedly across entries. When the system links your post to these centroids, it helps you recognize patterns in the writing you submitted, offering a bird’s-eye view of how common life-experiences and thought clusters ebb and flow. All of this happens without without ever using generative AI.
-      </p>
-      <br>
-      <p>
-        This mapping lets you explore the "City of PeriDocs" and its well-labeled archived of ideas and anecdotes and thoughts in a way that is richly detailed in whats oberserved in the writing of the entry users have submitted. Over time, you can see how your journal entries interact with neighborhoods of nuance emotion (NNEs) and reflect on the evolving landscape of thoughts and apparent themes from writing across time and across the open internet!
-      </p>
+      <p class="left">After this long tirade, he eventually decides to drink the glass originally in front of Westley, which he thinks he has tricked Westley into believing was the one originally in front of him (he switched them out with a really obvious “look over there!”). He reasons that if Westley shows no hesitation to drink out of the cup that Vizzini decided on, then Vizzini will be safe under the guise of the (poorly executed) “cup switching.”</p><br>
 
+      <p class="left">Vizzini dies. Not because Westley plays an excellent bluff, and not because he knew that Vizzini would pull any of the tricks that he did. Westley’s game works regardless of his opponent, as long as they don’t catch on to one key thing: both glasses were poisoned, but Westley had built an immunity to the poison. Of course, had Vizzini known this, he wouldn’t have played the game. It was a game he was incapable of winning. Thus the real game was choosing to play at all.</p><br>
 
-      <h2>Crisis detection</h2>
-      <p>
-        Submissions indicating risk of harm to self or others are flagged immediately. Users see a safety notification notifying the presence of a potential crisis entry. In addition, users are reminded of the existence of emergency services local to their area. See our privacy policy for details about what information is stored for crisis entries. 
-      </p>
+      <p class="left">We cannot feel the absence of what we do not know exists, and we cannot desire something we do not understand. To be ignorant is to be full of bliss, but to seek out knowledge and complexity is to discover how much joy a human can truly feel. Pain as well, yes, but in the right situations, there is unique power in exploring <strong>a greater realm</strong> of happiness—a possible infinity—regardless of any other factors.</p><br>
 
-      <h2>Contact</h2>
-      <p>
-        Questions or concerns about entries, privacy, or system operation can be sent to 
-        <a href="mailto:peridocs@protonmail.com">peridocs@protonmail.com</a>.
-      </p>
+      <p class="left">Like our perception of life itself, Westley successfully created the illusion of only having two choices. He defeated Vizzini because of his genuine belief that he had to participate in someone else’s game. We are all constricted by the identities we build as a result of being tied to an unjust, imbalanced system. The pathways we follow in life—education, career, marriage, friendship, family, hobbies—are primarily determined by others telling us what they “should” look like, based on aspects of ourselves that were not chosen and were determined before we were born. It can be difficult to believe sometimes. Adapting to the knowledge of the seemingly infinite choices we <strong>can</strong> make takes effort to unlearn and fight against. But with this knowledge, countless people’s lives have been changed by the introduction of a beautiful idea that was just never allowed to occur to them.</p><br>
+
+      <p class="left">Even without any way of proving either outcome, or a seemingly contrived explanation as to how it could be possible, the simple knowledge that the glasses <strong>might both</strong> be poisoned would have stopped Vizzini from moving forward. And he would have looked for another way. Because <strong>there is always another way</strong>.</p><br>
+
+      <p class="left">—</p><br>
+
+      <p class="left">The decision-making process is inherently flawed, and thus, computational interpretation of language that attempts to make a final decision will fail again and again to do so without risking irrational, sporadic results. One of PeriDocs’ greatest strengths is its ability (and the creators’ commitment) to listen to the voices of many, to view real human experience through more than one lens. Different perspectives are important to consider, <strong>especially</strong> if they appear ridiculous or impossible or beyond the realm of understanding.</p><br>
+
+      <p class="left">The name of this organization is heavily inspired by a <strong>paradox</strong> *wink* introduced by Hungarian-British philosopher and polymath Michael Polanyi:</p><br>
+
+      <p class="center">“We can know more than we can tell.”</p><br>
+
+      <p class="left">To no one’s surprise, I completely agree. There will never be enough words to display, in its entirety, the wonderful world that exists inside of our heads. PeriDocs aims not to deny the validity of this claim, but instead to live within the discomfort, as everyone must.</p><br>
+
+      <p class="left">Though what I find most beautiful about Polanyi’s paradox is what can exist beyond it. As individuals, we have no obligation to share the knowledge we’ve gained, but many of the wisest among us are the ones who choose to tell regardless. This, my friends, is where we are most fortunate, because this is not where the story ends. On its own, language is already remarkable; our words convey powerful ideas and preserve our minds that are trapped within impermanent forms. But it is through <strong>conversation</strong> that knowledge need not be told. It is through compassion and empathy and understanding of each other that language becomes so much more than the words that are said or written. It becomes the architecture in which we are allowed to grow, together.</p><br>
+
+      <p class="left">With PeriDocs, we hope to continue the conversation with our own question:</p><br>
+
+      <p class="center">“If <strong>we can know more than we can tell</strong>, then what do we learn when we find the strength to <strong>ask</strong>?”</p><br>
+
+      <p class="right">—Mya Blair, Co-Founder of <strong>PeriDocs</strong></p>
 
     </div>
     {% include 'includes/footer.html' %}

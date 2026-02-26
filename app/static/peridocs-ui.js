@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 202602252057  (YYYYMMDDhhmm)
+// save-state 202602261327  (YYYYMMDDhhmm)
 // ==========================================
 
 /* Notes:
@@ -300,7 +300,11 @@ document.addEventListener("DOMContentLoaded", () => {
           // ---------------------- Connect WebSocket ---------------------- //
           let crisisTriggered = false; // <-- ADDED FLAG
 
-          const ws = new WebSocket(`ws://${window.location.host}/ws/progress/${data.entry_id}`);
+          const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+          const ws = new WebSocket(`${wsProtocol}://${window.location.host}/ws/progress/${data.entry_id}`);
+          ws.onopen = () => console.log("WS connected!");
+          ws.onclose = () => console.log("WS closed");
+          ws.onerror = (err) => console.error("WS error:", err);
           ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
             console.log("WS message received:", msg);
