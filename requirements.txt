@@ -1,4 +1,4 @@
-#========= requirements.txt save-state 202602261352(format: YYYYMMDDhhmm) ========
+#========= requirements.txt save-state 202602261445(format: YYYYMMDDhhmm) ========
 # Core ML / NLP
 torch==2.10.0+cpu --index-url https://download.pytorch.org/whl/cpu
 transformers==4.46.2
@@ -21,6 +21,7 @@ safetensors>=0.4.1
 
 # python environments
 python-dotenv>=1.0.0,<2.0.0
+pipdeptree>=2.30.0
 
 # Encryption dependencies
 cryptography>=43.0.0,<44.0.0
