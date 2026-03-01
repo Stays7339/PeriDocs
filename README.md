@@ -5,151 +5,135 @@ Users may actively choose to rigorously describe their perspective of the world,
 
 ---
 
-## Setup Guide (Full Walkthrough)
 
-### Step 0. Install Prerequisites
+## PeriDocs Full Setup Instructions (from Zero to Running Webapp)
 
-#### For macOS
+Imagine you are starting with a completely clean machine. The instructions cover **macOS, Linux (like openSUSE), and Windows**, and assume you are not working as root except where necessary for initial permissions.
 
-1. Install Homebrew (if not already installed):
+### Step 0: Decide Your User
 
-   ```bash (Terminal)
-   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
+You **do not need to create a new admin/root user**, but you **should not run the app under an admin/root account**. Any pre-existing standard user account is fine, as long as you have **full write permissions in the folder where PeriDocs will live**.
 
-Official site: [https://brew.sh](https://brew.sh)
+* Example safe locations: `/home/username/peridocs` on Linux/macOS, or `C:\Users\username\peridocs` on Windows.
+* The setup script will create `.ssh` and `app` folders under this root directory.
 
-2. Install Python 3.12.7 and Git (pyenv recommended for exact version):
-
-   ```bash (Terminal)
-   brew install pyenv git
-   pyenv install 3.12.7
-   pyenv global 3.12.7
-   ```
-
-3. Verify installations:
-
-   ```bash (Terminal)
-   python3 --version
-   git --version
-   ```
+**Important:** Do **not** run the webapp as root—this prevents permissions and SSH problems like we’ve seen.
 
 ---
 
-#### For Linux (Ubuntu/Debian-based)
+### Step 1: SSH Key Setup and Permissions
 
-1. Update and install dependencies:
+1. Run the setup script with your standard user account. The script will:
+
+   * Check if an SSH key already exists for this user.
+   * If not, generate a new SSH key.
+   * Display the **public key** so you can copy it into your GitHub account.
+
+2. The script will pause and ask you to confirm that the key has been added to GitHub. This ensures that later, when the app pulls the repository, it can authenticate without root or manual password entry.
+
+**Tip:** This SSH key is created **one level above your app folder**—for example, if your PeriDocs root is `/home/user/peridocs`, the key lives in `/home/user/peridocs/.ssh`.
+
+---
+
+### Step 2: `.env` File Creation and Fernet Key
+
+1. After SSH setup, the script prompts you to create and fill a `.env` file in `peridocs/app/`.
+
+2. You can either:
+
+   * Let the script generate a Fernet key for you, or
+   * Provide a Fernet key from an **encrypted password manager** if you already have one.
+
+3. This `.env` file is **mandatory**. Without it, the webapp **will not start**, because the encryption key is required for internal operations.
+
+**Tip:** Keep the `.env` file private. Never commit it to GitHub. The script ensures it is created in the correct folder relative to `.ssh` so everything can interact properly.
+
+---
+
+### Step 3: Pull Repository
+
+1. With SSH configured and `.env` in place, the script **pulls the repository** into `peridocs/app`.
+2. If the folder already exists, the script will **update the repository instead of cloning**.
+3. At this point, `.env` is already present and the SSH key allows GitHub authentication without root.
+
+**Why this order matters:** Pulling the repo before `.env` exists or before SSH is set up will fail the daemon and prevent the RoBERTa model from installing correctly.
+
+---
+
+### Step 4: Virtual Environment and Dependencies
+
+1. The script creates a **Python virtual environment** inside the app folder (`venv`) to isolate dependencies from the system.
+2. It automatically installs all Python packages listed in `requirements.txt`.
+
+**Tip for MacOS, Linux, Windows:**
+
+* macOS/Linux: `python3 -m venv venv` and `source venv/bin/activate`
+* Windows: `python -m venv venv` and `venv\Scripts\activate`
+
+This step ensures the correct versions of PyTorch, sentence-transformers, and other dependencies are installed, including the CPU-only version of PyTorch.
+
+---
+
+### Step 5: Setup RoBERTa Model
+
+1. After dependencies are installed, the script runs `setup_roberta.py`.
+2. This downloads a **snapshot-locked RoBERTa model**, symlinks it to `app/models/roberta-large`, and enforces offline mode.
+3. The script performs a deterministic embedding test to make sure the model is loaded correctly.
+
+**Important:** This step **must run after the virtual environment is ready** but **before systemd** or any daemon attempt to start the app.
+
+---
+
+### Step 6: Optional Systemd / Service Setup (Linux Only)
+
+1. The script asks whether you want to set up the app as a **systemd service**.
+2. If yes, it creates a non-root service running as the user you’re logged in as, pointing at the `venv` Python binary.
+3. The script reloads systemd, enables the service, and can start it automatically.
+
+**Tip:** Skip this step if you are a developer and only want to run the app locally.
+
+---
+
+### Step 7: Verify the Webapp
+
+1. Run the app either via systemd (Linux) or manually:
 
    ```bash
-   sudo apt update && sudo apt upgrade -y
-   sudo apt install -y python3.12 python3.12-venv python3-pip git curl
+   /path/to/peridocs/app/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
    ```
 
-2. Verify installations:
+2. Open your browser at `http://127.0.0.1:8000/` to see the webapp running.
 
-   ```bash
-   python3 --version
-   git --version
-   ```
-
-3. (Optional) If you are using another distribution, substitute the package manager (dnf, pacman, etc.) as appropriate.
+3. Check the terminal logs to ensure the RoBERTa embeddings loaded correctly and there are no errors about missing `.env` or permissions.
 
 ---
 
-#### For Windows
+### Security Notes
 
-1. Install Git for Windows: [https://git-scm.com/download/win](https://git-scm.com/download/win)
-   During setup, choose:
+* SSH key is generated **per user**, never under root.
+* `.env` must be kept private.
+* The script enforces non-root execution for app files, models, and the `.ssh` folder.
+* Systemd runs as the non-root user if enabled.
 
-   * "Use Git from the Windows Command Prompt"
-   * "Checkout Windows-style, commit Unix-style line endings"
+**Minor things to note:**
 
-2. Install Python 3.12.7 (3.12.7 is the only version confirmed to work with compatibility between required libraries)
-   Download from: [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
-   During setup:
-
-   * Check "Add Python to PATH"
-   * Include pip during installation
-
-3. Verify installations:
-
-   ```powershell
-   python --version
-   git --version
-   ```
+* On Windows, systemd is skipped; you can use the virtual environment directly.
+* On MacOS/Linux, ensure firewall rules allow port 8000 if you want external access.
+* Fernet keys in `.env` must be unique per deployment to avoid conflicts.
 
 ---
 
-### Step 1. Clone the Repository
+### TL;DR Order of Operations
 
-Choose a folder to hold the project (for example, Desktop/ or Documents/ or PeriDocs-code/).
-
-```bash
-git clone https://github.com/Stays7339/PeriDocs.git
-cd PeriDocs-code
-```
-
-> Note: This repository should remain set to private. Only collaborators with access can clone it or pull from it.
-
----
-
-### Step 2. Create a Virtual Environment
-Activating the virtual environment ensures packages are installed locally and not system-wide.
-
-#### macOS / Linux
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-```
-
-#### Windows (PowerShell)
-
-```powershell
-python -m venv venv
-venv\Scripts\activate
-```
-
-If activation fails on Windows due to a security policy error:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-venv\Scripts\activate
-```
+1. SSH keys & non-root permissions
+2. `.env` creation + Fernet key
+3. Pull repository into `peridocs/app`
+4. Virtual environment setup & pip install
+5. Run `setup_roberta.py` to download and validate model
+6. Optional: systemd service setup (Linux only)
+7. Run the webapp and verify
 
 ---
-
-### Step 3. Install Dependencies
-
-With your virtual environment activated:
-
-```bash
-pip install -r requirements.txt
-```
-
-If pip needs upgrading:
-
-```bash
-pip install --upgrade pip
-```
-
----
-
-### Step 4. Set Up Secrets / Environment Variables
-
-Create a `.env` file in the project root with your local keys:
-
-```
-PERIDOCS_AES_KEY=your-secret-key
-ADMIN_TOKEN=your-admin-token
-```
-
-> Do **not** commit `.env` to GitHub.
-
-For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
-
-You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs-code`
-The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
 # Important: check what is *CRUCIAL* to add into .gitignore before continuing
 <details>
@@ -251,45 +235,10 @@ app/static/CabineyGrotesk_Complete/*
 
 # ^ ! ^ ! ^
 
----
-
-### Step 5. Run the App Locally
-
-Run this command inside the project folder:
-
-```bash
-uvicorn app.routes:app --host 0.0.0.0 --port 8000 --reload
-```
-
-You should see output similar to:
-
-```
-INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
-```
+Absolutely. Let’s lay this out in simple, hand-holding English while keeping it **production-safe and context-specific**. I’ll include all the logic we’ve worked out for SSH, `.env`, repo pull, venv, RoBERTa setup, and optional systemd.
 
 ---
 
-### Step 6. Open the App
-
-Open your browser and go to:
-
-```
-http://127.0.0.1:8000/
-```
-
-You now have PeriDocs running locally.
-
----
-
-### Step 7. (Optional) Developer Tooling Setup
-
-#### VS Code Recommended Setup
-
-1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
-2. Open the PeriDocs-code folder in VS Code.
-
-
----
 
 # Canonical Project Directory 
 
@@ -458,6 +407,7 @@ PeriDocs-code/                         # Root project folder
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
+├─ peridocs_full_setup_script.sh         # Installs .ssh, .env. venv, pip, pip libraries, and offline RoBERTa cache
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 ```
 </details>
