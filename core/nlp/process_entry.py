@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-03-15T21:06:20-05:00
+# save-state 2026-03-15T21:51:50-05:00
 # ==========================================
 
 from __future__ import annotations
@@ -203,20 +203,24 @@ async def process_entry_async(
     report_progress()  # 8 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
-    entries_file = "data/entries/entries.json"
-    all_entries = load_data(entries_file)
-    existing_texts = {e.get("safe_text", "") for e in all_entries}
+    # generate a random secret component
+    random_secret = secrets.token_hex(16)
 
-    if safe_text not in existing_texts:
-        # Only generate token if safe_text is new
-        delete_token = secrets.token_hex(32)
-        delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
-        entry["delete_token_hash"] = delete_token_hash
-    else:
-        delete_token = None  # Safe_text already exists, potentially written by a different user; therefore, deletion token should not be issued to user.
-        entry["delete_token_hash"] = (
-        "A duplicate of this verbatim entry exists in the system at the time that we recieved this newest re-submission."
-    ) 
+    # compact timestamp to embed in the token
+    timestamp_compact = timestamp.replace(":", "").replace("-", "")
+
+    # construct user-visible deletion token
+    delete_token = f"{entry['entry_id']}.{timestamp}.{random_secret}"  
+    # This is a *permutation* not a combination!
+    # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
+    # In other words, the deletion token that the user copies must be as follows:
+    # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
+
+    # hash stored server-side
+    delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()  # NEW
+
+    # persist only the hash
+    entry["delete_token_hash"] = delete_token_hash  # NEW
 
     report_progress()  # 9 / total_steps
 

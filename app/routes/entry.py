@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-03-15T19:37:00-05:00
+# save-state 2026-03-15T21:55:45-05:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -208,7 +208,14 @@ async def submit_success(request: Request, id: str):
     id = temp_to_real_entry_id.get(id, id)
 
     all_entries = load_data(entries_FILE)
-    entry = next((e for e in all_entries if e.get("entry_id") == id or e.get("id") == id), None)
+    entry = next(
+        (
+            e for e in reversed(all_entries)
+            if (e.get("entry_id") == id or e.get("id") == id)
+            and e.get("safe_text")
+        ),
+        None
+    )
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
@@ -280,7 +287,15 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
 
     try:
         dm = DeletionManager(ledger=ledger, centroids=centroid_system)
-        await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR )
+        await dm.delete_entry(
+            entry_id=entry_id,
+            token_hash=token_hash,
+            data_dir=DATA_DIR
+        )
+        # This is a *permutation* not a combination!
+        # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
+        # In other words, the deletion token that the user copies must be as follows:
+        # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
         return templates.TemplateResponse(
             "delete.html",
             {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
@@ -291,5 +306,5 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
         # Return a generic error page to the user
         return templates.TemplateResponse(
             "delete.html",
-            {"request": request, "error": "Deletion failed. Please contact support."}
+            {"request": request, "error": "Deletion requests are currently not working. Please contact support."}
         )
