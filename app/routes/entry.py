@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 202602261423(YYYYMMDDhhmm)
+# save-state 2026-03-15T19:37:00-05:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -25,13 +25,13 @@ from core.map.mapping_runtime import ledger, centroid_system
 
 
 templates = Jinja2Templates(directory="app/templates")
-entries_FILE = "data/entries.json"
+entries_FILE = "data/entries/entries.json"
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 logger = logging.getLogger("peridocs.entry-routing")
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
-for path_str in sorted(glob("data/entries_embeddings_dump*.npz")):
+for path_str in sorted(glob("data/entries/entries_mean_embeddings_dump*.npz")):
     path = Path(path_str)
     if path.exists():
         npz_data = np.load(path, allow_pickle=False)
@@ -280,7 +280,7 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
 
     try:
         dm = DeletionManager(ledger=ledger, centroids=centroid_system)
-        await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR)
+        await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR )
         return templates.TemplateResponse(
             "delete.html",
             {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}

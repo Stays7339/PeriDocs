@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602251850
+# Save-state: 2026-03-15T20:05:20-05:00
 # ==========================================
 
 """
@@ -199,7 +199,7 @@ class DeletionManager:
         Other entries in the file are untouched.
         """
 
-        path = os.path.join(data_dir, "entries.json")
+        path = os.path.join(data_dir, "entries", "entries.json")
 
         if not os.path.exists(path):
             # Nothing to do if the file does not exist
@@ -243,7 +243,7 @@ class DeletionManager:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(entries, f, ensure_ascii=False, indent=2)
 
-        logger.info(f"Entry {entry_id} metadata purged successfully, only minimal fields remain.")
+        logger.info(f"Entry {entry_id} metadata purged successfully. only minimal fields remain.")
     
     async def _remove_entry_from_centroid(
         self,
