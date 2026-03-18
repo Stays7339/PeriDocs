@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 PeriDocs deterministic setup script for all-roberta-large-v1.
-Last Updated: 202602171828
+Last Updated: 2026-03-18T13:05:00-04:00
 
 Guarantees:
 - Snapshot-locked to a specific HF commit
@@ -10,11 +10,11 @@ Guarantees:
 - Deterministic embedding test
 - Fails loudly if snapshot mismatch
 - Works from any working directory
+- No symlink required
 """
 
 import os
 import sys
-import hashlib
 from pathlib import Path
 from sentence_transformers import SentenceTransformer
 
@@ -55,7 +55,7 @@ MODEL_FOLDER.mkdir(parents=True, exist_ok=True)
 if not SNAPSHOT_DIR.exists():
     print("Snapshot not found locally. Downloading exact revision...")
     try:
-        model = SentenceTransformer(
+        SentenceTransformer(
             MODEL_NAME,
             revision=MODEL_REVISION,
             cache_folder=str(CACHE_FOLDER),
@@ -68,15 +68,6 @@ else:
     print("Snapshot already present. Skipping download.")
 
 # ==========================================================
-# Step 1b — Create symlink for app compatibility
-# ==========================================================
-
-roberta_link = MODEL_FOLDER / "roberta-large"
-if not roberta_link.exists():
-    roberta_link.symlink_to(SNAPSHOT_DIR)
-    print(f"Created symlink: {roberta_link} -> {SNAPSHOT_DIR}")
-
-# ==========================================================
 # Step 2 — Force Offline Mode
 # ==========================================================
 
@@ -84,14 +75,16 @@ os.environ["TRANSFORMERS_OFFLINE"] = "1"
 os.environ["HF_DATASETS_OFFLINE"] = "1"
 
 # ==========================================================
-# Step 3 — Load Model (Local Only, Snapshot Locked)
+# Step 3 — Load Model Directly from Locked Snapshot
 # ==========================================================
+
+if not SNAPSHOT_DIR.exists():
+    print("Fatal error: snapshot directory does not exist.")
+    sys.exit(1)
 
 try:
     model = SentenceTransformer(
-        MODEL_NAME,
-        revision=MODEL_REVISION,
-        cache_folder=str(CACHE_FOLDER),
+        str(SNAPSHOT_DIR),
         local_files_only=True,
     )
 except Exception as e:
@@ -121,10 +114,6 @@ except Exception as e:
 # Step 5 — Integrity Confirmation
 # ==========================================================
 
-if not SNAPSHOT_DIR.exists():
-    print("Snapshot directory missing after load.")
-    sys.exit(1)
-
 print("Snapshot path confirmed:")
 print(SNAPSHOT_DIR)
 
@@ -134,3 +123,4 @@ print(" - Snapshot locked")
 print(" - Offline enforced")
 print(" - Telemetry disabled")
 print(" - Deterministic-ready")
+print(" - Symlink-free")
