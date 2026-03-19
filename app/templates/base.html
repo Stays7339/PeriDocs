@@ -1,4 +1,4 @@
-<!-- PeriDocs-code/app/templates/base.html save-state 202602261654 -->
+<!-- PeriDocs-code/app/templates/base.html save-state 202602261329 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -21,9 +21,6 @@
 
   <button id="theme-toggle-btn" aria-label="Toggle theme">Dark Mode</button>
   <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
-  <a id="donate-btn" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00" aria-label="Donate to PeriDocs" target="_blank" rel="noopener noreferrer">
-  Donate
-  </a>
 
   {% include 'includes/modal-feedback.html' %}
   {% include 'includes/modal-crisis.html' %}
@@ -32,7 +29,6 @@
   <div id="privacy-toast"></div>
 
   <script src="/static/peridocs-ui.js" defer></script>
-
   <canvas id="snow-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;display:none;"></canvas>
 </body>
 </html>
