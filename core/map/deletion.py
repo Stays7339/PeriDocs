@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 202602251850
+# Save-state: 2026-03-19T16:46:30-04:00
 # ==========================================
 
 """
@@ -154,6 +154,7 @@ class DeletionManager:
         self,
         *,
         entry_id: str,
+        token_hash: str,
         data_dir: str,
     ) -> Dict[str, List[str]]:
         """
@@ -182,7 +183,11 @@ class DeletionManager:
             f"entry {entry_id} deleted. Affected centroids: {list(affected.keys())}"
         )
 
-        await self._purge_entry_metadata(entry_id=entry_id, data_dir=data_dir)
+        await self._purge_entry_metadata(
+            entry_id=entry_id,
+            token_hash=token_hash,
+            data_dir=data_dir
+        )
 
         return affected
 
@@ -190,6 +195,7 @@ class DeletionManager:
         self,
         *,
         entry_id: str,
+        token_hash: str,
         data_dir: str,
     ) -> None:
         """
@@ -199,7 +205,7 @@ class DeletionManager:
         Other entries in the file are untouched.
         """
 
-        path = os.path.join(data_dir, "entries.json")
+        path = os.path.join(data_dir, "entries", "entries.json")
 
         if not os.path.exists(path):
             # Nothing to do if the file does not exist
@@ -220,12 +226,12 @@ class DeletionManager:
         # --- Locate the target entry ---
         target = None
         for entry in entries:
-            if entry.get("entry_id") == entry_id or entry.get("id") == entry_id:
+            if entry.get("delete_token_hash") == token_hash:
                 target = entry
                 break
 
         if not target:
-            logger.warning(f"Entry {entry_id} not found in entries.json for metadata purge.")
+            logger.warning("Entry with matching delete_token_hash not found during metadata purge.")
             return
 
         # --- Strip all fields except minimal surviving ones ---
@@ -243,7 +249,7 @@ class DeletionManager:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(entries, f, ensure_ascii=False, indent=2)
 
-        logger.info(f"Entry {entry_id} metadata purged successfully, only minimal fields remain.")
+        logger.info(f"Entry {entry_id} metadata purged successfully. only minimal fields remain.")
     
     async def _remove_entry_from_centroid(
         self,

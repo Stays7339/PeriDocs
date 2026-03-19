@@ -1,7 +1,8 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 202602261152(YYYYMMDDhhmm)
+# save-state 2026-03-19T17:44:35-04:00
 # ==========================================
+
 
 from __future__ import annotations
 import asyncio
@@ -14,6 +15,8 @@ import json
 import numpy as np
 import secrets
 import hashlib
+import logging
+
 
 
 from .embeddings import encrypt_text, get_embedding_async
@@ -25,28 +28,33 @@ from .clause_utils import split_into_clauses, sliding_window_clauses
 from core.map.mapping_runtime import centroid_system
 from core.map import entry_membership_sequencer
 from app.helpers.file_ops import load_data
+from app.helpers.entry_similarity import highlight_standout_clauses
 
 
 # ---- BACKUP / TIMESTAMPED EMBEDDINGS ----
 now = datetime.now(timezone.utc)
 window = now.hour // 6
 BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
-entries_EMBED_FILE = f"data/entries_embeddings_dump{BACKUP_TIMESTAMP}.npz"
+entries_EMBED_FILE = f"data/entries/entries_mean_embeddings_dump{BACKUP_TIMESTAMP}.npz"
 
 # Glob for existing embeddings (to validate file location / expected path)
-existing_embed_files = sorted(glob("data/entries_embeddings_dump*.npz"))
+existing_embed_files = sorted(glob("data/entries/entries_mean_embeddings_dump*.npz"))
+entries_CLAUSE_EMBED_FILE = f"data/entries/entries_clause_embeddings_dump{BACKUP_TIMESTAMP}.npz"
+
+EMBEDDING_DIM = 1024
+logger = logging.getLogger(__name__)
 
 async def process_entry_async(
     text: str,
     user_ip: str,
-    max_clause_words: int = 100,
+    max_words_in_window_of_clauses: int = 66,
     progress_callback: Callable[[float], None] | None = None
 ) -> Dict[str, Any]:
     if not text.strip():
         raise ValueError("Empty or whitespace-only entry.")
 
     timestamp = datetime.now(timezone.utc).isoformat()
-    ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()[:8]
+    ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
 
@@ -68,26 +76,29 @@ async def process_entry_async(
 
     # ---------------- CLAUSE SPLIT ----------------
     clauses = split_into_clauses(safe_text)
-    windows = sliding_window_clauses(clauses, max_words=max_clause_words)
+    windows = sliding_window_clauses(clauses, max_words=max_words_in_window_of_clauses)
     report_progress()  # 2 / total_steps
 
     # ---------------- GENERATE EMBEDDING ----------------
     clause_embeddings = await get_embedding_async(windows)
     doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
+    if np.all(doc_embedding == 0) or np.isnan(doc_embedding).any():
+        doc_embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
     print("DOC EMBEDDING NORM:", np.linalg.norm(doc_embedding))
+
+    if not clause_embeddings or any(e.size == 0 for e in clause_embeddings):
+        clause_embeddings = [np.zeros(EMBEDDING_DIM, dtype=np.float32) for _ in (clause_embeddings or [0])]
+        logger.warning("Empty or zero-length clause embeddings detected; using zero vector fallback.")
+
+    # --- intra-entry standout clause flags ---
+    clause_embeddings_array = np.stack(clause_embeddings) if clause_embeddings else np.zeros((1, EMBEDDING_DIM), dtype=np.float32)
+    standout_flags = highlight_standout_clauses(clause_embeddings_array, threshold=0.65)
+
     report_progress()  # 3 / total_steps
 
     # ---------------- ID GENERATION ----------------
     sha8 = sha8_hash(safe_text)
-
-    # Compute full SHA256 first
-    full_sha256 = hashlib.sha256(safe_text.encode("utf-8")).hexdigest()
-
-    # Now compute truncated SHA8
-    sha8 = full_sha256[:8]
-
-    # Log both
-    print(f"[DEBUG] Full SHA256: {full_sha256} | SHA8: {sha8}")
+    
     report_progress()  # 4 / total_steps
     # ---------------- CRISIS CHECK ----------------
     crisis_msg = await crisis_notification_async(text)
@@ -120,7 +131,7 @@ async def process_entry_async(
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
     if not crisis_msg:
-        Path("data").mkdir(exist_ok=True)
+        Path("data/entries").mkdir(parents=True, exist_ok=True)
 
         # --- Persist document embeddings as .npz ---
         npz_path = entries_EMBED_FILE
@@ -141,20 +152,16 @@ async def process_entry_async(
         npz_dump[sha8] = doc_embedding
         np.savez_compressed(npz_path, **npz_dump)
 
-       
-        """
-         # load existing clause embeddings for the sake of saving it permanently. 
-         # As long as this is commented out, per clause embeddings are disabled.
-         # That's good for storage space, but not good for preserving the best quality of the final embeddings that actually lives on.
-        npz_clause_path = entries_CLAUSE_EMBED_FILE.replace(".json", ".npz")
-        if Path(npz_clause_path).exists():
-            clause_dump = dict(np.load(npz_clause_path, allow_pickle=False))
-        else:
-            clause_dump = {}
+        Path(entries_CLAUSE_EMBED_FILE).parent.mkdir(parents=True, exist_ok=True)
+        clause_dump = dict(np.load(entries_CLAUSE_EMBED_FILE, allow_pickle=False)) if Path(entries_CLAUSE_EMBED_FILE).exists() else {}
+        clause_dump[sha8] = clause_embeddings_array
+        np.savez_compressed(entries_CLAUSE_EMBED_FILE, **clause_dump)
 
-        clause_dump[sha8] = np.stack(clause_embeddings)
-        np.savez_compressed(npz_clause_path, **clause_dump)
-        """
+        
+        standout_path = f"data/entries/entries_standout_flags_dump{BACKUP_TIMESTAMP}.npz"
+        loaded_flags = dict(np.load(standout_path, allow_pickle=False)) if Path(standout_path).exists() else {}
+        loaded_flags[sha8] = np.array(standout_flags, dtype=bool)
+        np.savez_compressed(standout_path, **loaded_flags)
 
     report_progress()  # 7 / total_steps
 
@@ -197,17 +204,24 @@ async def process_entry_async(
     report_progress()  # 8 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
-    entries_file = "data/entries.json"
-    all_entries = load_data(entries_file)
-    existing_texts = {e.get("safe_text", "") for e in all_entries}
+    # generate a random secret component
+    random_secret = secrets.token_hex(16)
 
-    if safe_text not in existing_texts:
-        # Only generate token if safe_text is new
-        delete_token = secrets.token_hex(32)
-        delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
-        entry["delete_token_hash"] = delete_token_hash
-    else:
-        delete_token = None  # Safe_text already exists; no token issued
+    # compact timestamp to embed in the token
+    timestamp_compact = timestamp.replace(":", "").replace("-", "")
+
+    # construct user-visible deletion token
+    delete_token = f"{entry['entry_id']}.{timestamp}.{random_secret}"  
+    # This is a *permutation* not a combination!
+    # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
+    # In other words, the deletion token that the user copies must be as follows:
+    # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
+
+    # hash stored server-side
+    delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()  # NEW
+
+    # persist only the hash
+    entry["delete_token_hash"] = delete_token_hash  # NEW
 
     report_progress()  # 9 / total_steps
 
@@ -215,10 +229,10 @@ async def process_entry_async(
     return {**entry, "delete_token": delete_token}  # pass token to caller
 
 # ---------------- Sync Wrapper (meaning not asynchronous) ----------------
-def process_entry(text: str, user_ip: str, max_clause_words: int = 100) -> Dict[str, Any]:
+def process_entry(text: str, user_ip: str, max_words_in_window_of_clauses: int = 100) -> Dict[str, Any]:
     loop = asyncio.get_event_loop()
     if loop.is_running():
         # Run async safely if we're already in an event loop
-        return loop.run_until_complete(process_entry_async(text, user_ip, max_clause_words))
+        return loop.run_until_complete(process_entry_async(text, user_ip, max_words_in_window_of_clauses))
     else:
-        return asyncio.run(process_entry_async(text, user_ip, max_clause_words))
+        return asyncio.run(process_entry_async(text, user_ip, max_words_in_window_of_clauses))

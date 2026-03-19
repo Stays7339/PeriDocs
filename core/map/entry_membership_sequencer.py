@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 202602261138
+# Save-state: 2026-03-19T17:05:00-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -91,7 +91,7 @@ async def evaluate_centroid_candidates(
 async def link_entry(
     entry_id: str,
     *,
-    min_similarity: float = 0.8,
+    min_similarity: float = 0.65,
     max_affiliations: int | None = None,
 ) -> List[Tuple[str, float]]:
     """
@@ -128,7 +128,10 @@ async def link_entry(
         return applied
 
     # --- Step 2: Precentroids ---
-    precentroid_id = await suggest_precentroid_for_entry(entry_id, threshold=min_similarity)
+    precentroid_id, sim = await suggest_precentroid_for_entry(
+        entry_id,
+        threshold=min_similarity
+    )
     if precentroid_id:
         try:
             logger.debug(
@@ -139,7 +142,7 @@ async def link_entry(
                 "type": "LINK_CANDIDATE_PRECENTROID",
                 "centroid_id": precentroid_id,
                 "entry_id": entry_id,
-                "similarity": min_similarity,
+                "similarity": sim,
             })
             logger.debug("[LINK_ENTRY] Ledger event_index=%d", event_index)
 
@@ -157,7 +160,7 @@ async def link_entry(
                     "Entry %s already exists in precentroid %s, skipping append.",
                     entry_id, precentroid_id
                 )
-                applied.append((precentroid_id, min_similarity))  # still mark as applied
+                applied.append((precentroid_id, sim))  # still mark as applied
                 return applied  # <-- return early, do NOT append a new CentroidState
                 
             seen = set()
@@ -197,7 +200,7 @@ async def link_entry(
             raise  # propagate loudly
 
     if precentroid_id:
-        applied.append((precentroid_id, min_similarity))
+        applied.append((precentroid_id, sim))
 
     return applied
 
@@ -217,7 +220,7 @@ async def unlink_entry(
         logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)
         raise
 
-async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -> str | None:
+async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.65) -> tuple[str | None, float | None]:
     """
     Suggests an existing precentroid for the entry.
     Returns precentroid_id if matched, else None.
@@ -234,7 +237,8 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -
 
         async with system._lock:
             if not system._centroids:
-                return await centroid_system.create_precentroid([entry_id])
+                cid = await centroid_system.create_precentroid([entry_id])
+                return cid, 0.0
 
             for c in system._centroids.values():
 
@@ -250,11 +254,12 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.7) -
 
                 if sim >= threshold:
                     if c.centroid_id.startswith("precentroid_"):
-                        return c.centroid_id
+                        return c.centroid_id, sim
                     else:
                         return None
 
-            return await centroid_system.create_precentroid([entry_id])
+            cid = await centroid_system.create_precentroid([entry_id])
+            return cid, 0.0
 
     except Exception as e:
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)

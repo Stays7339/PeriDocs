@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 202602261423(YYYYMMDDhhmm)
+# save-state 2026-03-19T16:49:15-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -25,13 +25,13 @@ from core.map.mapping_runtime import ledger, centroid_system
 
 
 templates = Jinja2Templates(directory="app/templates")
-entries_FILE = "data/entries.json"
+entries_FILE = "data/entries/entries.json"
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 logger = logging.getLogger("peridocs.entry-routing")
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
-for path_str in sorted(glob("data/entries_embeddings_dump*.npz")):
+for path_str in sorted(glob("data/entries/entries_mean_embeddings_dump*.npz")):
     path = Path(path_str)
     if path.exists():
         npz_data = np.load(path, allow_pickle=False)
@@ -208,7 +208,14 @@ async def submit_success(request: Request, id: str):
     id = temp_to_real_entry_id.get(id, id)
 
     all_entries = load_data(entries_FILE)
-    entry = next((e for e in all_entries if e.get("entry_id") == id or e.get("id") == id), None)
+    entry = next(
+        (
+            e for e in reversed(all_entries)
+            if (e.get("entry_id") == id or e.get("id") == id)
+            and e.get("safe_text")
+        ),
+        None
+    )
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
@@ -280,7 +287,15 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
 
     try:
         dm = DeletionManager(ledger=ledger, centroids=centroid_system)
-        await dm.delete_entry(entry_id=entry_id, data_dir=DATA_DIR)
+        await dm.delete_entry(
+            entry_id=entry_id,
+            token_hash=token_hash,
+            data_dir=DATA_DIR
+        )
+        # This is a *permutation* not a combination!
+        # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
+        # In other words, the deletion token that the user copies must be as follows:
+        # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
         return templates.TemplateResponse(
             "delete.html",
             {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
@@ -291,5 +306,5 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
         # Return a generic error page to the user
         return templates.TemplateResponse(
             "delete.html",
-            {"request": request, "error": "Deletion failed. Please contact support."}
+            {"request": request, "error": "Deletion requests are currently not working. Please contact support."}
         )
