@@ -295,7 +295,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 24 February 2026 (202602241322 ; YYYYMMDDhhmm)
+## Canonical Project Directory as of 2026-03-19T17:35:15-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -384,16 +384,6 @@ PeriDocs-code/                         # Root project folder
 │  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
 │  ├─ entries.json                        # Stored entries
 │  ├─ feedback.json                       # Stored feedback and report inquiries
-│  ├─ high-profile-addresses.json         # Prevents PII exposure     
-│  ├─ names_au.json                       # Common-enough first names and last names from Australia.
-│  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
-│  ├─ names_ie.json                       # Common-enough first names and last names from Ireland.
-│  ├─ names_in.json                       # Common-enough first names and last names from India.
-│  ├─ names_nz.json                       # Common-enough first names and last names from New Zealand.
-│  ├─ names_sg.json                       # Common-enough first names and last names from Singapore.
-│  ├─ names_uk.json                       # Common-enough first names and last names from United Kingdom.
-│  ├─ names_us.json                       # Common-enough first names and last names from United States.
-│  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
@@ -402,24 +392,18 @@ PeriDocs-code/                         # Root project folder
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives
-│   ├─ roberta-large/                  # Sentence-understanding model
-│   │   ├─.locks/
-│   │   │   └─ models--sentence-transformers--all-roberta-large-v1/
-│   │   │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831.lock
-│   │   │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7.lock
-│   │   │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6.lock
-│   │   │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx].lock # Nine more files just like that
+│   ├─.locks/
+│   └─ models--sentence-transformers--all-roberta-large-v1/
 │   │   └─ models--sentence-transformers--all-roberta-large-v1/ # yes the same name
 │   │               ├─ .no_exist/
 │   │               │       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │               │                 ├─ adapter_config.json
 │   │               │                 └─ added_tokens.json
 │   │               ├─ blobs/
-│   │               │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
-│   │               │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
-│   │               ├─ refs/
-│   │               │           ├─ main # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
+│   │               │    └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
 │   │               └─ snapshots/
 │   │                       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
 │   │                                  ├─ 1_Pooling/
@@ -447,12 +431,7 @@ PeriDocs-code/                         # Root project folder
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
 │    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │
-├─ venv/                               # Python virtual environment (ignored by Git)
-│   ├─ bin/                            # Executables (python, pip, etc.)
-│   ├─ include/                        # Headers for building packages
-│   ├─ lib/                            # Installed Python packages
-│   ├─ share/                           # Shared resources for the virtual environment
-│   └─ pyvenv.cfg                      # Virtual environment configuration
+├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
