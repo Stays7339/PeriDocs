@@ -235,11 +235,16 @@ app/static/CabineyGrotesk_Complete/*
 
 # ^ ! ^ ! ^
 
+Absolutely. Let’s lay this out in simple, hand-holding English while keeping it **production-safe and context-specific**. I’ll include all the logic we’ve worked out for SSH, `.env`, repo pull, venv, RoBERTa setup, and optional systemd.
+
+---
+
+
 # Canonical Project Directory 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-15T16:05:40-05:00
+## Canonical Project Directory as of 24 February 2026 (202602241322 ; YYYYMMDDhhmm)
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -252,7 +257,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │
 │  │
 │  │
@@ -273,7 +278,9 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ peridocs-logo-v2.png
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
 │  │  ├─ peridocs-wordmark-202602232127.svg
-│  │  ├─ peridocs-wordmark-and-logo-202602261328.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232100.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -288,6 +295,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ submit-success.html            # Submission success page template
 │  │  ├─ terms-of-service.html          # Terms of Service page template
 │  │  └─ includes/                      # Partial web-page templates
+│  │      ├─ footer.html
 │  │      ├─ modal-crisis.html
 │  │      └─ modal-feedback.html
 │  │
@@ -322,6 +330,8 @@ PeriDocs-code/                         # Root project folder
 │
 │
 ├─ data/                                  # Local data storage
+│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
+│  ├─ entries.json                        # Stored entries
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ high-profile-addresses.json         # Prevents PII exposure     
 │  ├─ names_au.json                       # Common-enough first names and last names from Australia.
@@ -335,15 +345,9 @@ PeriDocs-code/                         # Root project folder
 │  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
-│  ├─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
-│  ├─ entries
-│  │  ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for embeddings roughly per 90 words to keep the main entries much more readable by humans.  
-│  │  ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for embeddings for the whole entry no matter the length to keep the main entries much more readable by humans.
-│  │  ├─ entries_standout_flags_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for segments of 
-│  │  └─ entries.json                     # Stored entries in the safe-text and meta-data. Embedding vectors are stored in entries_clause_embeddings_dump and entries_embeddings_dump
-│  └─ centroids/
-│     ├─[centroid/precentroid]_[x]_summary.json #shows the IDs and name labels for the current states and previous states, without the thousands of floats. The thousands of floats are in the non-pickled .npz file.
-│     └─ [centroid/precentroid]_[x].npz    #contains the embedding vector data for the centroid, including its previous states. All npz files should always be non-pickled, for the sake of security.
+│  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
+│
+│
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives

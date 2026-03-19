@@ -1,24 +1,17 @@
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-03-15T18:56:45-05:00
+# Save-state: 202602240843
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
 import os
 import numpy as np
-import logging
-
 from typing import Optional, Sequence
-from pathlib import Path
+import logging
 
 logger = logging.getLogger("peridocs.entry_similarity")
 
-# Base data directory (can be overridden with environment variable)
-DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
-
-# Subdirectories
-ENTRIES_DIR = DATA_DIR / "entries"        
-
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     """
@@ -50,10 +43,10 @@ def deterministic_mean(vectors: Sequence[np.ndarray]) -> np.ndarray:
     stacked = np.stack(vectors)
     return stacked.mean(axis=0)
 
-def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
+def safe_load_embedding(entry_id: str, data_dir: str = "data") -> np.ndarray:
     import os, glob, json
-    npz_files = sorted(ENTRIES_DIR.glob("entries_mean_embeddings_dump*.npz"))
-    json_files = sorted(ENTRIES_DIR.glob("entries_mean_embeddings_dump*.json"))
+    npz_files = sorted(glob.glob(os.path.join(data_dir, "entries_embeddings_dump*.npz")))
+    json_files = sorted(glob.glob(os.path.join(data_dir, "entries_embeddings_dump*.json")))
 
     found = None
     found_in_file = None
@@ -65,7 +58,7 @@ def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
                 if not isinstance(k, str) or len(k) != 8 or not all(c in "0123456789abcdef" for c in k.lower()):
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
 
-            if entry_id in data: 
+            if entry_id in data:
                 logger.warning(
                     "Embedding key match in NPZ file: entry_id=%s file=%s total_keys=%d",
                     entry_id, f, len(data.keys())
@@ -106,25 +99,3 @@ def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
         raise RuntimeError(f"Embedding not found for entry_id {entry_id}")
 
     return found
-
-def highlight_standout_clauses(clause_embeddings: np.ndarray, threshold: float = 0.7) -> list[bool]:
-    """
-    Identify clauses that are 'standout' relative to other clauses in the same entry.
-
-    Each clause is compared to the mean of all other clauses via cosine similarity.
-    If similarity < threshold, it is considered standout.
-
-    Returns a list of booleans aligned with clause_embeddings.
-    """
-    n = len(clause_embeddings)
-    if n == 0:
-        return []
-
-    standout_flags = []
-    for i in range(n):
-        other_embeddings = np.delete(clause_embeddings, i, axis=0)
-        mean_other = other_embeddings.mean(axis=0)
-        sim = cosine_similarity(clause_embeddings[i], mean_other)
-        standout_flags.append(sim < threshold)
-
-    return standout_flags

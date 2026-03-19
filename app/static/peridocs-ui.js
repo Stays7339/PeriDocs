@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-03-15T11:46:30-05:00 (YYYYMMDDhhmm)
+// save-state 202603051826 (YYYYMMDDhhmm)
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -46,9 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
     entryWrapper: document.getElementById("entry-wrapper"),
     toastContainer: document.querySelector("#general-toast-container"),
     privacyToast: document.querySelector("#privacy-toast"),
-    copyBtns: document.querySelectorAll("[data-safe-text].copy-btn"),
-    menuToggle: document.getElementById('menu-toggle-btn'),
-    headerMenu: document.querySelector('.header-menu'),
+    copyBtns: document.querySelectorAll("[data-safe-text].copy-btn")
   };
 
   const CONSENT_SESSION_KEY = "PeriDocs_ConsentGranted";
@@ -316,63 +314,4 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-UI_ELEMENTS.menuToggle?.addEventListener('click', () => {
-  UI_ELEMENTS.headerMenu?.classList.toggle('show');
-});
-// ---------------------- Swipeable Cards ---------------------- //
-
-function enableSwipeCards(selector = ".swipe-card") {
-
-  document.querySelectorAll(selector).forEach(card => {
-
-    let startX = 0;
-    let currentX = 0;
-    let dragging = false;
-
-    card.addEventListener("pointerdown", e => {
-      startX = e.clientX;
-      dragging = true;
-      card.classList.add("swiping");
-      card.setPointerCapture(e.pointerId);
-    });
-
-    card.addEventListener("pointermove", e => {
-      if (!dragging) return;
-
-      currentX = e.clientX - startX;
-      const rotate = currentX * 0.05;
-
-      card.style.transform = `translateX(${currentX}px) rotate(${rotate}deg)`;
-    });
-
-    card.addEventListener("pointerup", () => {
-      dragging = false;
-      card.classList.remove("swiping");
-
-      const threshold = 120;
-
-      if (Math.abs(currentX) > threshold) {
-
-        const direction = currentX > 0 ? 1 : -1;
-
-        card.style.transform =
-          `translateX(${direction * window.innerWidth}px) rotate(${direction * 20}deg)`;
-
-        card.style.opacity = "0";
-
-        setTimeout(() => card.remove(), 250);
-
-      } else {
-
-        card.style.transform = "";
-      }
-
-      currentX = 0;
-    });
-
-  });
-
-}
-
-enableSwipeCards();
 });

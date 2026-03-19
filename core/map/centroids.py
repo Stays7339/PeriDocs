@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-15T15:04:30-05:00
+# Save-state: 202602202046
 # ==========================================
 
 import os
@@ -28,10 +28,9 @@ from app.helpers.entry_similarity import (
 logger = logging.getLogger("peridocs.centroids")
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-ENTRIES_DIR = os.path.join(DATA_DIR, "entries")
 STATE_DIR = os.path.join(DATA_DIR, "centroids")
-SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
 ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
+SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
 
 # Ensure directories exist at startup
 os.makedirs(STATE_DIR, exist_ok=True)

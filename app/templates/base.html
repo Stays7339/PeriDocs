@@ -1,4 +1,4 @@
-<!-- PeriDocs-code/app/templates/base.html save-state ~ 2026-03-15T11:42:00-05:00 -->
+<!-- PeriDocs-code/app/templates/base.html save-state 202602261654 -->
 <!doctype html>
 <html lang="en" data-theme="light">
 <head>
@@ -12,32 +12,18 @@
 <body>
   <header class="site-wordmark">
     <a href="/" class="brand-link">
-      <img src="/static/peridocs-wordmark-and-logo-202602261328.png"
-          alt="PeriDocs logo"
-          class="brand-logo">
+      <img src="/static/peridocs-wordmark-and-logo-202602261328.png" alt="PeriDocs logo" class="brand-logo">
     </a>
-
-    <nav class="header-menu">
-      <p>
-        • <a href="/">Home</a> •
-        <a href="/about">About & Contact</a> •
-        <a href="/terms-of-service">Terms of Service</a> •
-        <a href="/privacy-policy">Privacy Policy</a> •
-        <a href="/delete">Deletion</a> •
-        <a href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00">Donation</a> •
-      </p>
-    </nav>
-
-    <button id="menu-toggle-btn" aria-label="Toggle menu">☰</button>
   </header>
 
 
-  <div class="wrap {% block layout %}layout-single{% endblock %}">
-  {% block content %}{% endblock %}
-  </div>
+  <div class="wrap">{% block content %}{% endblock %}</div>
 
-  <button id="theme-toggle-btn" aria-label="Toggle theme" class="btn primary">Dark Mode</button>
-  <button id="feedback-btn" aria-label="Give feedback" class="btn primary">Feedback</button>
+  <button id="theme-toggle-btn" aria-label="Toggle theme">Dark Mode</button>
+  <button id="feedback-btn" aria-label="Give feedback">Feedback</button>
+  <a id="donate-btn" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00" aria-label="Donate to PeriDocs" target="_blank" rel="noopener noreferrer">
+  Donate
+  </a>
 
   {% include 'includes/modal-feedback.html' %}
   {% include 'includes/modal-crisis.html' %}

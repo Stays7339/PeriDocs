@@ -1,6 +1,6 @@
 /* ==========================================
    PeriDocs Modular CSS — Variables
-   Save-state: ~ 2026-03-15T11:46:45-05:00
+   Save-state: 202603051825
 ========================================== */
 
 /* =========================
@@ -13,11 +13,11 @@
 
   /* Colors */
   --bg: #7F86B0; --card: #F0F0EB; --muted: #BFC8CC;
-  --accent: #7F86B0; --accent-hover: #6B708F;
+  --accent: #7F86B0; --accent-hover: #6B708F; --text: #111111;
   --white: #FFFFFF; --black: #000000;
-  --toast-bg: #F5E8A3;
+  --toast-bg: #F5E8A3; --toast-text: #000000;
   --toast-success: #A3F5B2; --toast-error: #F5A3A3;
-  --privacy-bg: var(--card); --privacy-text: var(--black); --privacy-link: var(--accent);
+  --privacy-bg: var(--card); --privacy-text: var(--text); --privacy-link: var(--accent);
 
   /* Borders / radius */
   --radius-card: 12px; --radius-button: 10px; --border-input: 1px solid var(--muted);
@@ -42,18 +42,12 @@
   --card-max-width: 96%;
   --card-max-height: calc(100vh - 4rem);
 
-  --card-min-width: 280px;
-  --card-feed-max-width: 420px;
-
   /* Typography */
-  --text: var(--black); /* default text color for light mode */
   --h1-margin: 0.5rem 0 1rem 0;
   --p-margin: 0.5rem 0 1rem 0;
   --header-gap: 0.6rem;
   --header-font-size: 1.6rem;
   --header-font-size-small: 1.35rem;
-  --header-height: 4.25rem;
-  --header-z: 7;
   --brand-logo-height: 3rem;
   --brand-logo-height-small: 2.4rem;
 
@@ -65,7 +59,7 @@
   /* Modal System */
   --modal-overlay-bg: rgba(17,17,17,0.55);
   --modal-backdrop-blur: 4px;
-  --modal-z: 6;
+  --modal-z: 1002;
   --modal-content-bg: var(--card);
   --modal-content-radius: var(--radius-card);
   --modal-content-padding: 24px;
@@ -114,11 +108,7 @@ html, body {
 /* =========================
    Card & Wrapper
 ========================= */
-.wrap {
-  width: 100%;
-  min-height: 100vh;
-  padding: calc(var(--header-height) + var(--space-2)) var(--space-2) var(--space-2);
-}
+.wrap { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: var(--space-2); }
 .card {
   display: flex; flex-direction: column;
   width: var(--card-width); max-width: var(--card-max-width); max-height: var(--card-max-height);
@@ -128,48 +118,7 @@ html, body {
   padding: var(--space-2);
   position: relative; overflow: hidden;
 }
-/* Feed cards expand naturally */
-.layout-masonry .card {
-  width: 100%;
-  max-width: var(--card-feed-max-width);
-  max-height: none;
-}
-
-.layout-masonry .card-content {
-  overflow: visible;
-}
 .card-content { flex:1; overflow-y:auto; margin-bottom: var(--space-2); padding-right: var(--space-1); }
-
-/* Swipe interaction support */
-
-.swipe-card {
-  touch-action: pan-y;
-  transition: transform 0.25s ease, opacity 0.25s ease;
-  will-change: transform;
-}
-
-.swipe-card.swiping {
-  transition: none;
-}
-
-/* =========================
-   Card Layout Modes
-========================= */
-
-/* Single card pages (existing behavior) */
-.layout-single {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* Masonry / board layout */
-.layout-masonry {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(var(--card-min-width), 1fr));
-  gap: var(--space-2);
-  align-items: start;
-}
 
 /* =========================
    Typography
@@ -188,24 +137,10 @@ p.left { text-align: left; } p.center { text-align: center; } p.right { text-ali
   font-weight: 600; font-size: 1rem; text-decoration: none;
   color: var(--white); background: var(--accent); border:none; cursor:pointer;
   transition: background 0.2s ease, transform 0.1s ease;
-  position: fixed; z-index: 3;
+  position: fixed; z-index: 1200;
 }
 .button:hover, .btn:hover { background: var(--accent-hover); transform: translateY(-1px); }
 .button:active, .btn:active { transform: translateY(0); }
-
-#theme-toggle-btn {
-  position: fixed;
-  left: var(--space-2);
-  bottom: var(--space-2);
-  z-index: 4;
-}
-
-#feedback-btn {
-  position: fixed;
-  right: var(--space-2);
-  bottom: var(--space-2);
-  z-index: 4;
-}
 
 /* =========================
    Inputs & Textareas
@@ -222,70 +157,24 @@ input:focus, textarea:focus { outline:none; border-color: var(--muted); box-shad
 /* =========================
    Links
 ========================= */
-a { color: var(--text); text-decoration: none; }
+a { color: var(--accent); text-decoration: none; }
 a:hover { color: var(--accent-hover); }
 
 /* =========================
    Header / Wordmark
 ========================= */
-
 header.site-wordmark {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-
-  display: flex;
-  align-items: center;
-  gap: var(--header-gap);
-
-  padding: var(--space-1) var(--space-2);
-
-  font-family: var(--font-family-main);
-  font-weight: var(--font-weight-bold);
-  font-size: var(--header-font-size);
-  color: var(--text);
-
-  background: var(--card);
-
-  opacity: 0.95;
-
-  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-
-  user-select: none;
-  pointer-events: auto;
-
-  z-index: var(--header-z);
+  position:absolute; top:1.25rem; left:50%; transform:translateX(-50%);
+  display:flex; align-items:center; gap: var(--header-gap);
+  font-family: var(--font-family-main); font-weight: var(--font-weight-bold);
+  font-size: var(--header-font-size); color: var(--text); opacity:0.95;
+  user-select:none; pointer-events:auto;
 }
-
-/* Logo */
-.brand-logo {
-  height: var(--brand-logo-height);
+.brand-logo { height: var(--brand-logo-height); }
+@media (max-width: 768px) {
+  header.site-wordmark { font-size: var(--header-font-size-small); }
+  .brand-logo { height: var(--brand-logo-height-small); }
 }
-
-html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9);}
-.brand-text{line-height:1;}
-
-/* Navigation group */
-.header-menu {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: 0.9rem;
-}
-
-.header-menu a {
-  color: var(--text);
-  text-decoration: none;
-  font-weight: var(--font-weight-medium);
-  transition: color 0.2s ease;
-}
-
-.header-menu a:hover {
-  color: var(--accent-hover);
-}
-
 
 /* =========================
    Entry Wrapper / Overlay
@@ -297,7 +186,7 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
   font-size:1rem; line-height:1.4;
 }
 .entry-overlay {
-  position:absolute; inset:0; z-index:2; pointer-events:none;
+  position:absolute; inset:0; z-index:10; pointer-events:none;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
   background-color: rgba(255,255,255,var(--overlay-opacity));
   backdrop-filter: blur(var(--streaks-blur)) saturate(120%);
@@ -306,7 +195,7 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
 }
 .entry-wrapper[data-locked="true"] .entry-overlay { opacity:1; pointer-events:auto; }
 .entry-overlay-streaks {
-  position:absolute; inset:0; z-index:1; pointer-events:none; border-radius:inherit;
+  position:absolute; inset:0; z-index:7; pointer-events:none; border-radius:inherit;
   filter: blur(var(--streaks-blur)); background: var(--streaks-bg);
   mask-image: var(--streaks-mask); -webkit-mask-image: var(--streaks-mask);
   mask-repeat:repeat; -webkit-mask-repeat:repeat; opacity:0;
@@ -327,7 +216,7 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
 .consent-toggle .toggle-knob {
   position:absolute; width: var(--toggle-knob-size); height: var(--toggle-knob-size);
   border-radius:50%; background: linear-gradient(145deg,#fff,#f2f2f2);
-  left: var(--toggle-knob-margin); top: var(--toggle-knob-margin); z-index:4;
+  left: var(--toggle-knob-margin); top: var(--toggle-knob-margin); z-index:2;
   transition: transform 0.3s ease;
 }
 .consent-toggle[data-state="on"] .toggle-knob { transform: translateX(var(--toggle-knob-transform-on)); }
@@ -353,58 +242,6 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
   #feedback-btn { right:1rem; bottom:1rem; }
   #theme-toggle-btn { left:1rem; bottom:1rem; }
   #donate-btn { right:10rem; bottom:1rem; }
-
-  #menu-toggle-btn {
-    display: inline-flex; /* show hamburger */
-  }
-
-  header.site-wordmark {
-    font-size: var(--header-font-size-small);
-  }
-
-  .brand-logo {
-    height: var(--brand-logo-height-small);
-  }
-
-  #menu-toggle-btn {
-    display: inline-flex;
-  }
-
-  .header-menu {
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-
-    flex-direction: column;
-
-    background: var(--card);
-    padding: var(--space-2);
-
-    box-shadow: 0 8px 16px rgba(0,0,0,0.15);
-
-    display: none;
-  }
-
-  .header-menu.show {
-    display: flex;
-  }
-
-  .header-menu a {
-    padding: var(--space-1) 0;
-  }
-
-
-/* Mobile-first: stacked, collapsible menu */
-#menu-toggle-btn {
-  display: none;
-  background: transparent;
-  border: none;
-  font-size: 1.5rem;
-  color: var(--text);
-  cursor: pointer;
-  margin-left: auto;
-}
 }
 
 /* =========================
@@ -419,13 +256,13 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
   flex-direction: row;       /* horizontal stacking */
   gap: var(--space-1);       /* use modular spacing */
   pointer-events: none;
-  z-index: 5;
+  z-index: 2000;
 }
 
 /* Use this for all individual toasts */
 .toast {
   background: var(--toast-bg);
-  color: var(--black);
+  color: var(--toast-text);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-button);
   display: inline-flex;
@@ -451,24 +288,3 @@ html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9
 .toast.success { background: var(--toast-success); }
 .toast.error { background: var(--toast-error); }
 .toast.info { background: var(--toast-bg); }
-
-#privacy-toast {
-  position: fixed;
-  bottom: calc(var(--button-height) + var(--space-3));
-  left: 50%;
-  transform: translateX(-50%);
-  display: none;
-  align-items: center;
-  gap: var(--space-2);
-  background: var(--privacy-bg);
-  color: var(--privacy-text);
-  padding: var(--space-2);
-  border-radius: var(--radius-card);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-  max-width: 90%;
-  z-index: 5;
-}
-
-#privacy-toast.show {
-  display: flex;
-}
