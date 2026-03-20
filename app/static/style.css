@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:16:25-04:00 ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:24:00-04:00 ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -482,15 +482,14 @@ html[data-theme='dark'] .brand-logo {
 /* Hamburger toggle (mobile) */
 #menu-toggle-btn { display: none; }
 
-
 @media (max-width: 835px) {
 
   /* ---------------------- Wrap / layout ---------------------- */
   .wrap {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: calc(4.25rem + 1rem) 1rem 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: calc(4.25rem + 1rem) 1rem 1rem;
   }
 
   /* ---------------------- Header / wordmark ---------------------- */
@@ -500,7 +499,7 @@ html[data-theme='dark'] .brand-logo {
     left: auto;
     justify-content: center;
     margin-top: 1.25rem;
-    font-size: 1.35rem;
+    font-size: 2rem;
   }
 
   .brand-logo {
@@ -515,7 +514,7 @@ html[data-theme='dark'] .brand-logo {
     border-radius: 16px;
     box-shadow: 0 6px 18px rgba(17,17,17,.08);
     position: relative;
-    transform: translateY(-7%); /* moves the card upward */
+    transform: translateY(-7%);
   }
 
   .card-content {
@@ -543,56 +542,31 @@ html[data-theme='dark'] .brand-logo {
   }
 
   /* ---------------------- Buttons ---------------------- */
-  /* Feedback button */
-  #feedback-btn {
-    bottom: 16px;
-    right: 10%;           /* fixed % from left, adjust for desired spacing */
-    width: 90px;         
-    height: 40px;        /* match squircle proportions */
-    border-radius: 10px; /* same as desktop */
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  /* Dark mode button */
-  #theme-toggle-btn {
-    bottom: 16px;
-    left: 10%;          /* fixed % from right */
-    width: 90px;         
-    height: 40px;        /* same as feedback */
-    border-radius: 10px; /* squircle like desktop */
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  /* Feedback button */
   #feedback-btn,
   #theme-toggle-btn {
-    display: flex;                 /* flex container for text */
-    align-items: center;           /* vertical centering */
-    justify-content: center;       /* horizontal centering */
-    text-align: center;            /* prevent left-align */
-    white-space: nowrap;           /* prevent wrapping */
-    line-height: 1;                /* ensure font sits in middle */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1;
   }
 
-  /* Feedback button specific */
   #feedback-btn {
     bottom: 16px;
     right: 10%;
-    width: 100px;      /* slightly wider to fit text + padding */
+    width: 100px;
     height: 40px;
     border-radius: 10px;
-    padding: 0 12px;   /* only horizontal padding; vertical handled by flex */
+    padding: 0 12px;
     font-size: 0.9rem;
   }
 
-  /* Dark mode button specific */
   #theme-toggle-btn {
     bottom: 16px;
     left: 10%;
-    width: 100px;      /* match feedback width */
-    height: 40px;      /* match feedback height */
+    width: 100px;
+    height: 40px;
     border-radius: 10px;
     padding: 0 12px;
     font-size: 0.9rem;
@@ -601,19 +575,13 @@ html[data-theme='dark'] .brand-logo {
   #privacy-toast {
     left: 50%;
     bottom: 10%;
-    transform: none;        /* remove translateX centering */
-    width: 100vw;           /* full viewport width */
-    border-radius: 0;       /* optional, flush with edges */
-    padding: 1rem;          /* adjust padding as needed */
+    transform: none;
+    width: 100vw;
+    border-radius: 0;
+    padding: 1rem;
   }
 
-}
-
-/* Mobile adjustments */
-@media (max-width: 835px) {
-  header.site-wordmark { font-size: 2rem; }
-  .brand-logo { height: 2.4rem; }
-
+  /* ---------------------- Menu ---------------------- */
   #menu-toggle-btn {
     display: inline-flex;
     background: #7F86B0;
@@ -644,7 +612,6 @@ html[data-theme='dark'] .brand-logo {
     transition: transform 0.3s ease;
     z-index: 8;
   }
-  html[data-theme=dark]
 
   .header-menu a,
   .header-menu button {
@@ -662,14 +629,26 @@ html[data-theme='dark'] .brand-logo {
     border-radius: 10px;
     transition: background 0.2s ease, transform 0.1s ease;
   }
+
   .header-menu a:hover,
-  .header-menu button:hover { background: #6B708F; transform: translateY(-1px); }
+  .header-menu button:hover {
+    background: #6B708F;
+    transform: translateY(-1px);
+  }
+
   .header-menu a:active,
-  .header-menu button:active { transform: translateY(0); }
+  .header-menu button:active {
+    transform: translateY(0);
+  }
 
-  .header-menu.show { transform: translateX(0); }
+  .header-menu.show {
+    transform: translateX(0);
+  }
 
-  .header-menu .spacer { height: 1.5rem; flex-shrink: 0; }
+  .header-menu .spacer {
+    height: 1.5rem;
+    flex-shrink: 0;
+  }
 
   /* Floating buttons into menu */
   #theme-toggle-btn,
@@ -687,7 +666,6 @@ html[data-theme='dark'] .brand-logo {
     font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     font-weight: 600;
   }
-  
 }
 
 /* Desktop link reset */
