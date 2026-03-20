@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 202602261427(YYYYMMDDhhmm) ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:16:25-04:00 ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -152,7 +152,7 @@ a:active:not(.brand-link) {
 }
 
 /* ---------------------- Header/logo ---------------------- */
-header.site-wordmark{position:absolute;top:1.25rem;left:1.5rem;display:flex;align-items:center;gap:.6rem;font-family:'Cabinet Grotesk',sans-serif;font-weight:700;font-size:1.6rem;color:var(--text);opacity:.95;user-select:none;pointer-events:auto;}
+header.site-wordmark{position: fixed;top: 0;left: 0;width: 100%;display:flex;align-items:center;gap:.6rem;font-family:'Cabinet Grotesk',sans-serif;font-weight:100;font-size:1.6rem;color:var(--text);opacity:.95;user-select:none;pointer-events:auto;}
 .brand-link{display:flex;align-items:center;text-decoration:none;color:inherit;}
 .brand-logo{height:3rem;width:auto;display:block;filter:none;  transform: scaleX(1); transform-origin: center}
 html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9);}
@@ -204,125 +204,6 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
 .feedback-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
 
 
-@media (max-width: 640px) {
-
-  /* ---------------------- Wrap / layout ---------------------- */
-  .wrap {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start;  /* vertical alignment for card */
-    padding-top: 2.5rem;      /* space from top */
-    padding-left: env(safe-area-inset-left);
-    padding-right: env(safe-area-inset-right);
-  }
-
-  /* ---------------------- Header / wordmark ---------------------- */
-  header.site-wordmark {
-    position: relative;
-    top: auto;
-    left: auto;
-    justify-content: center;
-    margin-top: 1.25rem;
-    font-size: 1.35rem;
-  }
-
-  .brand-logo {
-    height: 2.4rem;
-  }
-
-  /* ---------------------- Card ---------------------- */
-  .card {
-    width: 94%;
-    max-height: calc(100vh - 6rem);
-    padding: 1.5rem 1.25rem;
-    border-radius: 16px;
-    box-shadow: 0 6px 18px rgba(17,17,17,.08);
-    position: relative;
-    transform: translateY(-7%); /* moves the card upward */
-  }
-
-  .card-content {
-    flex: 1;
-    overflow-y: auto;
-    padding-right: 0.75rem;
-  }
-
-  /* ---------------------- Typography ---------------------- */
-  h1 {
-    font-size: 1.25rem;
-    margin-bottom: 1rem;
-  }
-
-  p {
-    font-size: 0.95rem;
-  }
-
-  textarea,
-  input[type="text"],
-  input[type="search"],
-  input[type="email"],
-  input[type="number"] {
-    font-size: 1rem;
-  }
-
-  /* ---------------------- Buttons ---------------------- */
-  /* Feedback button */
-  #feedback-btn {
-    bottom: 16px;
-    right: 10%;           /* fixed % from left, adjust for desired spacing */
-    width: 90px;         
-    height: 40px;        /* match squircle proportions */
-    border-radius: 10px; /* same as desktop */
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  /* Dark mode button */
-  #theme-toggle-btn {
-    bottom: 16px;
-    left: 10%;          /* fixed % from right */
-    width: 90px;         
-    height: 40px;        /* same as feedback */
-    border-radius: 10px; /* squircle like desktop */
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  /* Feedback button */
-  #feedback-btn,
-  #theme-toggle-btn {
-    display: flex;                 /* flex container for text */
-    align-items: center;           /* vertical centering */
-    justify-content: center;       /* horizontal centering */
-    text-align: center;            /* prevent left-align */
-    white-space: nowrap;           /* prevent wrapping */
-    line-height: 1;                /* ensure font sits in middle */
-  }
-
-  /* Feedback button specific */
-  #feedback-btn {
-    bottom: 16px;
-    right: 10%;
-    width: 100px;      /* slightly wider to fit text + padding */
-    height: 40px;
-    border-radius: 10px;
-    padding: 0 12px;   /* only horizontal padding; vertical handled by flex */
-    font-size: 0.9rem;
-  }
-
-  /* Dark mode button specific */
-  #theme-toggle-btn {
-    bottom: 16px;
-    left: 10%;
-    width: 100px;      /* match feedback width */
-    height: 40px;      /* match feedback height */
-    border-radius: 10px;
-    padding: 0 12px;
-    font-size: 0.9rem;
-  }
-
-}
-
 @media (hover: none) {
   #theme-toggle-btn:hover,
   #feedback-btn:hover {
@@ -334,17 +215,6 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
   #feedback-btn:active {
     background: var(--accent-hover);
     transform: translateY(-1px);
-  }
-}
-
-@media (max-width: 640px) {
-  #privacy-toast {
-    left: 50%;
-    bottom: 10%;
-    transform: none;        /* remove translateX centering */
-    width: 100vw;           /* full viewport width */
-    border-radius: 0;       /* optional, flush with edges */
-    padding: 1rem;          /* adjust padding as needed */
   }
 }
 
@@ -561,4 +431,272 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
 .about-content p.right { text-align: right; }
 h1.center {
   text-align: center;
+  
+}
+
+
+/* =========================
+   Header / Wordmark & Mobile Responsiveness
+========================= */
+
+/* Header */
+header.site-wordmark {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-weight: 100;
+  font-size: 2rem;
+  color: #000000;
+  background: #F0F0EB;
+  opacity: 0.95;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  user-select: none;
+  pointer-events: auto;
+  z-index: 7;
+}
+
+/* Logo */
+.brand-logo {
+  height: 3rem;
+}
+html[data-theme='dark'] .brand-logo {
+  filter: invert(1) brightness(.95) contrast(.9);
+}
+.brand-text { line-height: 1; }
+
+/* Header menu */
+.header-menu {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Hamburger toggle (mobile) */
+#menu-toggle-btn { display: none; }
+
+
+@media (max-width: 835px) {
+
+  /* ---------------------- Wrap / layout ---------------------- */
+  .wrap {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: calc(4.25rem + 1rem) 1rem 1rem;
+  }
+
+  /* ---------------------- Header / wordmark ---------------------- */
+  header.site-wordmark {
+    position: relative;
+    top: auto;
+    left: auto;
+    justify-content: center;
+    margin-top: 1.25rem;
+    font-size: 1.35rem;
+  }
+
+  .brand-logo {
+    height: 2.4rem;
+  }
+
+  /* ---------------------- Card ---------------------- */
+  .card {
+    width: 94%;
+    max-height: 80vh;
+    padding: 0.3rem;
+    border-radius: 16px;
+    box-shadow: 0 6px 18px rgba(17,17,17,.08);
+    position: relative;
+    transform: translateY(-7%); /* moves the card upward */
+  }
+
+  .card-content {
+    flex: 1;
+    overflow-y: auto;
+    padding-right: 0.75rem;
+  }
+
+  /* ---------------------- Typography ---------------------- */
+  h1 {
+    font-size: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  p {
+    font-size: 0.95rem;
+  }
+
+  textarea,
+  input[type="text"],
+  input[type="search"],
+  input[type="email"],
+  input[type="number"] {
+    font-size: 1rem;
+  }
+
+  /* ---------------------- Buttons ---------------------- */
+  /* Feedback button */
+  #feedback-btn {
+    bottom: 16px;
+    right: 10%;           /* fixed % from left, adjust for desired spacing */
+    width: 90px;         
+    height: 40px;        /* match squircle proportions */
+    border-radius: 10px; /* same as desktop */
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Dark mode button */
+  #theme-toggle-btn {
+    bottom: 16px;
+    left: 10%;          /* fixed % from right */
+    width: 90px;         
+    height: 40px;        /* same as feedback */
+    border-radius: 10px; /* squircle like desktop */
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+  }
+
+  /* Feedback button */
+  #feedback-btn,
+  #theme-toggle-btn {
+    display: flex;                 /* flex container for text */
+    align-items: center;           /* vertical centering */
+    justify-content: center;       /* horizontal centering */
+    text-align: center;            /* prevent left-align */
+    white-space: nowrap;           /* prevent wrapping */
+    line-height: 1;                /* ensure font sits in middle */
+  }
+
+  /* Feedback button specific */
+  #feedback-btn {
+    bottom: 16px;
+    right: 10%;
+    width: 100px;      /* slightly wider to fit text + padding */
+    height: 40px;
+    border-radius: 10px;
+    padding: 0 12px;   /* only horizontal padding; vertical handled by flex */
+    font-size: 0.9rem;
+  }
+
+  /* Dark mode button specific */
+  #theme-toggle-btn {
+    bottom: 16px;
+    left: 10%;
+    width: 100px;      /* match feedback width */
+    height: 40px;      /* match feedback height */
+    border-radius: 10px;
+    padding: 0 12px;
+    font-size: 0.9rem;
+  }
+
+  #privacy-toast {
+    left: 50%;
+    bottom: 10%;
+    transform: none;        /* remove translateX centering */
+    width: 100vw;           /* full viewport width */
+    border-radius: 0;       /* optional, flush with edges */
+    padding: 1rem;          /* adjust padding as needed */
+  }
+
+}
+
+/* Mobile adjustments */
+@media (max-width: 835px) {
+  header.site-wordmark { font-size: 2rem; }
+  .brand-logo { height: 2.4rem; }
+
+  #menu-toggle-btn {
+    display: inline-flex;
+    background: #7F86B0;
+    color: #FFFFFF;
+    border: none;
+    font-size: 1.5rem;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-left: auto;
+    padding: 0 1rem;
+    align-items: center;
+    justify-content: center;
+    z-index: 9;
+  }
+
+  .header-menu {
+    position: fixed;
+    top: 0;
+    right: 0;
+    height: 100vh;
+    width: 250px;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 1rem;
+    background: #F0F0EB;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.15);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    z-index: 8;
+  }
+  html[data-theme=dark]
+
+  .header-menu a,
+  .header-menu button {
+    width: 100%;
+    margin-bottom: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-weight: 600;
+    height: 48px;
+    text-decoration: none;
+    background: #7F86B0;
+    color: #FFFFFF;
+    border-radius: 10px;
+    transition: background 0.2s ease, transform 0.1s ease;
+  }
+  .header-menu a:hover,
+  .header-menu button:hover { background: #6B708F; transform: translateY(-1px); }
+  .header-menu a:active,
+  .header-menu button:active { transform: translateY(0); }
+
+  .header-menu.show { transform: translateX(0); }
+
+  .header-menu .spacer { height: 1.5rem; flex-shrink: 0; }
+
+  /* Floating buttons into menu */
+  #theme-toggle-btn,
+  #feedback-btn {
+    position: static;
+    width: 100%;
+    margin: 0;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    height: 48px;
+    border-radius: 10px;
+    background: #7F86B0;
+    color: #FFFFFF;
+    font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-weight: 600;
+  }
+  
+}
+
+/* Desktop link reset */
+@media (min-width: 836px) {
+  .header-menu a {
+    all: revert;
+    background: none;
+    color: #000000;
+    font-weight: 500;
+    text-decoration: none;
+  }
 }

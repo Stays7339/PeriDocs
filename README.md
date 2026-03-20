@@ -295,7 +295,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-19T17:35:15-04:00
+## Canonical Project Directory as of 2026-03-19T18:26:00-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -346,7 +346,6 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ submit-success.html            # Submission success page template
 │  │  ├─ terms-of-service.html          # Terms of Service page template
 │  │  └─ includes/                      # Partial web-page templates
-│  │      ├─ footer.html
 │  │      ├─ modal-crisis.html
 │  │      └─ modal-feedback.html
 │  │
