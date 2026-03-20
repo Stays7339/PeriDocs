@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 202602261327  (YYYYMMDDhhmm)
+// save-state 2026-03-19T18:29:05-04:00
 // ==========================================
 
 /* Notes:
@@ -454,4 +454,71 @@ window.copySafeTextToClipboard = copySafeTextToClipboard;
       }
   }); // end deleteForm submit listener
     }
+
+// =========================
+// Header & Mobile Menu
+// =========================
+
+function initHeaderMenu() {
+  try {
+    const headerMenu = document.querySelector('.header-menu');
+    const menuToggle = document.getElementById('menu-toggle-btn');
+    const themeBtn = document.getElementById('theme-toggle-btn');
+    const feedbackBtn = document.getElementById('feedback-btn');
+
+    // Mobile menu toggle
+    menuToggle?.addEventListener('click', () => {
+      headerMenu?.classList.toggle('show');
+    });
+
+    // Move theme/feedback buttons into sidebar on mobile
+    function updateSidebarButtons() {
+      if (!headerMenu || !themeBtn || !feedbackBtn) return;
+      if (window.innerWidth <= 835) {
+        if (!headerMenu.contains(themeBtn)) headerMenu.appendChild(themeBtn);
+        if (!headerMenu.contains(feedbackBtn)) headerMenu.appendChild(feedbackBtn);
+      } else {
+        if (themeBtn.parentNode === headerMenu) document.body.appendChild(themeBtn);
+        if (feedbackBtn.parentNode === headerMenu) document.body.appendChild(feedbackBtn);
+      }
+    }
+    updateSidebarButtons();
+    window.addEventListener('resize', updateSidebarButtons);
+
+    // Header link/button hover and active
+    function styleHeaderButtons() {
+      headerMenu?.querySelectorAll('a, button').forEach(el => {
+        el.style.width = '100%';
+        el.style.marginBottom = '1.5rem';
+        el.style.display = 'inline-flex';
+        el.style.alignItems = 'center';
+        el.style.justifyContent = 'center';
+        el.style.fontFamily = "'CabinetGrotesk-Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial";
+        el.style.fontWeight = '600';
+        el.style.height = '48px';
+        el.style.textDecoration = 'none';
+        el.style.background = '#7F86B0';
+        el.style.color = '#FFFFFF';
+        el.style.borderRadius = '10px';
+        el.style.transition = 'background 0.2s ease, transform 0.1s ease';
+        el.addEventListener('mouseenter', () => { el.style.background='#6B708F'; el.style.transform='translateY(-1px)'; });
+        el.addEventListener('mouseleave', () => { el.style.background='#7F86B0'; el.style.transform='translateY(0)'; });
+        el.addEventListener('mousedown', () => el.style.transform='translateY(0)');
+      });
+    }
+    styleHeaderButtons();
+
+  } catch (err) {
+    console.error('Header/menu init failed:', err);
+  }
+}
+
+// Run immediately or on DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initHeaderMenu);
+} else {
+  initHeaderMenu();
+}
+
 }); // end DOMContentLoaded
+
