@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:24:00-04:00 ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:55:30-04:00 ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -187,17 +187,6 @@ html[data-theme='dark'] .parse-feedback-bar{background:var(--parse-dark-bg);colo
 html[data-theme='dark'] .report-parse-btn{background:var(--parse-btn-dark-bg);border:1px solid var(--parse-btn-dark-border);color:var(--parse-btn-dark-text);}
 html[data-theme='dark'] .report-parse-btn:hover{background:var(--parse-btn-dark-hover-bg);}
 
-/* ---------------------- Layout tweaks / tables ---------------------- */
-.review-table{border-collapse:collapse;width:100%;font-size:.95rem;}
-.review-table th,.review-table td{border:1px solid var(--muted);padding:.5rem;vertical-align:top;}
-.review-table th{background-color:var(--card);text-align:left;color:var(--text);}
-.review-table tbody tr:nth-child(even){background-color:color-mix(in srgb,var(--card) 90%,var(--bg) 10%);}
-html[data-theme='dark'] .review-table tbody tr:nth-child(even){background-color:color-mix(in srgb,var(--card) 85%,var(--bg) 15%);}
-.review-table tbody tr:hover{background-color:color-mix(in srgb,var(--accent) 10%,var(--card) 90%);}
-html[data-theme='dark'] .review-table tbody tr:hover{background-color:color-mix(in srgb,var(--accent) 10%,var(--card) 5%);}
-.expanded{padding:.5rem 0 1rem 1rem;background-color:color-mix(in srgb,var(--card) 90%,var(--bg) 10%);border-left:3px solid var(--muted);}
-html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card) 80%,var(--bg) 20%);border-left-color:var(--muted);}
-
 /* ---------------------- Feedback Modal ---------------------- */
 .feedback-modal{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:1002;}
 .feedback-modal-content{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
@@ -294,7 +283,7 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center; /* centers label */
+  justify-content: center;
   background: rgba(255,255,255,0.2);
   border: 1px solid rgba(255,255,255,0.3);
   transition: background 0.3s ease, color 0.3s ease;
@@ -315,10 +304,10 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
 
 .consent-toggle .toggle-label {
   position: relative;
-  z-index: 1; /* above background but below knob if overlapping */
+  z-index: 1;
   font-weight: 600;
   text-align: center;
-  pointer-events: none; /* avoids accidental click interference */
+  pointer-events: none;
 }
 
 .consent-toggle[data-state="on"] {
@@ -327,10 +316,10 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
 }
 
 .consent-toggle[data-state="on"] .toggle-knob {
-  transform: translateX(214px); /* pill width minus knob width minus padding */
+  transform: translateX(214px);
 }
 
-/* Overlay fades out after consent */
+/* Overlay state */
 .entry-wrapper[data-locked="true"] .entry-overlay {
   opacity: 1;
   pointer-events: auto;
@@ -340,10 +329,10 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
 .entry-wrapper[data-locked="false"] .entry-overlay {
   opacity: 0;
   pointer-events: none;
-  z-index: 5; /* below textarea for proper focus */
+  z-index: 5;
 }
 
-/* Overlay content centered */
+/* Overlay content */
 .entry-overlay .overlay-content {
   display: flex;
   flex-direction: column;
@@ -353,19 +342,18 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
   gap: 12px;
   padding: 16px 24px;
 }
-/* ==========================================
-   Overlay Streaks
-========================================== */
+
+/* Overlay streaks (base + hidden state merged) */
 .entry-overlay-streaks {
   position: absolute;
   inset: 0;
-  z-index: 7; /* behind overlay content */
+  z-index: 7;
   pointer-events: none;
   border-radius: inherit;
+
+  background: rgba(255,255,255,0.8);
   filter: blur(1024px);
 
-  /* Light mode streaks */
-  background: rgba(255,255,255,0.8);
   mask-image: repeating-linear-gradient(
     13deg,
     rgba(0,0,0,0) 0px,
@@ -382,6 +370,9 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
   );
   mask-repeat: repeat;
   -webkit-mask-repeat: repeat;
+
+  opacity: 0;
+  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
 }
 
 /* Dark mode streaks */
@@ -407,37 +398,24 @@ html[data-theme='dark'] .expanded{background-color:color-mix(in srgb,var(--card)
   -webkit-mask-repeat: repeat;
 }
 
-/* ==========================================
-   Streaks initial hidden state
-========================================== */
-.entry-overlay-streaks {
-  opacity: 0;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-}
-
 .entry-wrapper[data-locked="true"] .entry-overlay-streaks {
   opacity: 1;
   visibility: visible;
   transition: opacity 0.6s ease, visibility 0s;
 }
 
-/* ---------------------- About page paragraph alignment ---------------------- */
+/* About page paragraph alignment */
 .about-content p {
-  margin: 0 0 1rem 0; /* space between paragraphs */
+  margin: 0 0 1rem 0;
 }
 
 .about-content p.left { text-align: left; }
 .about-content p.center { text-align: center; }
 .about-content p.right { text-align: right; }
+
 h1.center {
   text-align: center;
-  
 }
-
-
-/* =========================
-   Header / Wordmark & Mobile Responsiveness
-========================= */
 
 /* Header */
 header.site-wordmark {
@@ -465,10 +443,14 @@ header.site-wordmark {
 .brand-logo {
   height: 3rem;
 }
+
 html[data-theme='dark'] .brand-logo {
   filter: invert(1) brightness(.95) contrast(.9);
 }
-.brand-text { line-height: 1; }
+
+.brand-text {
+  line-height: 1;
+}
 
 /* Header menu */
 .header-menu {
@@ -479,12 +461,13 @@ html[data-theme='dark'] .brand-logo {
   font-size: 0.9rem;
 }
 
-/* Hamburger toggle (mobile) */
-#menu-toggle-btn { display: none; }
+/* Hamburger toggle */
+#menu-toggle-btn {
+  display: none;
+}
 
 @media (max-width: 835px) {
 
-  /* ---------------------- Wrap / layout ---------------------- */
   .wrap {
     display: flex;
     justify-content: center;
@@ -492,7 +475,6 @@ html[data-theme='dark'] .brand-logo {
     padding: calc(4.25rem + 1rem) 1rem 1rem;
   }
 
-  /* ---------------------- Header / wordmark ---------------------- */
   header.site-wordmark {
     position: relative;
     top: auto;
@@ -506,7 +488,6 @@ html[data-theme='dark'] .brand-logo {
     height: 2.4rem;
   }
 
-  /* ---------------------- Card ---------------------- */
   .card {
     width: 94%;
     max-height: 80vh;
@@ -523,7 +504,6 @@ html[data-theme='dark'] .brand-logo {
     padding-right: 0.75rem;
   }
 
-  /* ---------------------- Typography ---------------------- */
   h1 {
     font-size: 1.25rem;
     margin-bottom: 1rem;
@@ -541,37 +521,6 @@ html[data-theme='dark'] .brand-logo {
     font-size: 1rem;
   }
 
-  /* ---------------------- Buttons ---------------------- */
-  #feedback-btn,
-  #theme-toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    text-align: center;
-    white-space: nowrap;
-    line-height: 1;
-  }
-
-  #feedback-btn {
-    bottom: 16px;
-    right: 10%;
-    width: 100px;
-    height: 40px;
-    border-radius: 10px;
-    padding: 0 12px;
-    font-size: 0.9rem;
-  }
-
-  #theme-toggle-btn {
-    bottom: 16px;
-    left: 10%;
-    width: 100px;
-    height: 40px;
-    border-radius: 10px;
-    padding: 0 12px;
-    font-size: 0.9rem;
-  }
-
   #privacy-toast {
     left: 50%;
     bottom: 10%;
@@ -581,7 +530,6 @@ html[data-theme='dark'] .brand-logo {
     padding: 1rem;
   }
 
-  /* ---------------------- Menu ---------------------- */
   #menu-toggle-btn {
     display: inline-flex;
     background: #7F86B0;
@@ -649,6 +597,7 @@ html[data-theme='dark'] .brand-logo {
     height: 1.5rem;
     flex-shrink: 0;
   }
+  
 
   /* Floating buttons into menu */
   #theme-toggle-btn,
@@ -666,6 +615,35 @@ html[data-theme='dark'] .brand-logo {
     font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     font-weight: 600;
   }
+
+  /* Dark mode header background */
+  html[data-theme='dark'] header.site-wordmark {
+    background: var(--card);
+    color: var(--text);
+  }
+
+  /* Dark mode mobile sidebar menu */
+  html[data-theme='dark'] .header-menu {
+    background: var(--card);
+    color: var(--text);
+  }
+
+  html[data-theme='dark'] .header-menu a,
+  html[data-theme='dark'] .header-menu button {
+    background: var(--accent);
+    color: var(--text);
+  }
+
+  html[data-theme='dark'] .header-menu a:hover,
+  html[data-theme='dark'] .header-menu button:hover {
+    background: var(--accent-hover);
+  }
+  /* ---------------------- Buttons for <a> links---------------------- */
+  button,.btn{display:inline-block;padding:0.6rem 1rem;border-radius:10px;font-weight:600;text-decoration:none;cursor:pointer;box-shadow:0 4px 12px rgba(17,17,17,.12);transition:background .16s ease;font-size:.9rem;}
+  button.primary,.btn.primary{background:var(--accent);color:var(--white);border:none;}
+  button.ghost,.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--muted);}
+  button:hover,.btn:hover,button.primary:hover,.btn.primary:hover{background-color:var(--accent-hover);}
+
 }
 
 /* Desktop link reset */
