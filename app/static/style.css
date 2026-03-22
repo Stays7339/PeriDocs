@@ -1,4 +1,4 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-20T12:55:30-04:00 ---------------------- */
+/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-21T20:40:30-04:00 ---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -79,7 +79,7 @@ html,body{height:100%;width:100%;background:linear-gradient(180deg,var(--bg),var
 
 /* ---------------------- Layout ---------------------- */
 .wrap{display:flex;justify-content:center;align-items:center;min-height:100vh;width:100%;padding:1rem;box-sizing:border-box;}
-.card{display:flex;flex-direction:column;width:720px;max-width:96%;max-height:calc(100vh - 4rem);background:var(--card);border-radius:var(--radius);box-shadow:0 10px 30px rgba(17,17,17,.06);padding:1rem;position:relative;overflow:hidden;}
+.card{display:flex;flex-direction:column;width:720px;max-width:96%;max-height:80vh;background:var(--card);border-radius:var(--radius);box-shadow:0 10px 30px rgba(17,17,17,.06);padding:1rem;position:relative;overflow:hidden;}
 .card-content{flex:1;overflow-y:auto;margin-bottom:1rem;padding-right:0.5rem;}
 .card footer{font-size:12px;color:var(--muted);text-align:center;padding-top:1rem;border-top:none;}
 .card > *:first-child{margin-top:1rem;}
@@ -152,13 +152,38 @@ a:active:not(.brand-link) {
 }
 
 /* ---------------------- Header/logo ---------------------- */
-header.site-wordmark{position: fixed;top: 0;left: 0;width: 100%;display:flex;align-items:center;gap:.6rem;font-family:'Cabinet Grotesk',sans-serif;font-weight:100;font-size:1.6rem;color:var(--text);opacity:.95;user-select:none;pointer-events:auto;}
 .brand-link{display:flex;align-items:center;text-decoration:none;color:inherit;}
 .brand-logo{height:3rem;width:auto;display:block;filter:none;  transform: scaleX(1); transform-origin: center}
 html[data-theme='dark'] .brand-logo{filter:invert(1) brightness(.95) contrast(.9);}
 .brand-text{line-height:1;}
-header.site-wordmark .brand-link{color:inherit;text-decoration:none;}
-header.site-wordmark .brand-link:hover,header.site-wordmark .brand-link:active{color:inherit;text-decoration:none;}
+header.header-bar .brand-link{color:inherit;text-decoration:none;}
+header.header-bar .brand-link:hover,header.header-bar .brand-link:active{color:inherit;text-decoration:none;}
+
+/* Header */
+header.header-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  font-weight: 100;
+  font-size: 2rem;
+  color: var(--text);
+  background: var(--card);
+  opacity: 0.95;
+  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+  user-select: none;
+  pointer-events: auto;
+  z-index: 7;
+}
+
+header.header-bar >p {
+  margin-top: 1rem;
+}
 
 /* ---------------------- Feedback / Theme buttons ---------------------- */
 #feedback-btn,#theme-toggle-btn,.feedback-btn{position:fixed;bottom:1.5rem;background:var(--accent);color:var(--white);border:none;border-radius:10px;cursor:pointer;font-weight:600;box-shadow:0 4px 12px rgba(17,17,17,.12);transition:background .16s ease;font-size:.9rem;padding:0.6rem 1rem;z-index:1000;}
@@ -267,7 +292,7 @@ html[data-theme='dark'] .report-parse-btn:hover{background:var(--parse-btn-dark-
   }
 }
 
-/* Mobile press feedback */
+
 .entry-wrapper[data-locked="true"]:active .entry-overlay {
   backdrop-filter: blur(2.5px) saturate(160%);
 }
@@ -297,7 +322,7 @@ html[data-theme='dark'] .report-parse-btn:hover{background:var(--parse-btn-dark-
   background: linear-gradient(145deg, #fff, #f2f2f2);
   box-shadow: 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 2px rgba(255,255,255,0.4);
   left: 4px;
-  top: 4px;
+  top: 2.5px;
   transition: transform 0.3s ease;
   z-index: 2;
 }
@@ -342,6 +367,7 @@ html[data-theme='dark'] .report-parse-btn:hover{background:var(--parse-btn-dark-
   gap: 12px;
   padding: 16px 24px;
 }
+
 
 /* Overlay streaks (base + hidden state merged) */
 .entry-overlay-streaks {
@@ -417,32 +443,6 @@ h1.center {
   text-align: center;
 }
 
-/* Header */
-header.site-wordmark {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.5rem 1rem;
-  font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
-  font-weight: 100;
-  font-size: 2rem;
-  color: #000000;
-  background: #F0F0EB;
-  opacity: 0.95;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-  user-select: none;
-  pointer-events: auto;
-  z-index: 7;
-}
-
-/* Logo */
-.brand-logo {
-  height: 3rem;
-}
 
 html[data-theme='dark'] .brand-logo {
   filter: invert(1) brightness(.95) contrast(.9);
@@ -472,15 +472,14 @@ html[data-theme='dark'] .brand-logo {
     display: flex;
     justify-content: center;
     align-items: flex-start;
-    padding: calc(4.25rem + 1rem) 1rem 1rem;
+    padding: 3rem 1rem 1rem;
   }
 
-  header.site-wordmark {
+  header.header-bar {
     position: relative;
     top: auto;
     left: auto;
     justify-content: center;
-    margin-top: 1.25rem;
     font-size: 2rem;
   }
 
@@ -532,8 +531,6 @@ html[data-theme='dark'] .brand-logo {
 
   #menu-toggle-btn {
     display: inline-flex;
-    background: #7F86B0;
-    color: #FFFFFF;
     border: none;
     font-size: 1.5rem;
     border-radius: 10px;
@@ -554,7 +551,7 @@ html[data-theme='dark'] .brand-logo {
     flex-direction: column;
     align-items: flex-start;
     padding: 1rem;
-    background: #F0F0EB;
+    background: var(--card);
     box-shadow: -4px 0 16px rgba(0,0,0,0.15);
     transform: translateX(100%);
     transition: transform 0.3s ease;
@@ -610,14 +607,12 @@ html[data-theme='dark'] .brand-logo {
     align-items: center;
     height: 48px;
     border-radius: 10px;
-    background: #7F86B0;
-    color: #FFFFFF;
     font-family: 'CabinetGrotesk-Variable', system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     font-weight: 600;
   }
 
   /* Dark mode header background */
-  html[data-theme='dark'] header.site-wordmark {
+  html[data-theme='dark'] header.header-bar {
     background: var(--card);
     color: var(--text);
   }
@@ -638,21 +633,54 @@ html[data-theme='dark'] .brand-logo {
   html[data-theme='dark'] .header-menu button:hover {
     background: var(--accent-hover);
   }
-  /* ---------------------- Buttons for <a> links---------------------- */
-  button,.btn{display:inline-block;padding:0.6rem 1rem;border-radius:10px;font-weight:600;text-decoration:none;cursor:pointer;box-shadow:0 4px 12px rgba(17,17,17,.12);transition:background .16s ease;font-size:.9rem;}
-  button.primary,.btn.primary{background:var(--accent);color:var(--white);border:none;}
-  button.ghost,.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--muted);}
-  button:hover,.btn:hover,button.primary:hover,.btn.primary:hover{background-color:var(--accent-hover);}
+  
+  /* Dark mode for nav links in header menu */
+  html[data-theme='dark'] .header-menu a.btn.primary {
+    background: var(--accent);
+    color: var(--text);
+  }
+
+  html[data-theme='dark'] .header-menu a.btn.primary:hover {
+    background: var(--accent-hover);
+  }
 
 }
 
-/* Desktop link reset */
+@media (max-width: 835px) {
+  /* Make the overlay a scrollable container on mobile */
+  #entry-wrapper .entry-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow-y: auto;          /* enable scrolling */
+    padding: 1rem;
+    display: block;            /* stop flex centering */
+    -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+  }
+
+  #entry-wrapper .entry-overlay .overlay-content {
+    max-height: none;          /* remove fixed min-height conflicts */
+    overflow: visible;         /* content scrolls inside overlay container */
+    text-align: left;          /* optional for paragraph readability */
+  }
+
+  /* Keep the toggle pill at top */
+  #consent-toggle {
+    margin-bottom: 1rem;
+  }
+}
+
+/* Ensure desktop nav links don’t wrap */
 @media (min-width: 836px) {
-  .header-menu a {
-    all: revert;
-    background: none;
-    color: #000000;
-    font-weight: 500;
-    text-decoration: none;
+  .header-menu a,
+  .header-menu button {
+    white-space: nowrap;       /* prevent text stacking */
+    padding: 0.5rem 1rem;      /* give enough horizontal room */
+  }
+
+  .card {
+    margin-top: 2rem; /* adjust to taste */
   }
 }

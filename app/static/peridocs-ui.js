@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-03-19T18:29:05-04:00
+// save-state 2026-03-21T22:30:50-04:00
 // ==========================================
 
 /* Notes:
@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const entryForm = document.querySelector('#entry-form');
 
   /* ================================
-     Consent Lock Feature (Production)
+     Consent Lock Feature
   ================================ */
   const entryWrapper = document.getElementById("entry-wrapper");
   const consentToggle = document.getElementById("consent-toggle");
@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* --- Initialize --- */
   applyConsentState(consentGranted);
 
-  /* --- Consolidated Event Listener --- */
+  /* --- Consolidated Event Listener --- 
   if (consentToggle) {
     consentToggle.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 3000);
       applyConsentState(!consentGranted);
     });
-  }
+  }*/
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
@@ -497,12 +497,11 @@ function initHeaderMenu() {
         el.style.fontWeight = '600';
         el.style.height = '48px';
         el.style.textDecoration = 'none';
-        el.style.background = '#7F86B0';
         el.style.color = '#FFFFFF';
         el.style.borderRadius = '10px';
         el.style.transition = 'background 0.2s ease, transform 0.1s ease';
-        el.addEventListener('mouseenter', () => { el.style.background='#6B708F'; el.style.transform='translateY(-1px)'; });
-        el.addEventListener('mouseleave', () => { el.style.background='#7F86B0'; el.style.transform='translateY(0)'; });
+        el.addEventListener('mouseenter', () => { el.style.transform='translateY(-1px)'; });
+        el.addEventListener('mouseleave', () => { el.style.transform='translateY(0)'; });
         el.addEventListener('mousedown', () => el.style.transform='translateY(0)');
       });
     }
