@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-03-15T13:07:35-05:00
+# Save-state: 2026-03-19T17:05:00-04:00
 # ==========================================
 """
 Entry Membership Sequencer.

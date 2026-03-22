@@ -1,7 +1,8 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-03-15T21:51:50-05:00
+# save-state 2026-03-19T17:44:35-04:00
 # ==========================================
+
 
 from __future__ import annotations
 import asyncio
@@ -53,7 +54,7 @@ async def process_entry_async(
         raise ValueError("Empty or whitespace-only entry.")
 
     timestamp = datetime.now(timezone.utc).isoformat()
-    ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()[:8]
+    ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
 

@@ -5,135 +5,151 @@ Users may actively choose to rigorously describe their perspective of the world,
 
 ---
 
+## Setup Guide (Full Walkthrough)
 
-## PeriDocs Full Setup Instructions (from Zero to Running Webapp)
+### Step 0. Install Prerequisites
 
-Imagine you are starting with a completely clean machine. The instructions cover **macOS, Linux (like openSUSE), and Windows**, and assume you are not working as root except where necessary for initial permissions.
+#### For macOS
 
-### Step 0: Decide Your User
+1. Install Homebrew (if not already installed):
 
-You **do not need to create a new admin/root user**, but you **should not run the app under an admin/root account**. Any pre-existing standard user account is fine, as long as you have **full write permissions in the folder where PeriDocs will live**.
+   ```bash (Terminal)
+   /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
 
-* Example safe locations: `/home/username/peridocs` on Linux/macOS, or `C:\Users\username\peridocs` on Windows.
-* The setup script will create `.ssh` and `app` folders under this root directory.
+Official site: [https://brew.sh](https://brew.sh)
 
-**Important:** Do **not** run the webapp as root—this prevents permissions and SSH problems like we’ve seen.
+2. Install Python 3.12.7 and Git (pyenv recommended for exact version):
 
----
-
-### Step 1: SSH Key Setup and Permissions
-
-1. Run the setup script with your standard user account. The script will:
-
-   * Check if an SSH key already exists for this user.
-   * If not, generate a new SSH key.
-   * Display the **public key** so you can copy it into your GitHub account.
-
-2. The script will pause and ask you to confirm that the key has been added to GitHub. This ensures that later, when the app pulls the repository, it can authenticate without root or manual password entry.
-
-**Tip:** This SSH key is created **one level above your app folder**—for example, if your PeriDocs root is `/home/user/peridocs`, the key lives in `/home/user/peridocs/.ssh`.
-
----
-
-### Step 2: `.env` File Creation and Fernet Key
-
-1. After SSH setup, the script prompts you to create and fill a `.env` file in `peridocs/app/`.
-
-2. You can either:
-
-   * Let the script generate a Fernet key for you, or
-   * Provide a Fernet key from an **encrypted password manager** if you already have one.
-
-3. This `.env` file is **mandatory**. Without it, the webapp **will not start**, because the encryption key is required for internal operations.
-
-**Tip:** Keep the `.env` file private. Never commit it to GitHub. The script ensures it is created in the correct folder relative to `.ssh` so everything can interact properly.
-
----
-
-### Step 3: Pull Repository
-
-1. With SSH configured and `.env` in place, the script **pulls the repository** into `peridocs/app`.
-2. If the folder already exists, the script will **update the repository instead of cloning**.
-3. At this point, `.env` is already present and the SSH key allows GitHub authentication without root.
-
-**Why this order matters:** Pulling the repo before `.env` exists or before SSH is set up will fail the daemon and prevent the RoBERTa model from installing correctly.
-
----
-
-### Step 4: Virtual Environment and Dependencies
-
-1. The script creates a **Python virtual environment** inside the app folder (`venv`) to isolate dependencies from the system.
-2. It automatically installs all Python packages listed in `requirements.txt`.
-
-**Tip for MacOS, Linux, Windows:**
-
-* macOS/Linux: `python3 -m venv venv` and `source venv/bin/activate`
-* Windows: `python -m venv venv` and `venv\Scripts\activate`
-
-This step ensures the correct versions of PyTorch, sentence-transformers, and other dependencies are installed, including the CPU-only version of PyTorch.
-
----
-
-### Step 5: Setup RoBERTa Model
-
-1. After dependencies are installed, the script runs `setup_roberta.py`.
-2. This downloads a **snapshot-locked RoBERTa model**, symlinks it to `app/models/roberta-large`, and enforces offline mode.
-3. The script performs a deterministic embedding test to make sure the model is loaded correctly.
-
-**Important:** This step **must run after the virtual environment is ready** but **before systemd** or any daemon attempt to start the app.
-
----
-
-### Step 6: Optional Systemd / Service Setup (Linux Only)
-
-1. The script asks whether you want to set up the app as a **systemd service**.
-2. If yes, it creates a non-root service running as the user you’re logged in as, pointing at the `venv` Python binary.
-3. The script reloads systemd, enables the service, and can start it automatically.
-
-**Tip:** Skip this step if you are a developer and only want to run the app locally.
-
----
-
-### Step 7: Verify the Webapp
-
-1. Run the app either via systemd (Linux) or manually:
-
-   ```bash
-   /path/to/peridocs/app/venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```bash (Terminal)
+   brew install pyenv git
+   pyenv install 3.12.7
+   pyenv global 3.12.7
    ```
 
-2. Open your browser at `http://127.0.0.1:8000/` to see the webapp running.
+3. Verify installations:
 
-3. Check the terminal logs to ensure the RoBERTa embeddings loaded correctly and there are no errors about missing `.env` or permissions.
-
----
-
-### Security Notes
-
-* SSH key is generated **per user**, never under root.
-* `.env` must be kept private.
-* The script enforces non-root execution for app files, models, and the `.ssh` folder.
-* Systemd runs as the non-root user if enabled.
-
-**Minor things to note:**
-
-* On Windows, systemd is skipped; you can use the virtual environment directly.
-* On MacOS/Linux, ensure firewall rules allow port 8000 if you want external access.
-* Fernet keys in `.env` must be unique per deployment to avoid conflicts.
+   ```bash (Terminal)
+   python3 --version
+   git --version
+   ```
 
 ---
 
-### TL;DR Order of Operations
+#### For Linux (Ubuntu/Debian-based)
 
-1. SSH keys & non-root permissions
-2. `.env` creation + Fernet key
-3. Pull repository into `peridocs/app`
-4. Virtual environment setup & pip install
-5. Run `setup_roberta.py` to download and validate model
-6. Optional: systemd service setup (Linux only)
-7. Run the webapp and verify
+1. Update and install dependencies:
+
+   ```bash
+   sudo apt update && sudo apt upgrade -y
+   sudo apt install -y python3.12 python3.12-venv python3-pip git curl
+   ```
+
+2. Verify installations:
+
+   ```bash
+   python3 --version
+   git --version
+   ```
+
+3. (Optional) If you are using another distribution, substitute the package manager (dnf, pacman, etc.) as appropriate.
 
 ---
+
+#### For Windows
+
+1. Install Git for Windows: [https://git-scm.com/download/win](https://git-scm.com/download/win)
+   During setup, choose:
+
+   * "Use Git from the Windows Command Prompt"
+   * "Checkout Windows-style, commit Unix-style line endings"
+
+2. Install Python 3.12.7 (3.12.7 is the only version confirmed to work with compatibility between required libraries)
+   Download from: [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
+   During setup:
+
+   * Check "Add Python to PATH"
+   * Include pip during installation
+
+3. Verify installations:
+
+   ```powershell
+   python --version
+   git --version
+   ```
+
+---
+
+### Step 1. Clone the Repository
+
+Choose a folder to hold the project (for example, Desktop/ or Documents/ or PeriDocs-code/).
+
+```bash
+git clone https://github.com/Stays7339/PeriDocs.git
+cd PeriDocs-code
+```
+
+> Note: This repository should remain set to private. Only collaborators with access can clone it or pull from it.
+
+---
+
+### Step 2. Create a Virtual Environment
+Activating the virtual environment ensures packages are installed locally and not system-wide.
+
+#### macOS / Linux
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+#### Windows (PowerShell)
+
+```powershell
+python -m venv venv
+venv\Scripts\activate
+```
+
+If activation fails on Windows due to a security policy error:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+venv\Scripts\activate
+```
+
+---
+
+### Step 3. Install Dependencies
+
+With your virtual environment activated:
+
+```bash
+pip install -r requirements.txt
+```
+
+If pip needs upgrading:
+
+```bash
+pip install --upgrade pip
+```
+
+---
+
+### Step 4. Set Up Secrets / Environment Variables
+
+Create a `.env` file in the project root with your local keys:
+
+```
+PERIDOCS_AES_KEY=your-secret-key
+ADMIN_TOKEN=your-admin-token
+```
+
+> Do **not** commit `.env` to GitHub.
+
+For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
+
+You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs-code`
+The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
 # Important: check what is *CRUCIAL* to add into .gitignore before continuing
 <details>
@@ -235,11 +251,51 @@ app/static/CabineyGrotesk_Complete/*
 
 # ^ ! ^ ! ^
 
+---
+
+### Step 5. Run the App Locally
+
+Run this command inside the project folder:
+
+```bash
+uvicorn app.routes:app --host 0.0.0.0 --port 8000 --reload
+```
+
+You should see output similar to:
+
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+```
+
+---
+
+### Step 6. Open the App
+
+Open your browser and go to:
+
+```
+http://127.0.0.1:8000/
+```
+
+You now have PeriDocs running locally.
+
+---
+
+### Step 7. (Optional) Developer Tooling Setup
+
+#### VS Code Recommended Setup
+
+1. Install VS Code: [https://code.visualstudio.com/](https://code.visualstudio.com/)
+2. Open the PeriDocs-code folder in VS Code.
+
+
+---
+
 # Canonical Project Directory 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-15T16:05:40-05:00
+## Canonical Project Directory as of 2026-03-19T18:26:00-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -252,7 +308,7 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │
 │  │
 │  │
@@ -273,7 +329,9 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ peridocs-logo-v2.png
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
 │  │  ├─ peridocs-wordmark-202602232127.svg
-│  │  ├─ peridocs-wordmark-and-logo-202602261328.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232100.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.png
+│  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -322,49 +380,29 @@ PeriDocs-code/                         # Root project folder
 │
 │
 ├─ data/                                  # Local data storage
+│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
+│  ├─ entries.json                        # Stored entries
 │  ├─ feedback.json                       # Stored feedback and report inquiries
-│  ├─ high-profile-addresses.json         # Prevents PII exposure     
-│  ├─ names_au.json                       # Common-enough first names and last names from Australia.
-│  ├─ names_ca.json                       # Common-enough first names and last names from Canada.
-│  ├─ names_ie.json                       # Common-enough first names and last names from Ireland.
-│  ├─ names_in.json                       # Common-enough first names and last names from India.
-│  ├─ names_nz.json                       # Common-enough first names and last names from New Zealand.
-│  ├─ names_sg.json                       # Common-enough first names and last names from Singapore.
-│  ├─ names_uk.json                       # Common-enough first names and last names from United Kingdom.
-│  ├─ names_us.json                       # Common-enough first names and last names from United States.
-│  ├─ names_za.json                       # Common-enough first names and last names from South Africa.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
-│  ├─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
-│  ├─ entries
-│  │  ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for embeddings roughly per 90 words to keep the main entries much more readable by humans.  
-│  │  ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for embeddings for the whole entry no matter the length to keep the main entries much more readable by humans.
-│  │  ├─ entries_standout_flags_dump[YYYYMMDD]_[0-3].npz file(s) # Storage for segments of 
-│  │  └─ entries.json                     # Stored entries in the safe-text and meta-data. Embedding vectors are stored in entries_clause_embeddings_dump and entries_embeddings_dump
-│  └─ centroids/
-│     ├─[centroid/precentroid]_[x]_summary.json #shows the IDs and name labels for the current states and previous states, without the thousands of floats. The thousands of floats are in the non-pickled .npz file.
-│     └─ [centroid/precentroid]_[x].npz    #contains the embedding vector data for the centroid, including its previous states. All npz files should always be non-pickled, for the sake of security.
+│  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
+│
+│
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives
-│   ├─ roberta-large/                  # Sentence-understanding model
-│   │   ├─.locks/
-│   │   │   └─ models--sentence-transformers--all-roberta-large-v1/
-│   │   │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831.lock
-│   │   │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7.lock
-│   │   │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6.lock
-│   │   │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx].lock # Nine more files just like that
+│   ├─.locks/
+│   └─ models--sentence-transformers--all-roberta-large-v1/
 │   │   └─ models--sentence-transformers--all-roberta-large-v1/ # yes the same name
 │   │               ├─ .no_exist/
 │   │               │       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
+│   │               │                 ├─ adapter_config.json
 │   │               │                 └─ added_tokens.json
 │   │               ├─ blobs/
-│   │               │           ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
-│   │               │           ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
-│   │               │           └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
-│   │               ├─ refs/
-│   │               │           ├─ main # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 2ea7ad0e45a9d1d1591782ba7e29a703d0758831 # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 4ebe4bb3f3114daf2e4cc349f24873a1175a35d7 # no . or "dot" extension nor / or "slash" extension
+│   │               │    ├─ 7a7f517f71e7a3286b03572ece4fb2e5a0571db6 # no . or "dot" extension nor / or "slash" extension
+│   │               │    └─ [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] # Nine more files just like that
 │   │               └─ snapshots/
 │   │                       └─ cf74d8acd4f198de950bf004b262e6accfed5d2c/
 │   │                                  ├─ 1_Pooling/
@@ -392,18 +430,12 @@ PeriDocs-code/                         # Root project folder
 │    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
 │    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │
-├─ venv/                               # Python virtual environment (ignored by Git)
-│   ├─ bin/                            # Executables (python, pip, etc.)
-│   ├─ include/                        # Headers for building packages
-│   ├─ lib/                            # Installed Python packages
-│   ├─ share/                           # Shared resources for the virtual environment
-│   └─ pyvenv.cfg                      # Virtual environment configuration
+├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
-├─ peridocs_full_setup_script.sh         # Installs .ssh, .env. venv, pip, pip libraries, and offline RoBERTa cache
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 ```
 </details>

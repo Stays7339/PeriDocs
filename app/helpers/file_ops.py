@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/file_ops.py
-# save-state updated 2026-03-15T13:34:45-05:00
+# save-state updated 202602201527
 # ==========================================
 
 import json
@@ -9,7 +9,7 @@ from typing import Any, Dict, List
 from datetime import datetime
 from app.helpers.json_safe import json_safe  # updated import
 
-DATA_FILE = os.path.join(os.path.dirname(__file__), '../../entries/entries.json')
+DATA_FILE = os.path.join(os.path.dirname(__file__), '../../data/entries.json')
 
 def load_data(file_path: str = DATA_FILE) -> List[Dict[str, Any]]:
     """Safely load JSON data, return empty list if file missing or invalid"""
