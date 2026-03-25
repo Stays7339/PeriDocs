@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-03-19T16:49:15-04:00
+# save-state 2026-03-24T19:57:40-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -24,10 +24,11 @@ from core.map.mapping_runtime import ledger, centroid_system
 
 
 
+
 templates = Jinja2Templates(directory="app/templates")
 entries_FILE = "data/entries/entries.json"
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-logger = logging.getLogger("peridocs.entry-routing")
+logger = logging.getLogger("peridocs.app.routes.entry.py")
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}
@@ -183,9 +184,7 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
                 "crisis_flag": crisis_flag
             }
 
-            # Debug log
-            # print(f"[DEBUG WS SEND] entry_id={entry_id}, progress={progress}, crisis_flag={crisis_flag}")
-
+            
             # Send progress message only if crisis not yet triggered
             if not crisis_triggered:
                 try:
@@ -206,7 +205,6 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
 async def submit_success(request: Request, id: str):
     # ---------------- Resolve temp ID → real entry_id ----------------
     id = temp_to_real_entry_id.get(id, id)
-
     all_entries = load_data(entries_FILE)
     entry = next(
         (
@@ -240,6 +238,7 @@ async def submit_success(request: Request, id: str):
 
     top_matches_formatted = [
         {
+            "entry_nickname": e["entry"].get("entry_nickname"),
             "entry_id": json_safe(e["entry"].get("entry_id", e["entry"].get("id"))),
             "excerpt": json_safe(e["entry"].get("safe_text", ""))[:200],
             "similarity_pct": round(max(min(e["score"], 1.0), 0.0) * 100, 1),
@@ -254,6 +253,7 @@ async def submit_success(request: Request, id: str):
         "submit-success.html",
         {
             "request": request,
+            "entry_nickname": entry.get("entry_nickname"),
             "entry_id": entry.get("entry_id", entry.get("id")),
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,

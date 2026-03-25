@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-03-19T17:04:30-04:00
+# Save-state: 2026-03-24T14:55:30-04:00
 # ==========================================
 
 """
@@ -28,6 +28,7 @@ LEDGER_PATH = DATA_DIR / "ledger.json"
 _ledger_lock = asyncio.Lock()
 _ledger_cache: Dict[str, Any] | None = None
 
+logger = logging.getLogger("peridocs.core.map.ledeger")
 
 def _initial_ledger() -> Dict[str, Any]:
     return {
@@ -39,6 +40,13 @@ def _initial_ledger() -> Dict[str, Any]:
 
 
 async def _load() -> Dict[str, Any]:
+    """
+    Load ledger.json from disk.
+    If missing:
+        - Prompt human if centroids exist in STATE_DIR.
+        - If user agrees, create initial ledger.
+        - If user declines, raise RuntimeError.
+    """
     global _ledger_cache
     if _ledger_cache is not None:
         return _ledger_cache
@@ -46,8 +54,16 @@ async def _load() -> Dict[str, Any]:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.path.exists(LEDGER_PATH):
+        # Check if centroids exist on disk
+        centroids_exist = any(
+            fname.endswith("_summary.json") for fname in os.listdir(os.path.join(DATA_DIR, "centroids"))
+        )
+        if centroids_exist:
+            logger.error("[ledger_init] Centroids found on disk but ledger.json is missing. Aborting startup.")
+            raise RuntimeError("Startup aborted: ledger.json missing while centroids exist")
+
         _ledger_cache = _initial_ledger()
-#        await _save(_ledger_cache)
+        await _save(_ledger_cache)  # safe write to disk
     else:
         with open(LEDGER_PATH, "r", encoding="utf-8") as f:
             _ledger_cache = json.load(f)

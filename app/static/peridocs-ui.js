@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-03-21T22:30:50-04:00
+// save-state 2026-03-23T18:312:45-04:00
 // ==========================================
 
 /* Notes:
@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* --- Initialize --- */
   applyConsentState(consentGranted);
 
-  /* --- Consolidated Event Listener --- 
+  /* --- Consolidated Event Listener --- */
   if (consentToggle) {
     consentToggle.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 3000);
       applyConsentState(!consentGranted);
     });
-  }*/
+  }
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');

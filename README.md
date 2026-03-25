@@ -231,7 +231,7 @@ build/
 data/*
 !data/.gitkeep
 data/entries.json
-
+backups-for-the-main-data-folder/*
 
 # ------------------------------
 # Ignore embeddings models folders since we have large data sets
@@ -295,7 +295,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-19T18:26:00-04:00
+## Canonical Project Directory as of 2026-03-24T18:05:30-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -352,8 +352,8 @@ PeriDocs-code/                         # Root project folder
 │  │
 │  └─ __pycache__/                       # Python compiled bytecode cache
 │
-│
-│
+├─backups-for-the-main-data-folder
+│   └─peridocs_backup_[YYYY]-[MM]-[DD]T[HH]-[mm]-[ss]Z.zip
 ├─ core/
 │   ├─ map/
 │   │   ├─ admin_review_helpers.py        # The Moderation Layer - logic for creating a dashboard for human administrators at PeriDocs.
@@ -380,8 +380,13 @@ PeriDocs-code/                         # Root project folder
 │
 │
 ├─ data/                                  # Local data storage
-│  ├─ [entries_embeddings_dumpYYYYMMDD_[0-3].json file(s)] # Storage for embeddings to keep the main entries much more readable by humans.
-│  ├─ entries.json                        # Stored entries
+│  ├─ centroids/
+│  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
+│  │   └─[centroid/precentroid]_[natural_sort_integer].npz
+│  ├─ entries/                        # Stored entries
+│  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
+│  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
+│  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.

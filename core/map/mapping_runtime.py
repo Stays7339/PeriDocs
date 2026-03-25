@@ -1,16 +1,25 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 202602151513 (YYYYMMDDhhmm)
+# Save-state: 2026-03-24T17:47:30-04:00 (YYYYMMDDhhmm)
 # ==========================================
-
+import os
 import logging
+import asyncio
+import zipfile
 from typing import Optional
+from pathlib import Path
+from datetime import datetime
 
 from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
 
-logger = logging.getLogger("peridocs.mapping_runtime")
+logger = logging.getLogger("peridocs.core.map.mapping_runtime")
 
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
+ENTRIES_DIR = os.path.join(DATA_DIR, "entries")
+STATE_DIR = os.path.join(DATA_DIR, "centroids")
+SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
+ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 
 # ---------------------------------------------------------------------
 # Singleton Instances
@@ -60,6 +69,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
         return
 
     logger.info("Initializing mapping runtime...")
+    logger.info("Centroids loaded: %s", list(centroid_system._centroids.keys()))
 
     # Load ledger into memory
     await ledger.load()
@@ -67,18 +77,62 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     # Reconstruct centroid state from disk
     await centroid_system.load_state()
 
-    # --- NEW: preload burst/split suggestions ---
+    # --- VERIFY centroids against ledger ---
+    try:
+        await ledger.verify_runtime_state(centroid_system)
+        # Startup-level integrity check (JSON/NPZ)
+        await centroid_system._verify_integrity_on_startup()
+    except Exception as e:
+        logger.error("[initialize_runtime] Centroid/Ledger mismatch or file integrity failure: %s", e)
+        # Flush user entries safely here if needed (optional)
+        # For (non-literal, skeletal) example: await entry.flush_pending_entries()
+        raise RuntimeError("Mapping runtime startup aborted due to integrity failure")
+
+    # Preload burst/split suggestions
     await centroid_system._load_split_suggestions()
 
     _initialized = True
 
     if verify:
         await ledger.verify_runtime_state(_centroid_system)
-
+    logger.info("Centroids loaded: %s", list(centroid_system._centroids.keys()))
     logger.info("Mapping runtime initialized successfully.")
 
+    # Schedule periodic check after initialization
+    asyncio.create_task(periodic_integrity_check())
     
+# Define one central interval
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300  # 5 minutes, change this once
 
+async def periodic_integrity_check():
+    """
+    Periodically verify centroid integrity and create a zip backup if checks pass.
+    """
+    backup_dir = Path.cwd()  # project root
+    backups_folder = backup_dir / "backups-for-the-main-data-folder"
+    backups_folder.mkdir(exist_ok=True)
+
+    while True:
+        try:
+            # Verify integrity
+            await _centroid_system._verify_integrity_on_startup()
+
+            # Create zip backup of full data folder
+            timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
+            backup_name = backups_folder / f"peridocs_backup_{timestamp}.zip"
+
+            # Recursively zip DATA_DIR
+            data_dir_path = Path(DATA_DIR)
+            with zipfile.ZipFile(backup_name, "w", zipfile.ZIP_DEFLATED) as zf:
+                for file_path in data_dir_path.rglob("*"):
+                    zf.write(file_path, file_path.relative_to(data_dir_path))
+
+            logger.info(f"[periodic_integrity_check] Backup created: {backup_name}")
+
+        except Exception as e:
+            logger.error(f"[periodic_integrity_check] Integrity check or backup failed: {e}")
+
+        await asyncio.sleep(PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS)
 
 # ---------------------------------------------------------------------
 # Health / Debug Utilities

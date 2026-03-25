@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-19T17:04:00-04:00
+# Save-state: 2026-03-24T17:41:55-04:00
 # ==========================================
 
 import os
@@ -14,9 +14,11 @@ from datetime import datetime, timezone
 from typing import Dict, List
 import numpy as np
 from numpy.linalg import norm
-from core.map.ledger import IdentifierLedger
 from scipy.cluster.hierarchy import linkage, fcluster
 from concurrent.futures import ThreadPoolExecutor
+
+from core.map.ledger import IdentifierLedger
+from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from app.helpers.entry_similarity import (
     cosine_similarity,
     deterministic_mean,
@@ -25,7 +27,7 @@ from app.helpers.entry_similarity import (
 
 
 
-logger = logging.getLogger("peridocs.centroids")
+logger = logging.getLogger("peridocs.core.map.centroids")
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 ENTRIES_DIR = os.path.join(DATA_DIR, "entries")
@@ -174,6 +176,100 @@ class CentroidSystem:
                 f"Centroid ID {centroid_id} does not exist in ledger"
             )
 
+    async def _verify_integrity_on_startup(self) -> None:
+        """
+        Comprehensive startup-time integrity check for centroids.
+
+        Checks performed:
+        1. Ledger must be loaded.
+        2. In-memory centroids:
+            - JSON exists and matches centroid_id
+            - .npz exists and vectors are valid/non-zero
+            - States exist
+        3. Ledger → disk consistency:
+            - Every issued suffix in ledger must have corresponding JSON/NPZ on disk
+        4. Logs all errors before raising RuntimeError
+        5. Zero vectors found during checks are recorded to zero_vector_flags.json
+        """
+
+        await self._assert_ledger_ready()
+
+        missing_files = []
+        invalid_vectors = []
+        empty_states = []
+        mismatched_json_ids = []
+        ledger_missing_on_disk = []
+        self._zero_vector_flags = {}
+
+        # --- check in-memory centroids ---
+        async with self._lock:
+            for cid, centroid in self._centroids.items():
+                json_path = os.path.join(STATE_DIR, f"{cid}_summary.json")
+                npz_path = os.path.join(STATE_DIR, f"{cid}.npz")
+
+                if not os.path.exists(json_path) or not os.path.exists(npz_path):
+                    missing_files.append(cid)
+                    continue
+
+                # Load JSON
+                try:
+                    with open(json_path, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if data.get("centroid_id") != cid:
+                        mismatched_json_ids.append(cid)
+                except Exception as e:
+                    mismatched_json_ids.append(cid)
+                    logger.error("[_verify_integrity] Failed to read JSON %s: %s", json_path, e)
+                    continue
+
+                # Check states
+                if not data.get("states"):
+                    empty_states.append(cid)
+                    continue
+
+                # Check vectors
+                try:
+                    npz_data = np.load(npz_path)
+                    for key, vec in npz_data.items():
+                        if not isinstance(vec, np.ndarray) or np.all(vec == 0):
+                            invalid_vectors.append(f"{cid}:{key}")
+                            self._zero_vector_flags[f"{cid}:{key}"] = "zero or invalid vector"
+                except Exception as e:
+                    invalid_vectors.append(f"{cid}:npz_load_fail")
+                    logger.error("[_verify_integrity] Failed to read NPZ %s: %s", npz_path, e)
+
+        # --- check ledger → disk consistency ---
+        ledger_snapshot = await self._ledger.snapshot()
+        for suffix_str, record in ledger_snapshot["issued_suffixes"].items():
+            cid = f"precentroid_{suffix_str}"
+            json_path = os.path.join(STATE_DIR, f"{cid}_summary.json")
+            npz_path = os.path.join(STATE_DIR, f"{cid}.npz")
+            if not os.path.exists(json_path) or not os.path.exists(npz_path):
+                ledger_missing_on_disk.append(cid)
+
+        # --- aggregate errors ---
+        errors = []
+        if missing_files:
+            errors.append(f"In-memory centroids missing JSON/NPZ: {missing_files}")
+        if invalid_vectors:
+            errors.append(f"Zero or invalid vectors: {invalid_vectors}")
+        if empty_states:
+            errors.append(f"Centroids with no states: {empty_states}")
+        if mismatched_json_ids:
+            errors.append(f"JSON centroid_id mismatch: {mismatched_json_ids}")
+        if ledger_missing_on_disk:
+            errors.append(f"Ledger has issued suffixes but disk files missing: {ledger_missing_on_disk}")
+
+        # persist zero vector flags
+        await self.persist_zero_vector_flags()
+
+        if errors:
+            for err in errors:
+                logger.error("[_verify_integrity] %s", err)
+            raise RuntimeError("Centroid integrity check failed. See logs above.")
+
+        logger.info("[_verify_integrity] All centroids passed startup integrity check.")
+        
     async def persist_zero_vector_flags(self):
         if hasattr(self, "_zero_vector_flags") and self._zero_vector_flags:
             with open(self._zero_vector_flags_file, "w", encoding="utf-8") as f:
@@ -482,7 +578,7 @@ class CentroidSystem:
     async def burst_precentroid(
         self,
         precentroid_id: str,
-        threshold: float = 0.8
+        threshold: float = BURST_PRECENTROID_STARTING_THRESHOLD
     ) -> List[str]:
         """
         Burst a precentroid as a *mode of rejection*.

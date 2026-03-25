@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-03-19T17:44:35-04:00
+# save-state 2026-03-24T19:07:15-04:00
 # ==========================================
 
 
@@ -21,7 +21,7 @@ import logging
 
 from .embeddings import encrypt_text, get_embedding_async
 from .pii import redact_pii
-from .hash_utils import sha8_hash
+from .hash_utils import full_hash
 from .crisis_detector import crisis_notification_async
 from .crisis_recorder import append_crisis_record
 from .clause_utils import split_into_clauses, sliding_window_clauses
@@ -97,7 +97,9 @@ async def process_entry_async(
     report_progress()  # 3 / total_steps
 
     # ---------------- ID GENERATION ----------------
-    sha8 = sha8_hash(safe_text)
+    entry_id = full_hash(safe_text)
+
+    entry_nickname = entry_id[:12]
     
     report_progress()  # 4 / total_steps
     # ---------------- CRISIS CHECK ----------------
@@ -106,7 +108,8 @@ async def process_entry_async(
 
     # ---------------- CONSTRUCT ENTRY ----------------
     entry: Dict[str, Any] = {
-        "entry_id": sha8,
+        "entry_nickname": entry_nickname,
+        "entry_id": entry_id,
         "timestamp": timestamp,
         "ip_salt": ip_salt,
         "encrypted_raw_ip": encrypted_raw_ip,
@@ -142,25 +145,25 @@ async def process_entry_async(
 
             # validate keys
             for k in loaded.keys():
-                if not isinstance(k, str) or len(k) != 8 or not all(c in "0123456789abcdef" for c in k.lower()):
+                if not isinstance(k, str) or not all(c in "0123456789abcdef" for c in k.lower()):
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
 
             npz_dump = loaded
         else:
             npz_dump = {}
 
-        npz_dump[sha8] = doc_embedding
+        npz_dump[entry_id] = doc_embedding
         np.savez_compressed(npz_path, **npz_dump)
 
         Path(entries_CLAUSE_EMBED_FILE).parent.mkdir(parents=True, exist_ok=True)
         clause_dump = dict(np.load(entries_CLAUSE_EMBED_FILE, allow_pickle=False)) if Path(entries_CLAUSE_EMBED_FILE).exists() else {}
-        clause_dump[sha8] = clause_embeddings_array
+        clause_dump[entry_id] = clause_embeddings_array
         np.savez_compressed(entries_CLAUSE_EMBED_FILE, **clause_dump)
 
         
         standout_path = f"data/entries/entries_standout_flags_dump{BACKUP_TIMESTAMP}.npz"
         loaded_flags = dict(np.load(standout_path, allow_pickle=False)) if Path(standout_path).exists() else {}
-        loaded_flags[sha8] = np.array(standout_flags, dtype=bool)
+        loaded_flags[entry_id] = np.array(standout_flags, dtype=bool)
         np.savez_compressed(standout_path, **loaded_flags)
 
     report_progress()  # 7 / total_steps

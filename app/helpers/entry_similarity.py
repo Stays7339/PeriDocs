@@ -1,7 +1,7 @@
 
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-03-19T16:48:30-04:00
+# Save-state: 2026-03-24T18:25:15-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -63,11 +63,11 @@ def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
     for f in npz_files:
         with np.load(f, allow_pickle=False) as data:
             for k in data.keys():
-                if not isinstance(k, str) or len(k) != 8 or not all(c in "0123456789abcdef" for c in k.lower()):
+                if not isinstance(k, str) or not all(c in "0123456789abcdef" for c in k.lower()):
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
 
             if entry_id in data: 
-                logger.warning(
+                logger.info(
                     "Embedding key match in NPZ file: entry_id=%s file=%s total_keys=%d",
                     entry_id, f, len(data.keys())
                 )

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-03-19T17:05:00-04:00
+# Save-state: 2026-03-24T17:42:15-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -24,6 +24,7 @@ from app.helpers.entry_similarity import (
 )
 from core.map.mapping_runtime import centroid_system
 from core.map.centroids import CentroidState
+from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 
 logger = logging.getLogger("peridocs.entry_membership_sequencer")
 
@@ -91,7 +92,7 @@ async def evaluate_centroid_candidates(
 async def link_entry(
     entry_id: str,
     *,
-    min_similarity: float = 0.65,
+    min_similarity: float = MINIMUM_SIMILARITY_THRESHOLD,
     max_affiliations: int | None = None,
 ) -> List[Tuple[str, float]]:
     """
@@ -220,7 +221,7 @@ async def unlink_entry(
         logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)
         raise
 
-async def suggest_precentroid_for_entry(entry_id: str, threshold: float = 0.65) -> tuple[str | None, float | None]:
+async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMUM_SIMILARITY_THRESHOLD) -> tuple[str | None, float | None]:
     """
     Suggests an existing precentroid for the entry.
     Returns precentroid_id if matched, else None.

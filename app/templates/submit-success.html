@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-03-19T18:23:40-04:00 #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-03-24T19:17:40-04:00 #}
 {% extends "base.html" %}
 {% block title %}Entry saved | PeriDocs{% endblock %}
 
@@ -7,7 +7,7 @@
   <div class="card-content">
 
     <!-- Entry ID and confirmation -->
-    <div class="id">Saved • Entry <strong>{{ entry_id }}</strong></div>
+    <div class="id">Saved • Entry <strong>{{ entry_nickname }}</strong></div>
     <h1>Your entry has been saved successfully.</h1>
 
     <!-- Privacy note -->
@@ -56,7 +56,7 @@
         <small>
           (Source ID: 
           <a href="/submit-success?id={{ match.entry_id }}" class="source-link">
-            {{ match.entry_id }}
+            {{ match.entry_nickname }}
           </a>)
         </small><br>
         <br>
