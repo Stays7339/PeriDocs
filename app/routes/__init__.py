@@ -77,7 +77,7 @@ async def cleanup_old_backups():
     if not backup_dir.exists():
         return
 
-    backups = sorted(backup_dir.glob("peridocs_backup_*.zip"), reverse=True)
+    backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
     # Keep the most recent
     to_delete = backups[1:]
     for f in to_delete:

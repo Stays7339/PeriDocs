@@ -67,7 +67,7 @@ def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
 
             if entry_id in data: 
-                logger.info(
+                logger.debug(
                     "Embedding key match in NPZ file: entry_id=%s file=%s total_keys=%d",
                     entry_id, f, len(data.keys())
                 )

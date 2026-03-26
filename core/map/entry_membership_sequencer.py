@@ -12,7 +12,7 @@ This module orchestrates:
 - full auditability, full precision
 - ensures entry "snobbery": once in a centroid, entry avoids precentroids
 """
-
+import numpy as np
 from typing import Dict, List, Tuple
 import logging
 from datetime import datetime, timezone
@@ -157,7 +157,7 @@ async def link_entry(
             
             # ------------------ FIX: skip duplicate append ------------------
             if entry_id in c.current.entry_ids:
-                logger.warning(
+                logger.debug(
                     "Entry %s already exists in precentroid %s, skipping append.",
                     entry_id, precentroid_id
                 )
@@ -186,7 +186,7 @@ async def link_entry(
                     metadata=c.current.metadata.copy()
                 )
             )
-            logger.info(
+            logger.debug(
                 "[LINK_ENTRY] Appended entry %s to precentroid %s, total states=%d",
                 entry_id, precentroid_id, len(c.states)
             )
@@ -233,8 +233,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
         entry_vec = await system.run_sync_in_thread(safe_load_embedding, entry_id)
 
         # ---- DEBUG: print entry norm ----
-        import numpy as np
-        print("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
+        logger.debug("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
 
         async with system._lock:
             if not system._centroids:
@@ -245,7 +244,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
 
                 # ---- DEBUG: print centroid norm ----
                 centroid_norm = np.linalg.norm(c.current.vector)
-                print("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
+                logger.debug("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
 
                 sim = cosine_similarity(entry_vec, c.current.vector)
 

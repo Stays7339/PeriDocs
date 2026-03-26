@@ -78,7 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
   /* --- Initialize --- */
   applyConsentState(consentGranted);
 
-  /* --- Listening For Click on the Consent Toggle (un-comment to re-enable consent toggle) --- 
+  /* --- Listening For Click on the Consent Toggle (un-comment to re-enable consent toggle) --- */
   if (consentToggle) {
     consentToggle.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -89,7 +89,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 3000);
       applyConsentState(!consentGranted);
     });
-  }*/
+  }
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');

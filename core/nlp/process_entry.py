@@ -54,7 +54,7 @@ async def process_entry_async(
         raise ValueError("Empty or whitespace-only entry.")
 
     timestamp = datetime.now(timezone.utc).isoformat()
-    ip_salt = hashlib.sha256(user_ip.encode()).hexdigest()
+    ip_hash = hashlib.sha256(user_ip.encode()).hexdigest()
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
 
@@ -111,7 +111,7 @@ async def process_entry_async(
         "entry_nickname": entry_nickname,
         "entry_id": entry_id,
         "timestamp": timestamp,
-        "ip_salt": ip_salt,
+        "ip_hash": ip_hash,
         "encrypted_raw_ip": encrypted_raw_ip,
         "encrypted_raw_text": encrypted_safe_text,
         "crisis_flag": bool(crisis_msg),
