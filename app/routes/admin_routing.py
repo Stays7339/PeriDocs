@@ -1,57 +1,143 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 202601012209
+# refactored 2026-03-26T21:06:30-04:00
 # ==========================================
+import os
+import json
+import asyncio
+from typing import List, Dict
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from typing import List, Dict, Any
-from core.map import centroids
-from core.map import admin_review_helpers as review
+from pydantic import BaseModel, Field
 
+from core.map.mapping_runtime import centroid_system
+
+# Initialize router with proper prefix and tags
 router = APIRouter(prefix="/admin", tags=["admin-review"])
 templates = Jinja2Templates(directory="app/templates")
 
-# ---------------- Page ----------------
-@router.get("", response_class=HTMLResponse)
-async def admin_review_page(request: Request):
+# -----------------------------
+# Pydantic Models
+# -----------------------------
+class ApprovePrecentroidPayload(BaseModel):
+    id: str
+    label: str
+    nne: str
+
+
+class RejectPrecentroidPayload(BaseModel):
+    id: str
+
+
+class EntriesSafeTextPayload(BaseModel):
+    entry_ids: List[str] = Field(..., description="List of entry IDs to fetch safe_text")
+
+
+# -----------------------------
+# Admin HTML Dashboard Route
+# -----------------------------
+@router.get("/", response_class=HTMLResponse)
+async def review_dashboard(request: Request):
+    """
+    Render the admin review dashboard page with Jinja template.
+    """
     return templates.TemplateResponse("admin-review.html", {"request": request})
 
-# ---------------- Queue JSON ----------------
-@router.get("/review-queue-json")
-async def get_review_queue_json():
-    # Ensure queue is initialized
-    await review.initialize_review_queue()
-    items = await review.list_review_queue(status="pending")
 
-    out = []
-    for r in items:
-        # Determine card type
-        if r["suggestion_type"] == "new_centroid":
-            card_type = "precentroid"
-        elif r["suggestion_type"] == "split_centroid":
-            card_type = "split_suggestion"
+# -----------------------------
+# Review Queue & Precentroid Endpoints
+# -----------------------------
+@router.get("/review-queue")
+async def get_review_queue():
+    """
+    Retrieve all centroids/precentroids pending human review as JSON.
+    """
+    return await centroid_system.build_review_queue()
+
+
+@router.post("/approve-precentroid")
+async def approve_precentroid(payload: ApprovePrecentroidPayload):
+    """
+    Approve a precentroid and convert it into a full centroid.
+    """
+    new_id = await centroid_system.approve_precentroid(
+        payload.id,
+        label=payload.label,
+        nne=payload.nne
+    )
+    return {"status": "ok", "new_id": new_id}
+
+
+@router.post("/reject-precentroid")
+async def reject_precentroid(payload: RejectPrecentroidPayload):
+    """
+    Reject a precentroid. Uses placeholder threshold/similarities for now.
+    """
+    similarities: List[float] = []
+    threshold: float = 0.5
+
+    await centroid_system.reject_precentroid(
+        payload.id,
+        similarities=similarities,
+        threshold=threshold
+    )
+    return {"status": "ok"}
+
+
+# -----------------------------
+# Entry Safe Text Fetch (async + caching)
+# -----------------------------
+ENTRIES_FILE = os.path.join("data", "entries", "entries.json")
+ENTRIES_INDEX: List[Dict] = []
+
+
+async def load_entries_index() -> List[Dict]:
+    """
+    Async load all entries from JSON file into memory.
+    Returns list of dicts (entries).
+    """
+    global ENTRIES_INDEX
+    if ENTRIES_INDEX:
+        return ENTRIES_INDEX
+
+    try:
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
+        if isinstance(data, list):
+            ENTRIES_INDEX = data
         else:
-            card_type = "unknown"
+            ENTRIES_INDEX = []
+    except Exception:
+        ENTRIES_INDEX = []
 
-        # Construct summary from first sample if available
-        samples = r.get("samples", [])
-        summary = samples[0] if samples else r.get("human_note") or "No summary available."
+    return ENTRIES_INDEX
 
-        # Build meta dictionary
-        meta = {
-            "centroid_id": r["centroid_id"],
-            "metrics": r.get("metrics", {}),
-            "status": r["status"],
-            "human_labels": r.get("human_labels", []),
-            "created_at": r.get("created_at"),
-        }
 
-        out.append({
-            "id": r["suggestion_id"],
-            "type": card_type,
-            "summary": summary,
-            "meta": meta
+async def find_entry_by_id(entry_id: str) -> Dict:
+    """
+    Search loaded entries for a given entry_id.
+    Returns dict or empty dict if not found.
+    """
+    entries = await load_entries_index()
+    for entry in entries:
+        if entry.get("entry_id") == entry_id:
+            return entry
+    return {}
+
+
+@router.post("/entries-safe-text")
+async def get_entries_safe_text(payload: EntriesSafeTextPayload):
+    """
+    Given a list of entry_ids, return their safe_text for human moderation.
+    """
+    results = []
+    for eid in payload.entry_ids:
+        entry = await find_entry_by_id(eid)
+        results.append({
+            "entry_id": eid,
+            "safe_text": entry.get("safe_text", "")
         })
 
-    return out
+    return {"entries": results}

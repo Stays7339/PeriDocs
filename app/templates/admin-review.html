@@ -1,76 +1,126 @@
-{# PeriDocs-code/app/templates/admin-review.html save-state 202602251923 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-03-26T20:21:00-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
 {% block content %}
-<div class="card admin-review-card">
-  <div class="card-content">
-    <h1>Centroid Review Dashboard</h1>
-
-    {% if flash %}
-      <div class="flash-message">{{ flash }}</div>
-    {% endif %}
-
-    <!-- ---------------- Swiping Card Interface ---------------- -->
-    <div id="review-card-container" class="swipe-card">
-      <h2 id="card-title">Loading...</h2>
-      <p id="card-summary"></p>
-
-      <!-- Meta info -->
-      <ul id="card-meta"></ul>
-
-      <!-- Editable human note -->
-      <div id="card-note-container" style="display:none; margin-top:1em;">
-        <label for="card-note">Reviewer Note:</label>
-        <textarea id="card-note" class="note-input" data-max="1000"></textarea>
-        <div id="note-count" class="char-counter">0 / 1000 chars</div>
-      </div>
-
-      <!-- Editable human labels -->
-      <div id="card-label-container" style="display:none; margin-top:1em;">
-        <label for="card-labels">Labels (comma-separated):</label>
-        <input type="text" id="card-labels" class="label-input" data-max="100" />
-        <div id="label-count" class="char-counter">0 / 100 chars</div>
-      </div>
-
-      <div id="card-details" style="display:none; margin-top:1em;"></div>
-
-      <div class="card-actions" style="margin-top:1em;">
-        <button id="read-more-btn" class="btn primary">Read more</button>
-        <button id="approve-btn" class="btn primary">Approve</button>
-        <button id="reject-btn" class="btn primary">Reject</button>
-      </div>
-    </div>
-
-    <hr>
-
-    <div id="queue-stats">
-      <p>Loading review queue stats...</p>
-    </div>
-
-    <!-- ---------------- Character counter script ---------------- -->
-    <script>
-      function attachCharCounters() {
-        const noteEl = document.getElementById("card-note");
-        const noteCount = document.getElementById("note-count");
-        if(noteEl && noteCount){
-          noteEl.addEventListener("input", ()=> {
-            noteCount.textContent = noteEl.value.length + " / " + noteEl.dataset.max + " chars";
-          });
-        }
-        const labelEl = document.getElementById("card-labels");
-        const labelCount = document.getElementById("label-count");
-        if(labelEl && labelCount){
-          labelEl.addEventListener("input", ()=> {
-            labelCount.textContent = labelEl.value.length + " / " + labelEl.dataset.max + " chars";
-          });
-        }
-      }
-      document.addEventListener("DOMContentLoaded", attachCharCounters);
-    </script>
-
-    <!-- ---------------- Include admin_review.js ---------------- -->
-    <script src="/static/admin_review.js" defer></script>
-  </div>
+<div class="card">
+  <h1>Review Queue</h1>
+  <div id="review-list" class="card-content"></div>
 </div>
+
+<script>
+const reviewListContainer = document.getElementById("review-list");
+let reviewQueue = [];
+
+async function fetchQueue() {
+  const res = await fetch("/admin/review-queue");
+  reviewQueue = await res.json();
+  renderQueue();
+
+  const params = new URLSearchParams(window.location.search);
+  const pid = params.get("precentroid");
+  if (pid) openPrecentroid(pid);
+}
+
+function renderQueue() {
+  reviewListContainer.innerHTML = "";
+  reviewQueue.forEach(item => {
+    const el = document.createElement("div");
+    el.className = "excerpt";
+    el.dataset.id = item.id;
+
+    el.innerHTML = `
+      <strong class="clickable">${item.id}</strong><br>
+      ${item.summary}<br>
+      Entries: ${item.meta.entry_count}
+      <div style="margin-top:10px;">
+        <button class="btn primary expand-btn">View Entries</button>
+        <button class="btn primary approve-btn">Approve</button>
+        <button class="btn ghost reject-btn">Reject</button>
+      </div>
+      <div class="entries-container" style="display:none; margin-top:10px;"></div>
+    `;
+
+    const expandBtn = el.querySelector(".expand-btn");
+    const approveBtn = el.querySelector(".approve-btn");
+    const rejectBtn = el.querySelector(".reject-btn");
+    const entriesContainer = el.querySelector(".entries-container");
+    const clickableTitle = el.querySelector(".clickable");
+
+    // Expand / collapse entries
+    expandBtn.addEventListener("click", async () => toggleEntries(item.id));
+
+    clickableTitle.addEventListener("click", () => openPrecentroid(item.id));
+
+    approveBtn.addEventListener("click", async () => {
+      const label = prompt("Enter label:");
+      const nne = prompt("Enter nne:");
+      if (!label || !nne) return;
+
+      await fetch("/admin/approve-precentroid", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ id: item.id, label, nne })
+      });
+
+      fetchQueue();
+    });
+
+    rejectBtn.addEventListener("click", async () => {
+      await fetch("/admin/reject-precentroid", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ id: item.id })
+      });
+
+      fetchQueue();
+    });
+
+    reviewListContainer.appendChild(el);
+  });
+}
+
+// ---- NEW: toggleEntries ----
+async function toggleEntries(precentroidId) {
+  const el = [...reviewListContainer.children].find(e => e.dataset.id === precentroidId);
+  if (!el) return;
+
+  const entriesContainer = el.querySelector(".entries-container");
+
+  if (entriesContainer.style.display === "block") {
+    entriesContainer.style.display = "none"; // collapse
+  } else {
+    // fetch and show
+    const entryIds = reviewQueue.find(p => p.id === precentroidId).meta.entry_ids || [];
+    const res = await fetch("/admin/entries-safe-text", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ entry_ids: entryIds })
+    });
+    const data = await res.json();
+    entriesContainer.innerHTML = data.entries.map(e => `<p class="matched-snippet">${e.safe_text}</p>`).join("");
+    entriesContainer.style.display = "block";
+
+    // scroll to element
+    el.scrollIntoView({ behavior: "smooth" });
+
+    // update URL
+    const url = new URL(window.location);
+    url.searchParams.set("precentroid", precentroidId);
+    history.pushState({ precentroid: precentroidId }, "", url);
+  }
+}
+
+// Handle back/forward navigation
+window.addEventListener("popstate", event => {
+  const pid = event.state?.precentroid;
+  if (pid) openPrecentroid(pid);
+  else reviewQueue.forEach(item => {
+    const el = [...reviewListContainer.children].find(e => e.dataset.id === item.id);
+    if (el) el.querySelector(".entries-container").style.display = "none";
+  });
+});
+
+fetchQueue();
+</script>
 {% endblock %}

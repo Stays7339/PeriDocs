@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-24T17:41:55-04:00
+# Save-state: 2026-03-26T23:53:40-04:00
 # ==========================================
 
 import os
@@ -48,7 +48,6 @@ class CentroidState:
         event_index: int,
         entry_ids: List[str],
         vector: np.ndarray,
-        saajes: Dict[str, float] | None = None,
         metadata: Dict | None = None,
     ):
         self.event_index = event_index
@@ -366,15 +365,13 @@ class CentroidSystem:
                         logger.warning("[load_state] State has no entry_ids in centroid %s, using zero vector", centroid_id)
                         state_vector = np.zeros(1024, dtype=np.float32)
 
-                    # Saajes & metadata
-                    saajes = s.get("saajes", {})
+                    # Metadata
                     metadata = s.get("metadata", {})
 
                     c.states.append(CentroidState(
                         s["event_index"],
                         entry_ids,
                         state_vector,
-                        saajes=saajes,
                         metadata=metadata
                     ))
 
@@ -475,7 +472,7 @@ class CentroidSystem:
         # attach default metadata for review queue
         metadata = {
             "review_status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
+            "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
             "human_note": "",
             "human_labels": [],
         }
@@ -485,7 +482,7 @@ class CentroidSystem:
         c = Centroid(cid)
         logger.debug(f"[CREATE_PRECENTROID] _centroids keys now: {list(self._centroids.keys())}")
         self._assert_event_order(c, event_index)
-        c.states.append(CentroidState(event_index, entry_ids, vector, saajes=None, metadata=metadata))
+        c.states.append(CentroidState(event_index, entry_ids, vector, metadata=metadata))
         self._centroids[cid] = c
 
         # persist safely
@@ -508,7 +505,7 @@ class CentroidSystem:
                 raise RuntimeError(f"Unknown precentroid {precentroid_id}")
 
             suffix = int(precentroid_id.split("_")[1])
-            await self._ledger.approve_suffix(suffix)
+            await self._ledger.approve_suffix(suffix, kind="centroid")
             new_id = f"centroid_{suffix}"
 
             # assert new centroid is recognized by ledger
@@ -522,17 +519,23 @@ class CentroidSystem:
                 "nne": nne,
             })
 
+            metadata = {
+                "review_status": "approved",
+                "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
+                "human_note": nne,
+                "human_labels": label,
+            }
+
             c.centroid_id = new_id
             c.label = label
             c.nne = nne
             self._assert_event_order(c, event_index)
 
-            # preserve embedding & saajes, promote metadata
+            # preserve embedding & promote metadata
             c.states.append(CentroidState(
                 event_index,
                 c.current.entry_ids,
                 c.current.vector,
-                c.current.saajes,
                 metadata=c.current.metadata  # retain metadata if needed
             ))
 
@@ -540,11 +543,18 @@ class CentroidSystem:
             await self._persist(c)
 
             # archive precentroid JSON safely
-            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}.json")
+            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
                 os.remove(precentroid_path)
             except FileNotFoundError:
-                pass
+                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
+
+            # archive precentroid JSON safely
+            precentroid_path_for_npz = os.path.join(STATE_DIR, f"{precentroid_id}.npz")
+            try:
+                os.remove(precentroid_path_for_npz)
+            except FileNotFoundError:
+                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
 
             return new_id
 
@@ -568,7 +578,7 @@ class CentroidSystem:
             if c is None:
                 raise RuntimeError(f"Unknown precentroid {precentroid_id}")
 
-            await self._finalize_precentroid_rejection(
+            await self.burst_precentroid(
                 precentroid_id=precentroid_id,
                 c=c,
                 similarities=similarities,
@@ -768,27 +778,28 @@ class CentroidSystem:
                 # Default frontend fields
                 human_note = metadata.get("human_note", "")
                 human_labels = metadata.get("human_labels", [])
-                created_at = metadata.get("created_at") or None
+                most_recent_promotion = metadata.get("most_recent_promotion") or None
                 summary = metadata.get("summary") or f"{len(c.current.entry_ids)} entry(s) attached."
 
                 queue.append({
-                    "id": centroid_id,
-                    "type": "precentroid" if centroid_id.startswith("precentroid_") else "centroid",
-                    "summary": summary,
-                    "meta": {
-                        "entry_count": len(c.current.entry_ids),
-                        "label": getattr(c, "label", None),
-                        "nne": getattr(c, "nne", None),
-                        **metadata,  # includes human_note, human_labels, created_at, etc.
-                    },
-                    "status": review_status,
-                    "human_note": human_note,
-                    "human_labels": human_labels,
-                    "created_at": created_at,
-                })
+                        "id": centroid_id,
+                        "type": "precentroid" if centroid_id.startswith("precentroid_") else "centroid",
+                        "summary": summary,
+                        "meta": {
+                            "entry_count": len(c.current.entry_ids),
+                            "entry_ids": list(c.current.entry_ids),  # <-- appended
+                            "label": getattr(c, "label", None),
+                            "nne": getattr(c, "nne", None),
+                            **metadata,
+                        },
+                        "status": review_status,
+                        "human_note": human_note,
+                        "human_labels": human_labels,
+                        "most_recent_promotion": most_recent_promotion,
+                    })
 
             # Optional: sort queue by creation time for deterministic ordering
-            queue.sort(key=lambda x: x.get("created_at") or "", reverse=False)
+            queue.sort(key=lambda x: x.get("most_recent_promotion") or "", reverse=False)
 
             logger.info(f"Built review queue with {len(queue)} items.")
             return queue

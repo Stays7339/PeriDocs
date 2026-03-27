@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-03-24T14:55:30-04:00
+# Save-state: 2026-03-26T23:31:55-04:00
 # ==========================================
 
 """
@@ -84,7 +84,7 @@ class IdentifierLedger:
     Identifier allocation is a state transition.
     """
 
-    VALID_KINDS = ("precentroid", "centroid_from_split")
+    VALID_KINDS = ("precentroid", "centroid", "centroid_from_split")
     VALID_TRANSITIONS = {
         "precentroid": ("centroid",),
         "centroid_from_split": ("centroid",),
@@ -104,7 +104,7 @@ class IdentifierLedger:
             ledger["next_centroid_id"] += 1
             ledger["issued_suffixes"][str(suffix)] = {
                 "kind": kind,
-                "consumed": False,       # <-- track lifecycle
+                "consumed": False,       
                 "approved": False,
                 "rejected": False
             }
@@ -120,7 +120,7 @@ class IdentifierLedger:
             await _save(ledger)
             return suffix
 
-    async def approve_suffix(self, suffix: int) -> None:
+    async def approve_suffix(self, suffix: int, kind: str) -> None:
         async with _ledger_lock:
             ledger = await _load()
             record = ledger["issued_suffixes"].get(str(suffix))
@@ -133,6 +133,7 @@ class IdentifierLedger:
 
             record["approved"] = True
             record["consumed"] = True
+            record["kind"] = kind
 
             event_index = await self._allocate_event_index_locked(ledger)
             ledger["events"].append({
@@ -176,7 +177,7 @@ class IdentifierLedger:
         event_type = payload["type"]
         required_fields: Dict[str, set] = {
             "ISSUE_SUFFIX": {"suffix", "kind"},
-            "APPROVE_SUFFIX": {"suffix"},
+            "APPROVE_SUFFIX": {"suffix", "kind"},
             "REJECT_SUFFIX": {"suffix"},
             "CREATE_PRECENTROID": {"centroid_id", "entry_ids"},
             "APPROVE_PRECENTROID": {"from", "to", "label", "nne"},

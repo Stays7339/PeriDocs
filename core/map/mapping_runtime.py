@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-03-24T17:47:30-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-03-26T20:29:20-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -119,7 +119,7 @@ async def periodic_integrity_check():
 
             # Create zip backup of full data folder
             timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
-            backup_name = backups_folder / f"peridocs_backup_{timestamp}.zip"
+            backup_name = backups_folder / f"peridocs_data_folder_backup_{timestamp}.zip"
 
             # Recursively zip DATA_DIR
             data_dir_path = Path(DATA_DIR)
