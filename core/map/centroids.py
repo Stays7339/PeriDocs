@@ -509,8 +509,8 @@ class CentroidSystem:
         metadata = {
             "review_status": "pending",
             "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
-            "human_note": "",
-            "human_description_from_human_moderators": [],
+            "title_from_human_moderator": "",
+            "description_from_human_moderator": [],
         }
 
         
@@ -558,8 +558,8 @@ class CentroidSystem:
             metadata = {
                 "review_status": "approved",
                 "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
-                "human_note": title_from_human_moderator,
-                "human_description_from_human_moderators": description_from_human_moderator,
+                "title_from_human_moderator": title_from_human_moderator,
+                "description_from_human_moderator": description_from_human_moderator,
             }
 
             c.centroid_id = new_id
@@ -812,8 +812,8 @@ class CentroidSystem:
                     continue
 
                 # Default frontend fields
-                human_note = metadata.get("human_note", "")
-                human_description_from_human_moderators = metadata.get("human_description_from_human_moderators", [])
+                title_from_human_moderator = metadata.get("title_from_human_moderator", "")
+                description_from_human_moderator = metadata.get("description_from_human_moderator", [])
                 most_recent_promotion = metadata.get("most_recent_promotion") or None
                 summary = metadata.get("summary") or f"{len(c.current.entry_ids)} entry(s) attached."
 
@@ -829,8 +829,8 @@ class CentroidSystem:
                             **metadata,
                         },
                         "status": review_status,
-                        "human_note": human_note,
-                        "human_description_from_human_moderators": human_description_from_human_moderators,
+                        "title_from_human_moderator": title_from_human_moderator,
+                        "description_from_human_moderator": description_from_human_moderator,
                         "most_recent_promotion": most_recent_promotion,
                     })
 
