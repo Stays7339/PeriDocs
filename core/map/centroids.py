@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-26T23:53:40-04:00
+# Save-state: 2026-03-28T16:10:00-04:00
 # ==========================================
 
 import os
@@ -70,8 +70,8 @@ class CentroidState:
 class Centroid:
     def __init__(self, centroid_id: str):
         self.centroid_id = centroid_id
-        self.label: str | None = None
-        self.nne: str | None = None
+        self.description_from_human_moderator: str | None = None
+        self.title_from_human_moderator: str | None = None
         self.states: List[CentroidState] = []
 
     @property
@@ -83,8 +83,8 @@ class Centroid:
     def serialize(self) -> Dict:
         return {
             "centroid_id": self.centroid_id,
-            "label": self.label,
-            "nne": self.nne,
+            "description_from_human_moderator": self.description_from_human_moderator,
+            "title_from_human_moderator": self.title_from_human_moderator,
             "states": [s.serialize() for s in self.states],
         }
 
@@ -133,7 +133,7 @@ class CentroidSystem:
                 f"new event_index {new_event_index} <= last {last_index}"
             )
     
-    async def _assert_prefix_matches_ledger(self, centroid_id: str) -> None:
+    async def _check_if_identifier_is_consistent_with_ledger(self, centroid_id: str) -> None:
         """
         Validates that a loaded centroid/precentroid ID matches the authoritative
         suffix state recorded in the ledger.
@@ -239,12 +239,48 @@ class CentroidSystem:
 
         # --- check ledger → disk consistency ---
         ledger_snapshot = await self._ledger.snapshot()
-        for suffix_str, record in ledger_snapshot["issued_suffixes"].items():
-            cid = f"precentroid_{suffix_str}"
-            json_path = os.path.join(STATE_DIR, f"{cid}_summary.json")
-            npz_path = os.path.join(STATE_DIR, f"{cid}.npz")
-            if not os.path.exists(json_path) or not os.path.exists(npz_path):
-                ledger_missing_on_disk.append(cid)
+        next_id = ledger_snapshot.get("next_centroid_id", 0)
+
+        for suffix_str in ledger_snapshot["issued_suffixes"].keys():
+            # Find all matching files for this suffix regardless of prefix
+            npz_matches = glob.glob(os.path.join(STATE_DIR, f"*_{suffix_str}.npz"))
+            json_matches = glob.glob(os.path.join(STATE_DIR, f"*_{suffix_str}_summary.json"))
+
+            if len(npz_matches) != 1 or len(json_matches) != 1:
+                ledger_missing_on_disk.append({
+                    "suffix": suffix_str,
+                    "npz_matches": npz_matches,
+                    "json_matches": json_matches,
+                })
+
+        # Also enforce no stray files beyond next_centroid_id
+        for path in glob.glob(os.path.join(STATE_DIR, "*_*.npz")):
+            try:
+                suffix = self._numeric_suffix(os.path.basename(path))
+                if suffix >= next_id:
+                    ledger_missing_on_disk.append({
+                        "unexpected_file": path,
+                        "reason": "suffix exceeds next_centroid_id",
+                    })
+            except Exception:
+                ledger_missing_on_disk.append({
+                    "unexpected_file": path,
+                    "reason": "invalid filename format",
+                })
+
+        for path in glob.glob(os.path.join(STATE_DIR, "*_summary.json")):
+            try:
+                suffix = self._numeric_suffix(os.path.basename(path))
+                if suffix >= next_id:
+                    ledger_missing_on_disk.append({
+                        "unexpected_file": path,
+                        "reason": "suffix exceeds next_centroid_id",
+                    })
+            except Exception:
+                ledger_missing_on_disk.append({
+                    "unexpected_file": path,
+                    "reason": "invalid filename format",
+                })
 
         # --- aggregate errors ---
         errors = []
@@ -338,9 +374,9 @@ class CentroidSystem:
 
                 # Reconstruct centroid
                 c = Centroid(payload["centroid_id"])
-                await self._assert_prefix_matches_ledger(c.centroid_id)
-                c.label = payload.get("label")
-                c.nne = payload.get("nne")
+                await self._check_if_identifier_is_consistent_with_ledger(c.centroid_id)
+                c.description_from_human_moderator = payload.get("description_from_human_moderator")
+                c.title_from_human_moderator = payload.get("title_from_human_moderator")
 
                 for s in payload.get("states", []):
                     self._assert_event_order(c, s["event_index"])
@@ -474,7 +510,7 @@ class CentroidSystem:
             "review_status": "pending",
             "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
             "human_note": "",
-            "human_labels": [],
+            "human_description_from_human_moderators": [],
         }
 
         
@@ -491,7 +527,7 @@ class CentroidSystem:
         return cid
 
 
-    async def approve_precentroid(self, precentroid_id: str, *, label: str, nne: str) -> str:
+    async def approve_precentroid(self, precentroid_id: str, *, description_from_human_moderator: str, title_from_human_moderator: str) -> str:
         """
         Approve a precentroid:
         - Ledger-backed approval
@@ -515,20 +551,20 @@ class CentroidSystem:
                 "type": "APPROVE_PRECENTROID",
                 "from": precentroid_id,
                 "to": new_id,
-                "label": label,
-                "nne": nne,
+                "description_from_human_moderator": description_from_human_moderator,
+                "title_from_human_moderator": title_from_human_moderator,
             })
 
             metadata = {
                 "review_status": "approved",
                 "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
-                "human_note": nne,
-                "human_labels": label,
+                "human_note": title_from_human_moderator,
+                "human_description_from_human_moderators": description_from_human_moderator,
             }
 
             c.centroid_id = new_id
-            c.label = label
-            c.nne = nne
+            c.description_from_human_moderator = description_from_human_moderator
+            c.title_from_human_moderator = title_from_human_moderator
             self._assert_event_order(c, event_index)
 
             # preserve embedding & promote metadata
@@ -720,8 +756,8 @@ class CentroidSystem:
             payload = {
                 "event_index": event_index,
                 "centroid_id": centroid_id,
-                "label": c.label,
-                "nne": c.nne,
+                "description_from_human_moderator": c.description_from_human_moderator,
+                "title_from_human_moderator": c.title_from_human_moderator,
                 "similarities": sims,
                 "threshold": threshold,
                 "min_similarity": min_sim,
@@ -777,7 +813,7 @@ class CentroidSystem:
 
                 # Default frontend fields
                 human_note = metadata.get("human_note", "")
-                human_labels = metadata.get("human_labels", [])
+                human_description_from_human_moderators = metadata.get("human_description_from_human_moderators", [])
                 most_recent_promotion = metadata.get("most_recent_promotion") or None
                 summary = metadata.get("summary") or f"{len(c.current.entry_ids)} entry(s) attached."
 
@@ -788,13 +824,13 @@ class CentroidSystem:
                         "meta": {
                             "entry_count": len(c.current.entry_ids),
                             "entry_ids": list(c.current.entry_ids),  # <-- appended
-                            "label": getattr(c, "label", None),
-                            "nne": getattr(c, "nne", None),
+                            "description_from_human_moderator": getattr(c, "description_from_human_moderator", None),
+                            "title_from_human_moderator": getattr(c, "title_from_human_moderator", None),
                             **metadata,
                         },
                         "status": review_status,
                         "human_note": human_note,
-                        "human_labels": human_labels,
+                        "human_description_from_human_moderators": human_description_from_human_moderators,
                         "most_recent_promotion": most_recent_promotion,
                     })
 

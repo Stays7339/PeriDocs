@@ -23,8 +23,8 @@ templates = Jinja2Templates(directory="app/templates")
 # -----------------------------
 class ApprovePrecentroidPayload(BaseModel):
     id: str
-    label: str
-    nne: str
+    description_from_human_moderator: str
+    title_from_human_moderator: str
 
 
 class RejectPrecentroidPayload(BaseModel):
@@ -64,8 +64,8 @@ async def approve_precentroid(payload: ApprovePrecentroidPayload):
     """
     new_id = await centroid_system.approve_precentroid(
         payload.id,
-        label=payload.label,
-        nne=payload.nne
+        description_from_human_moderator=payload.description_from_human_moderator,
+        title_from_human_moderator=payload.title_from_human_moderator
     )
     return {"status": "ok", "new_id": new_id}
 

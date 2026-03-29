@@ -13,7 +13,7 @@ Users may actively choose to rigorously describe their perspective of the world,
 
 1. Install Homebrew (if not already installed):
 
-   ```bash (Terminal)
+```bash (Terminal)
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
@@ -36,7 +36,7 @@ Official site: [https://brew.sh](https://brew.sh)
 
 ---
 
-#### For Linux (Ubuntu/Debian-based)
+#### For Linux (OpenSUSE is preferred for its backups and OS-level version control)
 
 1. Update and install dependencies:
 
@@ -82,11 +82,11 @@ Official site: [https://brew.sh](https://brew.sh)
 
 ### Step 1. Clone the Repository
 
-Choose a folder to hold the project (for example, Desktop/ or Documents/ or PeriDocs-code/).
+Choose a folder to hold the project (for example, PeriDocs/).
 
 ```bash
 git clone https://github.com/Stays7339/PeriDocs.git
-cd PeriDocs-code
+cd PeriDocs
 ```
 
 > Note: This repository should remain set to private. Only collaborators with access can clone it or pull from it.
@@ -141,14 +141,13 @@ Create a `.env` file in the project root with your local keys:
 
 ```
 PERIDOCS_AES_KEY=your-secret-key
-ADMIN_TOKEN=your-admin-token
 ```
 
 > Do **not** commit `.env` to GitHub.
 
 For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
-You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs-code`
+You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs`
 The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
 # Important: check what is *CRUCIAL* to add into .gitignore before continuing
@@ -453,7 +452,7 @@ PeriDocs-code/                         # Root project folder
 ## Notes
 
 * The `--reload` flag automatically restarts the server when code changes.
-* `data/entries.json` is intentionally ignored by Git for local user data.
+* `data/` is intentionally ignored by Git for local user data.
 * Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
 
 ## Miscellaneous FAQ

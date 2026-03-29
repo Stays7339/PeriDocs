@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-03-26T20:29:20-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-03-28T15:29:10-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -85,7 +85,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     except Exception as e:
         logger.error("[initialize_runtime] Centroid/Ledger mismatch or file integrity failure: %s", e)
         # Flush user entries safely here if needed (optional)
-        # For (non-literal, skeletal) example: await entry.flush_pending_entries()
+        # For a non-literal skeletal example: await entry.flush_pending_entries()
         raise RuntimeError("Mapping runtime startup aborted due to integrity failure")
 
     # Preload burst/split suggestions

@@ -51,9 +51,9 @@ async def list_review_queue(status: str = "pending") -> List[Dict[str, Any]]:
 
 # ---------------- Human moderation actions ----------------
 
-async def approve_precentroid(*, precentroid_id: str, label: str, nne: str) -> str:
+async def approve_precentroid(*, precentroid_id: str, description_from_human_moderator: str, title_from_human_moderator: str) -> str:
     """Approve a precentroid via centroid_system."""
-    return await centroid_system.approve_precentroid(precentroid_id, label=label, nne=nne)
+    return await centroid_system.approve_precentroid(precentroid_id, description_from_human_moderator=description_from_human_moderator, title_from_human_moderator=title_from_human_moderator)
 
 
 async def reject_precentroid(*, precentroid_id: str, threshold: float) -> None:

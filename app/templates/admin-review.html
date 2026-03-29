@@ -53,14 +53,14 @@ function renderQueue() {
     clickableTitle.addEventListener("click", () => openPrecentroid(item.id));
 
     approveBtn.addEventListener("click", async () => {
-      const label = prompt("Enter label:");
-      const nne = prompt("Enter nne:");
-      if (!label || !nne) return;
+      const description_from_human_moderator = prompt("Enter description_from_human_moderator:");
+      const title_from_human_moderator = prompt("Enter title_from_human_moderator:");
+      if (!description_from_human_moderator || !title_from_human_moderator) return;
 
       await fetch("/admin/approve-precentroid", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ id: item.id, label, nne })
+        body: JSON.stringify({ id: item.id, description_from_human_moderator, title_from_human_moderator })
       });
 
       fetchQueue();

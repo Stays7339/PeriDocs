@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-03-26T23:31:55-04:00
+# Save-state: 2026-03-28T15:40:40-04:00
 # ==========================================
 
 """
@@ -104,7 +104,7 @@ class IdentifierLedger:
             ledger["next_centroid_id"] += 1
             ledger["issued_suffixes"][str(suffix)] = {
                 "kind": kind,
-                "consumed": False,       
+                "reviewed_by_a_human": False,       
                 "approved": False,
                 "rejected": False
             }
@@ -132,7 +132,7 @@ class IdentifierLedger:
                 raise RuntimeError(f"Cannot approve rejected suffix {suffix}")
 
             record["approved"] = True
-            record["consumed"] = True
+            record["reviewed_by_a_human"] = True
             record["kind"] = kind
 
             event_index = await self._allocate_event_index_locked(ledger)
@@ -155,7 +155,7 @@ class IdentifierLedger:
                 raise RuntimeError(f"Suffix {suffix} already rejected")
 
             record["rejected"] = True
-            record["consumed"] = True
+            record["reviewed_by_a_human"] = True
 
             event_index = await self._allocate_event_index_locked(ledger)
             ledger["events"].append({
@@ -180,7 +180,7 @@ class IdentifierLedger:
             "APPROVE_SUFFIX": {"suffix", "kind"},
             "REJECT_SUFFIX": {"suffix"},
             "CREATE_PRECENTROID": {"centroid_id", "entry_ids"},
-            "APPROVE_PRECENTROID": {"from", "to", "label", "nne"},
+            "APPROVE_PRECENTROID": {"from", "to", "description_from_human_moderator", "title_from_human_moderator"},
             "ADD_SAAJE": {"centroid_id", "entry_id", "similarity"},
             "REMOVE_SAAJE": {"centroid_id", "entry_id"},
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
