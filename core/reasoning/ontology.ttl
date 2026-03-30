@@ -1,0 +1,24 @@
+# core/reasoning/ontology.ttl save-state: 2026-0320T17:16:00-04:00
+
+@prefix ex: <http://peridocs.org/ontology/> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+
+# Classes are not tied to centroid IDs
+ex:Comfort a owl:Class .
+ex:ConnectionFragility a owl:Class .
+ex:RelationalTurbulence a owl:Class .
+ex:PreparationForStress a owl:Class .
+
+# Rule: combination → turbulence
+ex:RelationalTurbulence
+    owl:equivalentClass [
+        a owl:Class ;
+        owl:intersectionOf (
+            ex:Comfort
+            ex:ConnectionFragility
+        )
+    ] .
+
+# Rule: turbulence → preparation
+ex:RelationalTurbulence rdfs:subClassOf ex:PreparationForStress .
