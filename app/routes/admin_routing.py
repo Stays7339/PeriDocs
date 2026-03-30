@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# refactored 2026-03-26T21:06:30-04:00
+# refactored 2026-03-29T23:11:50-04:00
 # ==========================================
 import os
 import json
@@ -13,6 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from core.map.mapping_runtime import centroid_system
+from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 
 # Initialize router with proper prefix and tags
 router = APIRouter(prefix="/admin", tags=["admin-review"])
@@ -73,15 +74,11 @@ async def approve_precentroid(payload: ApprovePrecentroidPayload):
 @router.post("/reject-precentroid")
 async def reject_precentroid(payload: RejectPrecentroidPayload):
     """
-    Reject a precentroid. Uses placeholder threshold/similarities for now.
+    Reject a precentroid.
     """
-    similarities: List[float] = []
-    threshold: float = 0.5
-
     await centroid_system.reject_precentroid(
         payload.id,
-        similarities=similarities,
-        threshold=threshold
+        threshold=BURST_PRECENTROID_STARTING_THRESHOLD
     )
     return {"status": "ok"}
 
