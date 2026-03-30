@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-28T16:10:00-04:00
+# Save-state: 2026-03-29T21:53:05-04:00
 # ==========================================
 
 import os
@@ -568,11 +568,19 @@ class CentroidSystem:
             self._assert_event_order(c, event_index)
 
             # preserve embedding & promote metadata
+            # Build new metadata snapshot (authoritative for this event)
+            new_metadata = {
+                "review_status": "approved",
+                "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
+                "title_from_human_moderator": title_from_human_moderator,
+                "description_from_human_moderator": description_from_human_moderator,
+            }
+
             c.states.append(CentroidState(
                 event_index,
                 c.current.entry_ids,
                 c.current.vector,
-                metadata=c.current.metadata  # retain metadata if needed
+                metadata=new_metadata
             ))
 
             self._centroids[new_id] = c

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-03-24T17:42:15-04:00
+# Save-state: 2026-03-29T16:17:15-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -182,7 +182,6 @@ async def link_entry(
                     event_index=event_index,
                     entry_ids=new_entry_ids,
                     vector=vector,
-                    saajes=None,
                     metadata=c.current.metadata.copy()
                 )
             )

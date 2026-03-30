@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-03-24T19:07:15-04:00
+# save-state 2026-03-29T16:37:10-04:00
 # ==========================================
 
 
@@ -84,7 +84,7 @@ async def process_entry_async(
     doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
     if np.all(doc_embedding == 0) or np.isnan(doc_embedding).any():
         doc_embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
-    print("DOC EMBEDDING NORM:", np.linalg.norm(doc_embedding))
+    logger.debug("DOC EMBEDDING NORM:", np.linalg.norm(doc_embedding))
 
     if not clause_embeddings or any(e.size == 0 for e in clause_embeddings):
         clause_embeddings = [np.zeros(EMBEDDING_DIM, dtype=np.float32) for _ in (clause_embeddings or [0])]
