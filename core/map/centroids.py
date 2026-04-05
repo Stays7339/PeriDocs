@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-05T12:05:45-04:00
+# Save-state: 2026-04-05T13:19:25-04:00
 # ==========================================
 
 import os
@@ -16,6 +16,7 @@ import numpy as np
 from numpy.linalg import norm
 from scipy.cluster.hierarchy import linkage, fcluster
 from concurrent.futures import ThreadPoolExecutor
+
 
 from core.map.ledger import IdentifierLedger
 from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
@@ -611,10 +612,12 @@ class CentroidSystem:
             self._centroids[new_id] = c
             await self._persist(c)
             # Reconcile entries.json with approved centroid
-            await entry_membership_sequencer.reconcile_centroid_membership_after_approval(
+            from core.map.entry_membership_sequencer import reconcile_centroid_membership_after_approval
+            await reconcile_centroid_membership_after_approval(
                 centroid_suffix=str(suffix),
                 event_index=event_index,
                 summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
+            )
             # archive precentroid JSON safely
             precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
