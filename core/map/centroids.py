@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-05T13:19:25-04:00
+# Save-state: 2026-04-05T13:58:55-04:00
 # ==========================================
 
 import os
@@ -28,7 +28,7 @@ from app.helpers.entry_similarity import (
 
 
 
-logger = logging.getLogger("peridocs.core.map.centroids")
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 ENTRIES_DIR = os.path.join(DATA_DIR, "entries")

@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_detector.py
-# Save-state updated 202512241847 (YYYYMMDDhhmm)
+# Save-state updated 2026-04-05T14:01:15-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 """
@@ -73,7 +73,7 @@ import re
 from difflib import SequenceMatcher
 import logging
 
-logger = logging.getLogger("peridocs.core.nlp.crisis_detector")
+logger = logging.getLogger(__name__)
 
 # ========================
 # Crisis phrase blacklist

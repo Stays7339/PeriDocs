@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-03-28T15:40:40-04:00
+# Save-state: 2026-04-05T14:00:25-04:00
 # ==========================================
 
 """
@@ -28,7 +28,7 @@ LEDGER_PATH = DATA_DIR / "ledger.json"
 _ledger_lock = asyncio.Lock()
 _ledger_cache: Dict[str, Any] | None = None
 
-logger = logging.getLogger("peridocs.core.map.ledeger")
+logger = logging.getLogger(__name__)
 
 def _initial_ledger() -> Dict[str, Any]:
     return {
@@ -300,6 +300,6 @@ class IdentifierLedger:
                         )
 
         # Optionally: log success
-        logging.getLogger("peridocs.mapping_runtime").info(
+        logger.info(
             f"Verified {len(centroids._centroids)} centroids successfully against ledger."
         )

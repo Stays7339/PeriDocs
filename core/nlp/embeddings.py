@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 2026-03-18T13:13:00-04:00
+# save-state updated 2026-04-05T14:01:45-04:00
 # ------------------------------------------
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 
 # ---------------- Logging ----------------
-logger = logging.getLogger("peridocs.embeddings")
+logger = logging.getLogger(__name__)
 
 # ---------------- Paths / Environment ----------------
 PROJECT_ROOT = Path(__file__).resolve().parents[2]

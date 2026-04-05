@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-03-19T16:46:30-04:00
+# Save-state: 2026-04-04T13:59:15-04:00
 # ==========================================
 
 """
@@ -29,7 +29,7 @@ from app.helpers.entry_similarity import (
 )
 from core.map.centroids import CentroidSystem
 
-logger = logging.getLogger("peridocs.deletion")
+logger = logging.getLogger(__name__)
 
 
 class DeletionManager:

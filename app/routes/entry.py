@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-03-24T19:57:40-04:00
+# save-state 2026-04-05T13:58:40-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -28,7 +28,7 @@ from core.map.mapping_runtime import ledger, centroid_system
 templates = Jinja2Templates(directory="app/templates")
 entries_FILE = "data/entries/entries.json"
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-logger = logging.getLogger("peridocs.app.routes.entry.py")
+logger = logging.getLogger(__name__)
 
 # ---------------- Load embeddings_index via globbing ----------------
 embeddings_index = {}

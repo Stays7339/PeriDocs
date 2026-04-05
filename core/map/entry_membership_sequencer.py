@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-05T11:41:10-04:00
+# Save-state: 2026-04-05T13:59:35-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -29,7 +29,7 @@ from core.map.centroids import CentroidState
 from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from core.map.mapping_runtime import entry_runtime
 
-logger = logging.getLogger("peridocs.entry_membership_sequencer")
+logger = logging.getLogger(__name__)
 
 
 class CandidateDecision:

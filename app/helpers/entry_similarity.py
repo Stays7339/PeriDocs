@@ -1,7 +1,7 @@
 
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-03-24T18:25:15-04:00
+# Save-state: 2026-04-05T13:57:25-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -12,7 +12,7 @@ import logging
 from typing import Optional, Sequence
 from pathlib import Path
 
-logger = logging.getLogger("peridocs.entry_similarity")
+logger = logging.getLogger(__name__)
 
 # Base data directory (can be overridden with environment variable)
 DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))

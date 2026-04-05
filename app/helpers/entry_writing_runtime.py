@@ -1,14 +1,16 @@
 # ==========================================
-# app/helpers/entry_runtime.py
-# Save-state: 2026-04-05T11:21:25-04:00
+# app/helpers/entry_writing_runtime.py
+# Save-state: 2026-04-05T13:56:10-04:00
 # ==========================================
 import asyncio
 import copy
 import os
+import logging
 from typing import List, Dict, Any
 
 from app.helpers.file_ops import load_data, save_data
 
+logger = logging.getLogger(__name__)
 
 class EntryWritingRuntime:
     """
@@ -43,15 +45,14 @@ class EntryWritingRuntime:
 
         Safe to call multiple times; only loads on first call.
         """
-
-        # --- APPENDED START: guard initialization with lock ---
+        logger.info("[EntryWritingRuntime] Starting initialize()")
         async with self._lock:
             if self._initialized:
                 return
 
             self._entries = load_data(self._entries_path)
             self._initialized = True
-        # --- APPENDED END ---
+        logger.info("[EntryWritingRuntime] Finished initialize()")
 
     async def reload(self) -> None:
         """

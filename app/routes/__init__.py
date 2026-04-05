@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-03-24T17:47:05-04:00 (YYYYMMDDhhmm)
+# save-state 2026-04-05T13:58:05-04:00 (YYYYMMDDhhmm)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -18,7 +18,7 @@ from core.map.mapping_runtime import initialize_runtime
 
 
 # ------------------- logging setup -------------------
-logger = logging.getLogger("peridocs.app.routes.__init__.py")
+logger = logging.getLogger(__name__)
 logging.basicConfig(
     level=logging.INFO,       # or DEBUG
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
