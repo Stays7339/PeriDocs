@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-03-29T16:37:10-04:00
+# save-state 2026-04-03T14:52:30-04:00
 # ==========================================
 
 
@@ -116,8 +116,6 @@ async def process_entry_async(
         "encrypted_raw_text": encrypted_safe_text,
         "crisis_flag": bool(crisis_msg),
         "safe_text": "" if crisis_msg else safe_text,
-        "centroid_id": None, # handled downstream by core/map/*
-        "centroid_distance": None, # handled downstream by core/map/*
         "embedding_file": None if crisis_msg else entries_EMBED_FILE,
         "embedding": None if crisis_msg else doc_embedding
     }
@@ -177,32 +175,15 @@ async def process_entry_async(
         applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
 
         centroid_links = []
-        precentroid_link = None
 
         for cid, similarity in applied_sorted:
-            if cid.startswith("precentroid_"):
-                # Only allow a single precentroid per entry
-                if precentroid_link is None:
-                    precentroid_link = {
-                        "centroid_id": cid,
-                        "similarity": similarity
-                    }
-            else:
-                centroid_links.append({
-                    "centroid_id": cid,
-                    "similarity": similarity
-                })
+            centroid_links.append({
+                "centroid_id": cid,
+                "similarity": similarity,
+                "event_index": None  # filled later during reconciliation if needed
+            })
 
-        # Centroids take priority over precentroids
-        if centroid_links:
-            entry["centroids"] = centroid_links
-            entry["precentroid"] = None
-        else:
-            entry["centroids"] = []
-            entry["precentroid"] = precentroid_link
-    else:
-        entry["centroids"] = []
-        entry["precentroid"] = None
+        entry["centroids"] = centroid_links
 
     report_progress()  # 8 / total_steps
 

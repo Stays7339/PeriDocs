@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-03-28T15:29:10-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-04-05T10:41:15-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -12,6 +12,7 @@ from datetime import datetime
 
 from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
+from app.helpers.entry_runtime import EntryWritingRuntime
 
 logger = logging.getLogger("peridocs.core.map.mapping_runtime")
 
@@ -27,12 +28,14 @@ ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 
 _ledger: IdentifierLedger = IdentifierLedger()
 _centroid_system: CentroidSystem = CentroidSystem(_ledger)
+_entry_runtime: EntryWritingRuntime = EntryWritingRuntime()
 
 _initialized: bool = False
 
 
 ledger = _ledger
 centroid_system = _centroid_system
+entry_runtime = _entry_runtime
 
 
 # ---------------------------------------------------------------------
@@ -90,6 +93,8 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     # Preload burst/split suggestions
     await centroid_system._load_split_suggestions()
+
+     await entry_runtime.initialize()
 
     _initialized = True
 

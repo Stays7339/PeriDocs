@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-30T16:10:00-04:00
+## Canonical Project Directory as of 2026-04-04T17:55:55-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -305,6 +305,7 @@ PeriDocs-code/                         # Root project folder
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
 │  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
@@ -320,7 +321,6 @@ PeriDocs-code/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
-│  │  ├─ admin-review.js                 # Allows humans to dictate what counts and what doesn't with centroids and semantic auto-groups
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ favicon.png
 │  │  ├─ peridocs-logo-v1-white.png
@@ -363,19 +363,20 @@ PeriDocs-code/                         # Root project folder
 │   │
 │   │
 │   │
-│   └─ nlp/
-│      ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
-│      ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
-│      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
-│      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
-│      ├─ embeddings.py                   # Manages all encryption, SentenceTransformer model, embedding computation, and caching.
-│      ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
-│      ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
-│      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
-│
-│
-│
+│   ├─  nlp/
+│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
+│   |   ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
+│   |   ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
+│   |   ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
+│   |   ├─ embeddings.py                   # Manages all encryption, SentenceTransformer model, embedding computation, and caching.
+│   |   ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
+│   |   ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
+│   |   ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
+│   |   └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
+│   └─ reasoning/
+│           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
+│           └─ # To Be Determined / #Work In Progress
+│           
 │
 ├─ data/                                  # Local data storage
 │  ├─ centroids/
@@ -425,13 +426,6 @@ PeriDocs-code/                         # Root project folder
 │
 │
 │
-├─ test-and-debug/                     
-│    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
-│    ├─ test_crisis_flag_detection.py   # Testing benchmarks for crisis detection
-│    ├─ test_dsmx.py                    # OBSOLETE
-│    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
-│    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
-│    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │
 ├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
 │

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-03-29T16:17:15-04:00
+# Save-state: 2026-04-05T11:41:10-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -12,6 +12,8 @@ This module orchestrates:
 - full auditability, full precision
 - ensures entry "snobbery": once in a centroid, entry avoids precentroids
 """
+import os
+import json
 import numpy as np
 from typing import Dict, List, Tuple
 import logging
@@ -25,6 +27,7 @@ from app.helpers.entry_similarity import (
 from core.map.mapping_runtime import centroid_system
 from core.map.centroids import CentroidState
 from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.mapping_runtime import entry_runtime
 
 logger = logging.getLogger("peridocs.entry_membership_sequencer")
 
@@ -39,6 +42,38 @@ class CandidateDecision:
         self.centroid_id = centroid_id
         self.similarity = similarity
 
+# ---------------- Runtime-backed embedding access ----------------
+
+async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
+    """
+    Runtime-aware embedding fetch.
+
+    Behavior:
+    1. Prefer in-memory embedding (fast path)
+    2. Fallback to safe_load_embedding (full validation path)
+    3. Cache result into runtime for future calls
+
+    Guarantees:
+    - Preserves duplicate detection and validation from safe_load_embedding
+    - Never silently returns None
+    """
+
+    # ---- Step 1: Try runtime (fast path) ----
+    emb = entry_runtime.get_embedding(entry_id)
+    if emb is not None:
+        return emb
+
+    # ---- Step 2: Fallback to canonical loader (disk + validation) ----
+    emb = await centroid_system.run_sync_in_thread(
+        safe_load_embedding,
+        entry_id
+    )
+
+    # ---- Step 3: Cache into runtime (so next call is memory-only) ----
+    # This does NOT skip validation, it only memoizes after validation
+    entry_runtime.set_embedding(entry_id, emb)
+
+    return emb
 
 async def evaluate_centroid_candidates(
     entry_id: str,
@@ -50,7 +85,7 @@ async def evaluate_centroid_candidates(
     Evaluate entry against all existing centroids.
     Returns list of CandidateDecision objects sorted by similarity.
     """
-    entry_vec = safe_load_embedding(entry_id)
+    entry_vec = await get_embedding_for_entry(entry_id)
     system = centroid_system
 
     decisions: List[CandidateDecision] = []
@@ -171,7 +206,7 @@ async def link_entry(
                     new_entry_ids.append(eid)                   
                     seen.add(eid)                                
                 
-            vectors = [safe_load_embedding(j) for j in new_entry_ids]
+            vectors = [await get_embedding_for_entry(j) for j in new_entry_ids]
             vector = deterministic_mean(vectors)
             logger.debug(
                 "[LINK_ENTRY] New entry_ids: %s, vector shape: %s",
@@ -229,7 +264,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
     system = centroid_system
 
     try:
-        entry_vec = await system.run_sync_in_thread(safe_load_embedding, entry_id)
+        entry_vec = await get_embedding_for_entry(entry_id)
 
         # ---- DEBUG: print entry norm ----
         logger.debug("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
@@ -263,3 +298,45 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
     except Exception as e:
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
         raise
+
+async def reconcile_centroid_membership_after_approval(
+    centroid_suffix: str,
+    event_index: int,
+    *,
+    summary_entries: list[dict]
+) -> None:
+    """
+    Update entries.json in-memory to reflect that the precentroid has been approved.
+
+    centroid_suffix: e.g., "10" if precentroid_10 → centroid_10
+    event_index: ledger event index for this approval
+    summary_entries: list of entry dicts representing the authoritative snapshot
+                     (already in memory, no disk I/O)
+    """
+    # Extract entry_ids from summary snapshot
+    entry_ids = {e["entry_id"] for e in summary_entries}
+
+    centroid_id = f"centroid_{centroid_suffix}"
+    precentroid_id = f"precentroid_{centroid_suffix}"
+
+    # Lock the runtime before mutating entries
+    async with entry_runtime._lock:
+        updated = False
+
+        for entry in entry_runtime._entries:
+            if entry.get("entry_id") not in entry_ids:
+                continue
+
+            centroids_list = entry.get("centroids", [])
+            if not isinstance(centroids_list, list):
+                continue
+
+            for c in centroids_list:
+                if c.get("centroid_id") == precentroid_id:
+                    c["centroid_id"] = centroid_id
+                    c["event_index"] = event_index
+                    logger.debug("Just so you know, reconcile_centroid_membership_after_approval ran just now.")
+                    updated = True
+
+        if updated:
+            await entry_runtime.persist()
