@@ -1,7 +1,7 @@
 
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-04-05T13:57:25-04:00
+# Save-state: 2026-04-05T19:20:20-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -124,7 +124,7 @@ def highlight_standout_clauses(clause_embeddings: np.ndarray, threshold: float =
     standout_flags = []
     for i in range(n):
         other_embeddings = np.delete(clause_embeddings, i, axis=0)
-        mean_other = other_embeddings.mean(axis=0)
+        mean_other = clause_embeddings[i] if other_embeddings.size == 0 else other_embeddings.mean(axis=0)
         sim = cosine_similarity(clause_embeddings[i], mean_other)
         standout_flags.append(sim < threshold)
 

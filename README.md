@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-04T17:55:55-04:00
+## Canonical Project Directory as of 2026-04-05T22:17:15-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -356,6 +356,7 @@ PeriDocs-code/                         # Root project folder
 ├─ core/
 │   ├─ map/
 │   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
+│   │   ├─ config.py                      # to avoid having to redfine the same value everywhere
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
@@ -375,7 +376,7 @@ PeriDocs-code/                         # Root project folder
 │   |   └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
 │   └─ reasoning/
 │           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
-│           └─ # To Be Determined / #Work In Progress
+│           └─ # To Be Determined / # Work In Progress
 │           
 │
 ├─ data/                                  # Local data storage

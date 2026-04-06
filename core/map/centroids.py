@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-05T13:58:55-04:00
+# Save-state: 2026-04-05T22:05:00-04:00
 # ==========================================
 
 import os
@@ -25,6 +25,7 @@ from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
+
 
 
 
@@ -611,13 +612,16 @@ class CentroidSystem:
 
             self._centroids[new_id] = c
             await self._persist(c)
+            logging.info("Phase one start")
             # Reconcile entries.json with approved centroid
             from core.map.entry_membership_sequencer import reconcile_centroid_membership_after_approval
+            logging.info("Phase two start")
             await reconcile_centroid_membership_after_approval(
                 centroid_suffix=str(suffix),
                 event_index=event_index,
                 summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
             )
+            logging.info("Phase three start")
             # archive precentroid JSON safely
             precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
@@ -793,6 +797,67 @@ class CentroidSystem:
 
         if os.path.exists(npz_src):
             os.replace(npz_src, npz_dst)
+
+    async def add_entry_to_centroid(
+        self,
+        centroid_id: str,
+        entry_id: str,
+        similarity: float
+    ) -> None:
+        """
+        Adds an entry to an existing centroid.  
+        Recomputes centroid vector, appends a new CentroidState, and records the event.
+
+        Raises:
+            RuntimeError if centroid_id is a precentroid or entry already exists.
+        """
+        from core.map.entry_membership_sequencer import get_embedding_for_entry
+        await self._assert_ledger_ready()
+        async with self._lock:
+            if centroid_id.startswith("precentroid_"):
+                raise RuntimeError("Cannot attach entry to precentroid via this method")
+
+            # fetch current centroid
+            c = self._centroids[centroid_id]
+            prev_state = c.current
+
+            # skip duplicates
+            if entry_id in prev_state.entry_ids:
+                raise RuntimeError(f"Entry {entry_id} already exists in {centroid_id}")
+
+            # new list of entry IDs
+            new_entry_ids = sorted(prev_state.entry_ids + [entry_id])
+
+            # recompute centroid vector
+            vectors = [await get_embedding_for_entry(j) for j in new_entry_ids]
+            vector = deterministic_mean(vectors)
+
+            # update entry → similarity mapping
+            entries_similarity_to_centroid = dict(getattr(prev_state, "entries_similarity_to_centroid", {}))
+            entries_similarity_to_centroid[entry_id] = similarity
+
+            # record ledger event
+            event_index = await self._ledger.record_event({
+                "type": "ADD_ENTRY_TO_CENTROID",
+                "centroid_id": centroid_id,
+                "entry_id": entry_id,
+                "similarity": similarity,
+            })
+
+            self._assert_event_order(c, event_index)
+
+            # append new state
+            c.states.append(
+                CentroidState(
+                    event_index=event_index,
+                    entry_ids=new_entry_ids,
+                    vector=vector,
+                    metadata={**prev_state.metadata, "entries_similarity_to_centroid": entries_similarity_to_centroid}
+                )
+            )
+
+            # persist to disk
+            await self._persist(c)
 
     # ----- drift & split suggestion -----
 

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-05T13:59:35-04:00
+# Save-state: 2026-04-05T22:12:05-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -59,7 +59,7 @@ async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
     """
 
     # ---- Step 1: Try runtime (fast path) ----
-    emb = entry_runtime.get_embedding(entry_id)
+    emb = await entry_runtime.get_embedding(entry_id)
     if emb is not None:
         return emb
 
@@ -71,7 +71,7 @@ async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
 
     # ---- Step 3: Cache into runtime (so next call is memory-only) ----
     # This does NOT skip validation, it only memoizes after validation
-    entry_runtime.set_embedding(entry_id, emb)
+    await entry_runtime.set_embedding(entry_id, emb)
 
     return emb
 
@@ -97,6 +97,8 @@ async def evaluate_centroid_candidates(
         ]
 
     for c in centroids:
+        logger.debug("entry_vec:", type(entry_vec))
+        logger.debug("centroid_vec:", type(c.current.vector))
         try:
             sim = cosine_similarity(entry_vec, c.current.vector)
         except ValueError:
@@ -139,7 +141,6 @@ async def link_entry(
     """
     system = centroid_system
     applied: List[Tuple[str, float]] = []
-
     # --- Step 1: Centroids ---
     centroid_candidates = await evaluate_centroid_candidates(
         entry_id,
@@ -149,7 +150,7 @@ async def link_entry(
 
     for cand in centroid_candidates:
         try:
-            await system.add_saaje(cand.centroid_id, entry_id, cand.similarity)
+            await system.add_entry_to_centroid(cand.centroid_id, entry_id, cand.similarity)
             applied.append((cand.centroid_id, cand.similarity))
         except Exception as e:
             logger.warning(
@@ -164,10 +165,17 @@ async def link_entry(
         return applied
 
     # --- Step 2: Precentroids ---
-    precentroid_id, sim = await suggest_precentroid_for_entry(
+    precentroid_result = await suggest_precentroid_for_entry(
         entry_id,
         threshold=min_similarity
     )
+
+    if precentroid_result is None:
+        # nothing to link, return early
+        return applied
+
+    precentroid_id, sim = precentroid_result
+
     if precentroid_id:
         try:
             logger.debug(
