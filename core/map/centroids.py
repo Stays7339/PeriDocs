@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-05T22:05:00-04:00
+# Save-state: 2026-04-15T16:27:40-04:00
 # ==========================================
 
 import os
@@ -25,7 +25,7 @@ from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
-
+from core.map.turtle_builder import build_rdf_for_centroid_state, serialize_graph_to_turtle
 
 
 
@@ -612,16 +612,33 @@ class CentroidSystem:
 
             self._centroids[new_id] = c
             await self._persist(c)
-            logging.info("Phase one start")
+
+            # ------------------------------------------------------------
+            # RDF projection (post-persistence, snapshot-only)
+            # ------------------------------------------------------------
+
+            rdf_graph = await build_rdf_for_centroid_state(
+                centroid_state=c.current,
+                centroid_id=new_id,
+            )
+
+            rdf_turtle = serialize_graph_to_turtle(rdf_graph)
+
+            # optional: persist RDF output somewhere (file/db/cache layer)
+            await self._persist_rdf(new_id, rdf_turtle)
+            # ------------------------------------------------------------
+
+            logging.info("Reconcile entries metadata nomenclature start")
             # Reconcile entries.json with approved centroid
             from core.map.entry_membership_sequencer import reconcile_centroid_membership_after_approval
-            logging.info("Phase two start")
+
             await reconcile_centroid_membership_after_approval(
                 centroid_suffix=str(suffix),
                 event_index=event_index,
                 summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
             )
-            logging.info("Phase three start")
+
+            logging.info("Archive previos centroid type 'shed skin' start")
             # archive precentroid JSON safely
             precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
@@ -859,79 +876,22 @@ class CentroidSystem:
             # persist to disk
             await self._persist(c)
 
-    # ----- drift & split suggestion -----
+            # ------------------------------------------------------------
+            # RDF projection (post-persistence, snapshot-only)
+            # ------------------------------------------------------------
 
-    async def analyze_and_suggest_split(self, centroid_id: str, threshold: float) -> None:
-        """
-        Perform drift analysis on a centroid.
-
-        If drift falls below threshold:
-            - Record a SUGGEST_SPLIT ledger event
-            - Persist an atomic suggestion artifact to disk
-
-        This method is:
-            - Deterministic
-            - Ledger-backed
-            - Crash-safe
-            - Replay-auditable
-        """
-
-        await self._assert_ledger_ready()
-
-        async with self._lock:
-            if centroid_id not in self._centroids:
-                raise RuntimeError(f"Unknown centroid {centroid_id}")
-
-            c = self._centroids[centroid_id]
-            history = c.states
-
-            if len(history) < 2:
-                return
-
-            sims = [
-                cosine_similarity(history[i - 1].vector, history[i].vector)
-                for i in range(1, len(history))
-            ]
-
-            min_sim = min(sims)
-
-            if min_sim >= threshold:
-                return
-
-            # --- Ledger event (authoritative) ---
-            event_index = await self._ledger.record_event({
-                "type": "SUGGEST_SPLIT",
-                "centroid_id": centroid_id,
-                "threshold": threshold,
-                "min_similarity": min_sim,
-            })
-
-            # --- Durable artifact ---
-            os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
-
-            payload = {
-                "event_index": event_index,
-                "centroid_id": centroid_id,
-                "description_from_human_moderator": c.description_from_human_moderator,
-                "title_from_human_moderator": c.title_from_human_moderator,
-                "threshold": threshold,
-                "min_similarity": min_sim,
-            }
-
-            final_path = os.path.join(
-                SUGGESTIONS_DIR,
-                f"{centroid_id}_split_{event_index}.json",
+            rdf_graph = await build_rdf_for_centroid_state(
+                centroid_state=c.current,
+                centroid_id=centroid_id,
             )
-            tmp_path = final_path + ".tmp"
 
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
+            rdf_turtle = serialize_graph_to_turtle(rdf_graph)
 
-            os.replace(tmp_path, final_path)
+            # optional: persist RDF output somewhere (file/db/cache layer)
+            await self._persist_rdf(centroid_id, rdf_turtle)
+            # ------------------------------------------------------------
 
-    
+
     # ----- review projection & admin utilities -----
 
     async def build_review_queue(self) -> list[dict]:
@@ -1016,3 +976,32 @@ class CentroidSystem:
             raise TypeError(f"Expected a callable, got {type(func)}: {func}")
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+
+
+    # ------------------------------------------------------------
+    # RDF persistence helper
+    # ------------------------------------------------------------
+    async def _persist_rdf(self, centroid_id: str, rdf_turtle: str) -> None:
+        """
+        Persist RDF Turtle snapshot for a centroid.
+
+        Characteristics:
+        - Overwrites previous snapshot (no versioning here)
+        - Not authoritative (can be regenerated)
+        - Deterministic given centroid state
+        """
+
+        RDF_DIR = os.path.join(DATA_DIR, "rdf")
+        os.makedirs(RDF_DIR, exist_ok=True)
+
+        final_path = os.path.join(RDF_DIR, f"{centroid_id}.ttl")
+        tmp_path = final_path + ".tmp"
+
+        # atomic write (same pattern you're already using elsewhere)
+        with open(tmp_path, "w", encoding="utf-8") as f:
+            f.write(rdf_turtle)
+            f.flush()
+            os.fsync(f.fileno())
+
+        os.replace(tmp_path, final_path)
+    # ------------------------------------------------------------
