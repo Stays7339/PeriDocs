@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-04-05T14:00:25-04:00
+# Save-state: 2026-04-19T14:38:27-04:00
 # ==========================================
 
 """
@@ -181,12 +181,13 @@ class IdentifierLedger:
             "REJECT_SUFFIX": {"suffix"},
             "CREATE_PRECENTROID": {"centroid_id", "entry_ids"},
             "APPROVE_PRECENTROID": {"from", "to", "description_from_human_moderator", "title_from_human_moderator"},
-            "ADD_SAAJE": {"centroid_id", "entry_id", "similarity"},
-            "REMOVE_SAAJE": {"centroid_id", "entry_id"},
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
             "BURST_PRECENTROID": {"centroid_id", "threshold"},
             "SUGGEST_SPLIT": {"centroid_id", "threshold", "min_similarity"},
             "DELETE_ENTRY": {"entry_id"},
+            "UNLINK_ENTRY": {"centroid_id", "entry_id"},
+            "LINK_ENTRY": {"centroid_id", "entry_id"},
+            "NEW_ENTRY_INGESTED": {"entry_id"},
             # Extend as needed
         }
 

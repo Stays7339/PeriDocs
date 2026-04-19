@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-15T16:27:40-04:00
+# Save-state: 2026-04-19T13:41:25-04:00
 # ==========================================
 
 import os
@@ -25,7 +25,7 @@ from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
-from core.map.turtle_builder import build_rdf_for_centroid_state, serialize_graph_to_turtle
+from core.map.turtle_caller import build_rdf_for_centroid_state, serialize_graph_to_turtle
 
 
 

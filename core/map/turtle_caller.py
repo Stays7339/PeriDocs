@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/turtle_caller.py
-# Save-state: 2026-04-15T16:22:05-04:00
+# Save-state: 2026-04-16T15:04:55-04:00
 # Derived ontology builder (JSON -> RDF/Turtle)
 # ==========================================
 
@@ -55,8 +55,14 @@ async def build_rdf_for_centroid_state(
     # Core centroid identity
     # ------------------------------------------------------------
     graph.add((centroid_uri, RDF.type, PERIDOCS.Centroid))
-    graph.add((centroid_uri, RDFS.label, Literal(getattr(centroid_state, "title_from_human_moderator", ""))))
-    graph.add((centroid_uri, DCTERMS.description, Literal(getattr(centroid_state, "description_from_human_moderator", ""))))
+
+    metadata = getattr(centroid_state, "metadata", {}) or {}
+
+    title = metadata.get("title_from_human_moderator", "")
+    description = metadata.get("description_from_human_moderator", "")
+
+    graph.add((centroid_uri, RDFS.label, Literal(title)))
+    graph.add((centroid_uri, DCTERMS.description, Literal(description)))
 
     logger.info("[rdf_builder] Built RDF graph for centroid: %s", centroid_id)
 

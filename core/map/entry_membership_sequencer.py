@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-05T22:12:05-04:00
+# Save-state: 2026-04-19T14:56:05-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -257,7 +257,7 @@ async def unlink_entry(
     Ledger-backed, audit-safe.
     """
     try:
-        await centroid_system.remove_saaje(centroid_id, entry_id)
+        await centroid_system.unlink_entry_from_centroid(centroid_id, entry_id)
         logger.info("Entry %s unlinked from centroid %s", entry_id, centroid_id)
     except Exception as e:
         logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)

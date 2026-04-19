@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-16T14:01:40-04:00
+## Canonical Project Directory as of 2026-04-19T10:40:30-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -308,8 +308,8 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
-│  │
+│  │  ├─  top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  └─ __pycache__/  
 │  │
 │  │
 ├─ routes/
@@ -331,25 +331,26 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ peridocs-wordmark-and-logo-202602232100.png
 │  │  ├─ peridocs-wordmark-and-logo-202602232133.png
 │  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
+│  │  ├─ [a few more as the logo has been marginally iterated upon]
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
-│  ├─ templates/                        # Jinja2 HTML templates
-│  │  ├─ about.html                     # About page template
-│  │  ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
-│  │  ├─ base.html                      # Layout template
-│  │  ├─ index.html                     # Main homepage template
-│  │  ├─ privacy.html                   # Privacy policy page template
-│  │  ├─ submit-success.html            # Submission success page template
-│  │  ├─ terms-of-service.html          # Terms of Service page template
-│  │  └─ includes/                      # Partial web-page templates
-│  │      ├─ modal-crisis.html
-│  │      └─ modal-feedback.html
-│  │
-│  │
-│  └─ __pycache__/                       # Python compiled bytecode cache
+│  └─ templates/                        # Jinja2 HTML templates
+│   ├─ about.html                     # About page template
+│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
+│   ├─ base.html                      # Layout template
+│   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
+│   ├─ index.html                     # Main homepage template
+│   ├─ privacy.html                   # Privacy policy page template
+│   ├─ submit-success.html            # Submission success page template
+│   ├─ terms-of-service.html          # Terms of Service page template
+│   └─ includes/                      # Partial web-page templates
+│      ├─ modal-crisis.html
+│      └─ modal-feedback.html
+│
+│
 │
 ├─backups-for-the-main-data-folder
 │   └─peridocs_backup_[YYYY]-[MM]-[DD]T[HH]-[mm]-[ss]Z.zip
@@ -362,8 +363,8 @@ PeriDocs-code/                         # Root project folder
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
 │   │   ├─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
 │   │   ├─ subregion_detector.py          # Used to detect areas of notable density inside of what's defined as technically one centroids. That way, the system has the ability to lightly suggest the potential of multiple centroids being made from that larger conglomerate of a given centroid.
-│   │   └─ turtle_caller.py # Used so that we can switch between JSON and TTL files for the sake of helping for ontology quieries.
-│   │
+│   │   ├─ turtle_caller.py               # Used so that we can switch between JSON and TTL files for the sake of helping for ontology quieries.
+│   │   └─ __pycache__/
 │   │
 │   ├─  nlp/
 │   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
@@ -374,7 +375,8 @@ PeriDocs-code/                         # Root project folder
 │   |   ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
 │   |   ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
 │   |   ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│   |   └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
+│   |   ├─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding centroid assignment, crisis check.
+│   |   └─ __pycache__/
 │   └─ reasoning/
 │           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
 │           └─ # To Be Determined / # Work In Progress
@@ -389,6 +391,7 @@ PeriDocs-code/                         # Root project folder
 │  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
 │  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
