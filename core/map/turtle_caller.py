@@ -1,14 +1,14 @@
 # ==========================================
 # core/map/turtle_caller.py
-# Save-state: 2026-04-1917:23:05-04:00
+# Save-state: 2026-04-T20:23:55-04:00
 # Derived ontology builder (JSON -> reasoning_file/Turtle)
 # ==========================================
 
 import logging
 from typing import Dict, Any, List, Optional
 
-from reasoning_filelib import Graph, URIRef, Literal, Namespace
-from reasoning_filelib.namespace import reasoning_file, reasoning_fileS, DCTERMS
+from rdflib import Graph, URIRef, Literal, Namespace
+from rdflib.namespace import RDF, RDFS, DCTERMS
 
 logger = logging.getLogger(__name__)
 
@@ -54,14 +54,14 @@ async def build_reasoning_file_for_centroid_state(
     # ------------------------------------------------------------
     # Core centroid identity
     # ------------------------------------------------------------
-    graph.add((centroid_uri, reasoning_file.type, PERIDOCS.Concept))
+    graph.add((centroid_uri, RDF.type, PERIDOCS.Concept))
 
     metadata = getattr(centroid_state, "metadata", {}) or {}
 
     title = metadata.get("title_from_human_moderator", "")
     description = metadata.get("description_from_human_moderator", "")
 
-    graph.add((centroid_uri, reasoning_fileS.label, Literal(title)))
+    graph.add((centroid_uri, RDFS.label, Literal(title)))
     graph.add((centroid_uri, DCTERMS.description, Literal(description)))
 
     logger.info("[reasoning_file_builder] Built reasoning_file graph for centroid: %s", centroid_id)

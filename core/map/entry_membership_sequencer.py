@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-19T14:56:05-04:00
+# Save-state: 2026-04-22T20:25:00-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -26,7 +26,7 @@ from app.helpers.entry_similarity import (
 )
 from core.map.mapping_runtime import centroid_system
 from core.map.centroids import CentroidState
-from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from core.map.mapping_runtime import entry_runtime
 
 logger = logging.getLogger(__name__)

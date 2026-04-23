@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# refactored 2026-03-29T23:11:50-04:00
+# refactored 2026-04-22T20:25:55-04:00
 # ==========================================
 import os
 import json
@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 
 from core.map.mapping_runtime import centroid_system
-from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 
 # Initialize router with proper prefix and tags
 router = APIRouter(prefix="/admin", tags=["admin-review"])

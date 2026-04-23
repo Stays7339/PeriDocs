@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-22T18:51:45-04:00
+# Save-state: 2026-04-22T20:22:15-04:00
 # ==========================================
 
 import os
@@ -19,7 +19,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 
 from core.map.ledger import IdentifierLedger
-from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from app.helpers.entry_similarity import (
     cosine_similarity,
     deterministic_mean,
