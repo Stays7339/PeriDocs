@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-19T13:41:25-04:00
+# Save-state: 2026-04-22T18:51:45-04:00
 # ==========================================
 
 import os
@@ -25,7 +25,7 @@ from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
-from core.map.turtle_caller import build_rdf_for_centroid_state, serialize_graph_to_turtle
+from core.map.turtle_caller import build_reasoning_file_for_centroid_state, serialize_graph_to_turtle
 
 
 
@@ -614,18 +614,18 @@ class CentroidSystem:
             await self._persist(c)
 
             # ------------------------------------------------------------
-            # RDF projection (post-persistence, snapshot-only)
+            # reasoning_file projection (post-persistence, snapshot-only)
             # ------------------------------------------------------------
 
-            rdf_graph = await build_rdf_for_centroid_state(
+            reasoning_file_graph = await build_reasoning_file_for_centroid_state(
                 centroid_state=c.current,
                 centroid_id=new_id,
             )
 
-            rdf_turtle = serialize_graph_to_turtle(rdf_graph)
+            reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
 
-            # optional: persist RDF output somewhere (file/db/cache layer)
-            await self._persist_rdf(new_id, rdf_turtle)
+            # optional: persist reasoning_file output somewhere (file/db/cache layer)
+            await self._persist_reasoning_file(new_id, reasoning_file_turtle)
             # ------------------------------------------------------------
 
             logging.info("Reconcile entries metadata nomenclature start")
@@ -638,7 +638,7 @@ class CentroidSystem:
                 summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
             )
 
-            logging.info("Archive previos centroid type 'shed skin' start")
+            logging.info("Archive previous centroid type 'shed skin' start")
             # archive precentroid JSON safely
             precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
@@ -877,18 +877,18 @@ class CentroidSystem:
             await self._persist(c)
 
             # ------------------------------------------------------------
-            # RDF projection (post-persistence, snapshot-only)
+            # reasoning_file projection (post-persistence, snapshot-only)
             # ------------------------------------------------------------
 
-            rdf_graph = await build_rdf_for_centroid_state(
+            reasoning_file_graph = await build_reasoning_file_for_centroid_state(
                 centroid_state=c.current,
                 centroid_id=centroid_id,
             )
 
-            rdf_turtle = serialize_graph_to_turtle(rdf_graph)
+            reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
 
-            # optional: persist RDF output somewhere (file/db/cache layer)
-            await self._persist_rdf(centroid_id, rdf_turtle)
+            # optional: persist reasoning_file output somewhere (file/db/cache layer)
+            await self._persist_reasoning_file(centroid_id, reasoning_file_turtle)
             # ------------------------------------------------------------
 
 
@@ -979,11 +979,11 @@ class CentroidSystem:
 
 
     # ------------------------------------------------------------
-    # RDF persistence helper
+    # reasoning_file persistence helper
     # ------------------------------------------------------------
-    async def _persist_rdf(self, centroid_id: str, rdf_turtle: str) -> None:
+    async def _persist_reasoning_file(self, centroid_id: str, reasoning_file_turtle: str) -> None:
         """
-        Persist RDF Turtle snapshot for a centroid.
+        Persist reasoning_file Turtle snapshot for a centroid.
 
         Characteristics:
         - Overwrites previous snapshot (no versioning here)
@@ -991,15 +991,15 @@ class CentroidSystem:
         - Deterministic given centroid state
         """
 
-        RDF_DIR = os.path.join(DATA_DIR, "rdf")
-        os.makedirs(RDF_DIR, exist_ok=True)
+        reasoning_file_DIR = os.path.join(DATA_DIR, "reasoning_file")
+        os.makedirs(reasoning_file_DIR, exist_ok=True)
 
-        final_path = os.path.join(RDF_DIR, f"{centroid_id}.ttl")
+        final_path = os.path.join(reasoning_file_DIR, f"{centroid_id}.ttl")
         tmp_path = final_path + ".tmp"
 
         # atomic write (same pattern you're already using elsewhere)
         with open(tmp_path, "w", encoding="utf-8") as f:
-            f.write(rdf_turtle)
+            f.write(reasoning_file_turtle)
             f.flush()
             os.fsync(f.fileno())
 

@@ -1,14 +1,14 @@
 # ==========================================
 # core/map/turtle_caller.py
-# Save-state: 2026-04-16T15:04:55-04:00
-# Derived ontology builder (JSON -> RDF/Turtle)
+# Save-state: 2026-04-1917:23:05-04:00
+# Derived ontology builder (JSON -> reasoning_file/Turtle)
 # ==========================================
 
 import logging
 from typing import Dict, Any, List, Optional
 
-from rdflib import Graph, URIRef, Literal, Namespace
-from rdflib.namespace import RDF, RDFS, DCTERMS
+from reasoning_filelib import Graph, URIRef, Literal, Namespace
+from reasoning_filelib.namespace import reasoning_file, reasoning_fileS, DCTERMS
 
 logger = logging.getLogger(__name__)
 
@@ -19,12 +19,12 @@ PERIDOCS = Namespace("urn:peridocs:")
 # Main Entry Point
 # ------------------------------------------------------------
 
-async def build_rdf_for_centroid_state(
+async def build_reasoning_file_for_centroid_state(
     centroid_state,
     centroid_id: str,
 ) -> Graph:
     """
-    Build RDF graph from an in-memory CentroidState object.
+    Build reasoning_file graph from an in-memory CentroidState object.
 
     This function:
         - DOES NOT read disk
@@ -42,8 +42,8 @@ async def build_rdf_for_centroid_state(
 
     Returns
     -------
-    rdflib.Graph
-        Fully constructed RDF graph representation of centroid + metadata
+    reasoning_filelib.Graph
+        Fully constructed reasoning_file graph representation of centroid + metadata
     """
 
     graph = Graph()
@@ -54,28 +54,28 @@ async def build_rdf_for_centroid_state(
     # ------------------------------------------------------------
     # Core centroid identity
     # ------------------------------------------------------------
-    graph.add((centroid_uri, RDF.type, PERIDOCS.Centroid))
+    graph.add((centroid_uri, reasoning_file.type, PERIDOCS.Concept))
 
     metadata = getattr(centroid_state, "metadata", {}) or {}
 
     title = metadata.get("title_from_human_moderator", "")
     description = metadata.get("description_from_human_moderator", "")
 
-    graph.add((centroid_uri, RDFS.label, Literal(title)))
+    graph.add((centroid_uri, reasoning_fileS.label, Literal(title)))
     graph.add((centroid_uri, DCTERMS.description, Literal(description)))
 
-    logger.info("[rdf_builder] Built RDF graph for centroid: %s", centroid_id)
+    logger.info("[reasoning_file_builder] Built reasoning_file graph for centroid: %s", centroid_id)
 
     return graph
 
 
 # ------------------------------------------------------------
-# Export helper (keeps RDF generation + serialization separate)
+# Export helper (keeps reasoning_file generation + serialization separate)
 # ------------------------------------------------------------
 
 def serialize_graph_to_turtle(graph: Graph) -> str:
     """
-    Serialize RDF graph into Turtle format.
+    Serialize reasoning_file graph into Turtle format.
 
     Kept separate to preserve clean separation between:
         - ontology construction
