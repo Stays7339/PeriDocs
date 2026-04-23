@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-04-03T14:52:30-04:00
+# save-state 2026-04-22T20:47:25-04:00
 # ==========================================
 
 
@@ -71,7 +71,7 @@ async def process_entry_async(
 
     # ---------------- SAFE TEXT ----------------
     safe_text = redact_pii(text)
-    encrypted_safe_text = encrypt_text(safe_text)
+    encrypted_safe_text = encrypt_text(text)
     report_progress()  # 1 / total_steps
 
     # ---------------- CLAUSE SPLIT ----------------
