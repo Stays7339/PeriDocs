@@ -1,7 +1,6 @@
 # ==========================================
 # core/map/perist_reasoning_data.py
-# Save-state: 2026-04-24T15:27:40-04:00
-# Derived ontology builder (JSON -> reasoning_file/Turtle)
+# Save-state: 2026-04-24T15:54:30-04:00
 # ==========================================
 
 import logging
@@ -14,6 +13,35 @@ logger = logging.getLogger(__name__)
 
 
 PERIDOCS = Namespace("urn:peridocs:")
+
+
+# ------------------------------------------------------------
+# reasoning_data persistence helper
+# ------------------------------------------------------------
+async def persist_reasoning_data(self, centroid_id: str, reasoning_file_turtle: str) -> None:
+    """
+    Persist reasoning_file Turtle snapshot for a centroid.
+
+    Characteristics:
+    - Overwrites previous snapshot (no versioning here)
+    - Not authoritative (can be regenerated)
+    - Deterministic given centroid state
+    """
+
+    reasoning_file_DIR = os.path.join(DATA_DIR, "reasoning_file")
+    os.makedirs(reasoning_file_DIR, exist_ok=True)
+
+    final_path = os.path.join(reasoning_file_DIR, f"{centroid_id}.ttl")
+    tmp_path = final_path + ".tmp"
+
+    # atomic write (same pattern you're already using elsewhere)
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        f.write(reasoning_file_turtle)
+        f.flush()
+        os.fsync(f.fileno())
+
+    os.replace(tmp_path, final_path)
+# ------------------------------------------------------------
 
 # ------------------------------------------------------------
 # EXISTENCE CHECK
@@ -54,7 +82,6 @@ def create_reasoning_file_stub(
     without breaking determinism elsewhere.
     """
 
-    concept_id = normalize_concept_id(concept_id)
     uri = PERIDOCS[f"concept_from_heuristic:{concept_id}"]
 
     if concept_exists(graph, concept_id):
