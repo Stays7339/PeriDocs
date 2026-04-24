@@ -1,15 +1,16 @@
 # ==========================================
 # core/reasoning/reasoning_runtime.py
-# Save-state: 2026-04-22T19:59:15-04:00
+# Save-state: 2026-04-23T12:45:50-04:00
 # ==========================================
 
 from typing import Dict, Any, List
-from .state import build_initial_state
+from .build_evaluation_state import build_initial_state
 from .heuristic_loader import load_heuristics
 from .evaluator import evaluate_heuristic
 from .damping import apply_damping
-from .receipt import summarize_state
+from .receipt_maker import summarize_state
 from .types import ConceptSignal, Inference
+from .evaluator import integrate_inference
 
 
 MIN_MEANINGFUL_WEIGHT = 0.01
@@ -37,15 +38,13 @@ async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
         meaningful = False
 
         for inf in new_inferences:
-            signal = state.setdefault(inf.output_concept, ConceptSignal(inf.output_concept))
+            changed = integrate_inference(state, inf)
 
-            adjusted_weight = apply_damping(len(signal.inferences), inf.weight)
-
-            if adjusted_weight < MIN_MEANINGFUL_WEIGHT:
+            if not changed:
                 continue
 
-            inf.weight = adjusted_weight
-            signal.add(inf)
+            if inf.weight < MIN_MEANINGFUL_WEIGHT:
+                continue
 
             receipt.append(inf.to_dict())
             meaningful = True

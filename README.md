@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-22T18:46:00-04:00
+## Canonical Project Directory as of 2026-04-23T13:58:55-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -379,7 +379,14 @@ PeriDocs/                         # Root project folder
 │   |   └─ __pycache__/
 │   └─ reasoning/
 │           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
-│           └─ # To Be Determined / # Work In Progress
+│           ├─ build_evaluation_state.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
+│           ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
+│           ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
+│           ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
+│           ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
+│           ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
+│           └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│ 
 │           
 │
 ├─ data/                                  # Local data storage
@@ -390,6 +397,8 @@ PeriDocs/                         # Root project folder
 │  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
+│  ├─ reasoning_files/                        # Stored entries
+│  │   └─ # ttl files are here, but nothing major
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.

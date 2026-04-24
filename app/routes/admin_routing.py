@@ -1,11 +1,12 @@
 # ==========================================
 # app/routes/admin_routing.py
-# refactored 2026-04-22T20:25:55-04:00
+# refactored 2026-04-23T14:26:30-04:00
 # ==========================================
 import os
 import json
 import asyncio
-from typing import List, Dict
+from typing import List, Dict, Any
+import hashlib
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -35,7 +36,9 @@ class RejectPrecentroidPayload(BaseModel):
 class EntriesSafeTextPayload(BaseModel):
     entry_ids: List[str] = Field(..., description="List of entry IDs to fetch safe_text")
 
-
+class CreateHeuristicPayload(BaseModel):
+    givens: List[str]
+    outputs: List[Dict[str, Any]]  # {concept, likelihood, justification?}
 # -----------------------------
 # Admin HTML Dashboard Route
 # -----------------------------
@@ -138,3 +141,57 @@ async def get_entries_safe_text(payload: EntriesSafeTextPayload):
         })
 
     return {"entries": results}
+
+HEURISTICS_FILE = os.path.join("data", "heuristics.json")
+
+
+@router.post("/create-heuristic")
+async def create_heuristic(payload: CreateHeuristicPayload):
+    if not payload.givens or not payload.outputs:
+        raise HTTPException(status_code=400, detail="Missing givens or outputs")
+
+    # normalize likelihoods (accept % or float)
+    cleaned_outputs = []
+    for o in payload.outputs:
+        concept = o.get("concept")
+        if not concept:
+            raise HTTPException(status_code=400, detail="Output concept missing")
+
+        likelihood = o.get("likelihood", 0)
+
+        try:
+            likelihood = float(likelihood)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid likelihood")
+
+        if likelihood > 1:
+            likelihood = likelihood / 100.0
+
+        if likelihood < 0:
+            likelihood = 0.0
+            
+        cleaned_outputs.append({
+            "concept": concept,
+            "likelihood": float(likelihood),
+            "justification": o.get("justification")
+        })
+
+    heuristic = {
+        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
+        "givens": payload.givens,
+        "outputs": cleaned_outputs
+    }
+
+    # load existing
+    if os.path.exists(HEURISTICS_FILE):
+        with open(HEURISTICS_FILE, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    data.append(heuristic)
+
+    with open(HEURISTICS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+    return {"status": "ok", "heuristic": heuristic}

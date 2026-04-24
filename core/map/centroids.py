@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-22T20:22:15-04:00
+# Save-state: 2026-04-23T12:57:10-04:00
 # ==========================================
 
 import os
@@ -850,8 +850,8 @@ class CentroidSystem:
             vector = deterministic_mean(vectors)
 
             # update entry → similarity mapping
-            entries_similarity_to_centroid = dict(getattr(prev_state, "entries_similarity_to_centroid", {}))
-            entries_similarity_to_centroid[entry_id] = similarity
+            entry_similarity_to_centroid = dict(getattr(prev_state, "entry_similarity_to_centroid", {}))
+            entry_similarity_to_centroid[entry_id] = similarity
 
             # record ledger event
             event_index = await self._ledger.record_event({
@@ -869,7 +869,7 @@ class CentroidSystem:
                     event_index=event_index,
                     entry_ids=new_entry_ids,
                     vector=vector,
-                    metadata={**prev_state.metadata, "entries_similarity_to_centroid": entries_similarity_to_centroid}
+                    metadata={**prev_state.metadata, "entry_similarity_to_centroid": entry_similarity_to_centroid}
                 )
             )
 

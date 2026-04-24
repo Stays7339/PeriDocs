@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-03-26T20:21:00-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-04-23T13:35:30-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
@@ -6,6 +6,25 @@
 <div class="card">
   <h1>Review Queue</h1>
   <div id="review-list" class="card-content"></div>
+</div>
+
+<div class="card">
+  <h2>Create Heuristic</h2>
+
+  <div id="givens-container"></div>
+  <button class="btn" onclick="addGiven()">+ Add Given</button>
+
+  <hr>
+
+  <div id="outputs-container"></div>
+  <button class="btn" onclick="addOutput()">+ Add Output</button>
+
+  <br><br>
+  <button class="btn primary" onclick="submitHeuristic()">Submit</button>
+
+  <datalist id="concept-list"></datalist>
+
+  <input list="concept-list" class="input" placeholder="Given concept...">
 </div>
 
 <script>
@@ -122,5 +141,68 @@ window.addEventListener("popstate", event => {
 });
 
 fetchQueue();
+
+// --------------------------------
+// Heuristics Loading Javascript
+// --------------------------------
+const givensContainer = document.getElementById("givens-container");
+const outputsContainer = document.getElementById("outputs-container");
+
+function addGiven(value = "") {
+  const div = document.createElement("div");
+  div.innerHTML = `<input class="input" placeholder="Given concept..." value="${value}">`;
+  givensContainer.appendChild(div);
+}
+
+function addOutput(concept = "", likelihood = "") {
+  const div = document.createElement("div");
+  div.innerHTML = `
+    <input class="input" placeholder="Output concept..." value="${concept}">
+    <input class="input" placeholder="Likelihood (0-1 or %)" value="${likelihood}">
+  `;
+  outputsContainer.appendChild(div);
+}
+
+async function submitHeuristic() {
+  const givens = [...givensContainer.querySelectorAll("input")]
+    .map(i => i.value.trim())
+    .filter(Boolean);
+
+  const outputs = [...outputsContainer.children].map(div => {
+    const inputs = div.querySelectorAll("input");
+    return {
+      concept: inputs[0].value.trim(),
+      likelihood: parseFloat(inputs[1].value)
+    };
+  }).filter(o => o.concept);
+
+  const res = await fetch("/admin/create-heuristic", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ givens, outputs })
+  });
+
+  const data = await res.json();
+  alert("Heuristic saved");
+
+  // optional reset
+  givensContainer.innerHTML = "";
+  outputsContainer.innerHTML = "";
+}
+
+async function loadConceptList() {
+  const res = await fetch("/admin/review-queue");
+  const data = await res.json();
+
+  const datalist = document.getElementById("concept-list");
+
+  data.forEach(item => {
+    const option = document.createElement("option");
+    option.value = item.id;
+    datalist.appendChild(option);
+  });
+}
+
+loadConceptList();
 </script>
 {% endblock %}

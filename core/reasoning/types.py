@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/types.py
-# Save-state: 2026-04-22T19:54:10-04:00
+# Save-state: 2026-04-23T12:40:00-04:00
 # ==========================================
 
 from __future__ import annotations
@@ -16,6 +16,7 @@ class Inference:
         heuristic_id: str,
         step: int,
         justification: Optional[str] = None,
+        path_id: Optional[str] = None,
     ):
         self.input_concepts = input_concepts
         self.output_concept = output_concept
@@ -23,6 +24,7 @@ class Inference:
         self.heuristic_id = heuristic_id
         self.step = step
         self.justification = justification
+        self.path_id = path_id
 
     def to_dict(self):
         return {
@@ -32,6 +34,7 @@ class Inference:
             "heuristic_id": self.heuristic_id,
             "step": self.step,
             "justification": self.justification,
+            "path_id": self.path_id,
         }
 
 
