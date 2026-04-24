@@ -25,7 +25,11 @@ from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
-from core.map.turtle_caller import build_reasoning_file_for_centroid_state, serialize_graph_to_turtle
+from core.map.perist_reasoning_data import (
+    build_reasoning_file_for_centroid_state,
+    serialize_graph_to_turtle,
+    persist_reasoning_data
+)
 
 
 
@@ -442,7 +446,7 @@ class CentroidSystem:
                 logger.info("[load_state] Loaded centroid %s with %d states", c.centroid_id, len(c.states))
 
 
-    async def _persist(self, centroid: Centroid) -> None:
+    async def persist_centroid_data(self, centroid: Centroid) -> None:
         os.makedirs(STATE_DIR, exist_ok=True)
 
         npz_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}.npz")
@@ -454,7 +458,7 @@ class CentroidSystem:
         npz_dump = {}
         for state_idx, state in enumerate(centroid.states):
             if state.vector is None or not isinstance(state.vector, np.ndarray):
-                logger.warning("[_persist] State %d in %s has invalid vector, using zero vector", state_idx, centroid.centroid_id)
+                logger.warning("[persist_centroid_data] State %d in %s has invalid vector, using zero vector", state_idx, centroid.centroid_id)
                 state_vector = np.zeros(1024, dtype=np.float32)
             else:
                 state_vector = state.vector
@@ -464,7 +468,7 @@ class CentroidSystem:
             npz_dump[key] = state_vector 
 
         if not npz_dump:
-            logger.info("[_persist] Centroid %s has no valid vectors, writing single zero vector", centroid.centroid_id)
+            logger.info("[persist_centroid_data] Centroid %s has no valid vectors, writing single zero vector", centroid.centroid_id)
             npz_dump["empty"] = np.zeros(1024, dtype=np.float32)
 
         # --- Save NPZ safely ---
@@ -473,9 +477,9 @@ class CentroidSystem:
             if not os.path.exists(tmp_npz):
                 raise RuntimeError(f"NPZ tmp file {tmp_npz} was not created!")
             os.replace(tmp_npz, npz_path)
-            logger.debug("[_persist] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
+            logger.debug("[persist_centroid_data] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
         except Exception as e:
-            logger.error("[_persist] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
+            logger.error("[persist_centroid_data] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
             raise
 
         # --- JSON summary ---
@@ -490,9 +494,9 @@ class CentroidSystem:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_json, json_path)
-            logger.debug("[_persist] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
+            logger.debug("[persist_centroid_data] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
         except Exception as e:
-            logger.error("[_persist] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
+            logger.error("[persist_centroid_data] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
             raise
             
     async def create_precentroid(self, entry_ids: List[str]) -> str:
@@ -549,7 +553,7 @@ class CentroidSystem:
         self._centroids[cid] = c
 
         # persist safely
-        await self._persist(c)
+        await self.persist_centroid_data(c)
 
         return cid
 
@@ -611,7 +615,7 @@ class CentroidSystem:
             ))
 
             self._centroids[new_id] = c
-            await self._persist(c)
+            await self.persist_centroid_data(c)
 
             # ------------------------------------------------------------
             # reasoning_file projection (post-persistence, snapshot-only)
@@ -625,7 +629,7 @@ class CentroidSystem:
             reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
 
             # optional: persist reasoning_file output somewhere (file/db/cache layer)
-            await self._persist_reasoning_file(new_id, reasoning_file_turtle)
+            await persist_reasoning_data(new_id, reasoning_file_turtle)
             # ------------------------------------------------------------
 
             logging.info("Reconcile entries metadata nomenclature start")
@@ -799,7 +803,7 @@ class CentroidSystem:
         ))
 
         # --- Persist final state BEFORE archiving ---
-        await self._persist(c)
+        await self.persist_centroid_data(c)
 
         # --- Move files to archive ---
 
@@ -874,7 +878,7 @@ class CentroidSystem:
             )
 
             # persist to disk
-            await self._persist(c)
+            await self.persist_centroid_data(c)
 
             # ------------------------------------------------------------
             # reasoning_file projection (post-persistence, snapshot-only)
@@ -888,7 +892,7 @@ class CentroidSystem:
             reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
 
             # optional: persist reasoning_file output somewhere (file/db/cache layer)
-            await self._persist_reasoning_file(centroid_id, reasoning_file_turtle)
+            await persist_reasoning_data(centroid_id, reasoning_file_turtle)
             # ------------------------------------------------------------
 
 
@@ -977,31 +981,3 @@ class CentroidSystem:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
-
-    # ------------------------------------------------------------
-    # reasoning_file persistence helper
-    # ------------------------------------------------------------
-    async def _persist_reasoning_file(self, centroid_id: str, reasoning_file_turtle: str) -> None:
-        """
-        Persist reasoning_file Turtle snapshot for a centroid.
-
-        Characteristics:
-        - Overwrites previous snapshot (no versioning here)
-        - Not authoritative (can be regenerated)
-        - Deterministic given centroid state
-        """
-
-        reasoning_file_DIR = os.path.join(DATA_DIR, "reasoning_file")
-        os.makedirs(reasoning_file_DIR, exist_ok=True)
-
-        final_path = os.path.join(reasoning_file_DIR, f"{centroid_id}.ttl")
-        tmp_path = final_path + ".tmp"
-
-        # atomic write (same pattern you're already using elsewhere)
-        with open(tmp_path, "w", encoding="utf-8") as f:
-            f.write(reasoning_file_turtle)
-            f.flush()
-            os.fsync(f.fileno())
-
-        os.replace(tmp_path, final_path)
-    # ------------------------------------------------------------

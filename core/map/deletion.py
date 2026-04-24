@@ -111,7 +111,7 @@ class DeletionManager:
                 )
             )
 
-            await self._centroids._persist(c)
+            await self._centroids.persist_centroid_data(c)
 
     # ------------------------------------------------------------
     # GLOBAL ENTRY REMOVAL (CENTROID LAYER)

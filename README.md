@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-23T13:58:55-04:00
+## Canonical Project Directory as of 2026-04-24T15:22:20-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -321,6 +321,8 @@ PeriDocs/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
+│  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
+│  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ favicon.png
 │  │  ├─ peridocs-logo-v1-white.png
@@ -362,8 +364,8 @@ PeriDocs/                         # Root project folder
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
 │   │   ├─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
+│   │   ├─ perist_reasoning_data.py       # Used so that we can switch between JSON and TTL files for the sake of helping for ontology quieries.
 │   │   ├─ subregion_detector.py          # Used to detect areas of notable density inside of what's defined as technically one centroids. That way, the system has the ability to lightly suggest the potential of multiple centroids being made from that larger conglomerate of a given centroid.
-│   │   ├─ turtle_caller.py               # Used so that we can switch between JSON and TTL files for the sake of helping for ontology quieries.
 │   │   └─ __pycache__/
 │   │
 │   ├─  nlp/
@@ -397,8 +399,9 @@ PeriDocs/                         # Root project folder
 │  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
-│  ├─ reasoning_files/                        # Stored entries
-│  │   └─ # ttl files are here, but nothing major
+│  ├─ reasoning_data/                        # Stored entries
+│  │   ├─ heuristics.json
+│  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
 │  ├─ feedback.json                       # Stored feedback and report inquiries
 │  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.

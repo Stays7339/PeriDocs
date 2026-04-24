@@ -232,7 +232,7 @@ async def link_entry(
                 "[LINK_ENTRY] Appended entry %s to precentroid %s, total states=%d",
                 entry_id, precentroid_id, len(c.states)
             )
-            await system._persist(c)
+            await system.persist_centroid_data(c)
             logger.debug("[LINK_ENTRY] Persisted precentroid %s to disk", precentroid_id)
             
         except Exception as e:

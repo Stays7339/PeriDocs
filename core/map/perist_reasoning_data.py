@@ -1,6 +1,6 @@
 # ==========================================
-# core/map/turtle_caller.py
-# Save-state: 2026-04-T20:23:55-04:00
+# core/map/perist_reasoning_data.py
+# Save-state: 2026-04-24T15:27:40-04:00
 # Derived ontology builder (JSON -> reasoning_file/Turtle)
 # ==========================================
 
@@ -14,6 +14,66 @@ logger = logging.getLogger(__name__)
 
 
 PERIDOCS = Namespace("urn:peridocs:")
+
+# ------------------------------------------------------------
+# EXISTENCE CHECK
+# ------------------------------------------------------------
+
+def concept_exists(graph: Graph, concept_id: str) -> bool:
+    """
+    Checks whether a centroid/concept node already exists in the graph.
+
+    This aligns with:
+      - evaluator expecting stable ConceptSignal keys
+      - admin_routing concept list derived from TTL parsing
+    """
+
+    uri = PERIDOCS[f"centroid:{concept_id}"]
+
+    return (uri, None, None) in graph
+
+
+# ------------------------------------------------------------
+# TTL STUB CREATION (lazy ontology expansion)
+# ------------------------------------------------------------
+
+def create_reasoning_file_stub(
+    graph: Graph,
+    concept_id: str,
+    label: Optional[str] = None
+) -> URIRef:
+    """
+    Ensures a concept exists in the ontology graph.
+
+    If missing:
+        - creates concept_from_heuristic node
+        - assigns rdf:type Concept
+        - optionally adds rdfs:label
+
+    This is the ONLY safe place in the system to introduce new ontology nodes
+    without breaking determinism elsewhere.
+    """
+
+    concept_id = normalize_concept_id(concept_id)
+    uri = PERIDOCS[f"concept_from_heuristic:{concept_id}"]
+
+    if concept_exists(graph, concept_id):
+        return uri
+
+    # ------------------------------------------------------------
+    # Create stub node (minimal valid ontology entity)
+    # ------------------------------------------------------------
+    graph.add((uri, RDF.type, PERIDOCS.Concept))
+
+    if label:
+        graph.add((uri, RDFS.label, Literal(label)))
+
+    logger.info(
+        "Created TTL stub for missing concept: %s",
+        concept_id
+    )
+
+    return uri
 
 # ------------------------------------------------------------
 # Main Entry Point

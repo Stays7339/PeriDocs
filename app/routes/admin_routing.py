@@ -1,12 +1,13 @@
 # ==========================================
 # app/routes/admin_routing.py
-# refactored 2026-04-23T14:26:30-04:00
+# save-state 2026-04-24T15:06:00-04:00
 # ==========================================
 import os
 import json
 import asyncio
 from typing import List, Dict, Any
 import hashlib
+import re
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
@@ -142,18 +143,41 @@ async def get_entries_safe_text(payload: EntriesSafeTextPayload):
 
     return {"entries": results}
 
-HEURISTICS_FILE = os.path.join("data", "heuristics.json")
+HEURISTICS_FILE = os.path.join("data", "reasoning_data", "heuristics.json")
 
+def normalize_concept(s: str) -> str:
+    if not s:
+        return ""
+
+    s = s.strip().lower()
+
+    # centroid alias → canonical id form
+    # handles BOTH "centroid 6" and "centroid6"
+    if s.startswith("centroid"):
+        import re
+        s = re.sub(r"centroid\s*(\d+)", r"centroid_\1", s)
+        return s
+
+    # label normalization
+    # collapse punctuation + normalize whitespace
+    s = re.sub(r"[^a-z0-9_\s]", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
 
 @router.post("/create-heuristic")
 async def create_heuristic(payload: CreateHeuristicPayload):
     if not payload.givens or not payload.outputs:
         raise HTTPException(status_code=400, detail="Missing givens or outputs")
 
-    # normalize likelihoods (accept % or float)
+
+    cleaned_givens = [normalize_concept(g) for g in payload.givens]
+
     cleaned_outputs = []
+
     for o in payload.outputs:
-        concept = o.get("concept")
+        raw_concept = o.get("concept")
+        concept = normalize_concept(raw_concept)
+
         if not concept:
             raise HTTPException(status_code=400, detail="Output concept missing")
 
@@ -166,19 +190,19 @@ async def create_heuristic(payload: CreateHeuristicPayload):
 
         if likelihood > 1:
             likelihood = likelihood / 100.0
-
         if likelihood < 0:
             likelihood = 0.0
-            
+
         cleaned_outputs.append({
             "concept": concept,
             "likelihood": float(likelihood),
             "justification": o.get("justification")
         })
 
+
     heuristic = {
         "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
-        "givens": payload.givens,
+        "givens": cleaned_givens,
         "outputs": cleaned_outputs
     }
 
@@ -195,3 +219,38 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         json.dump(data, f, indent=2)
 
     return {"status": "ok", "heuristic": heuristic}
+
+
+@router.get("/concepts")
+async def get_concepts():
+    """
+    Return list of concepts from TTL files for autocomplete.
+    Each item includes:
+    - id (centroid_id)
+    - label (human-readable)
+    """
+    from pathlib import Path
+    import re
+
+    concepts = []
+    ttl_dir = Path("data/reasoning_files")
+
+    if not ttl_dir.exists():
+        return {"concepts": []}
+
+    for file in ttl_dir.glob("*.ttl"):
+        text = file.read_text(encoding="utf-8")
+
+        urn_match = re.search(r"centroid:(centroid_\d+)", text)
+        label_match = re.search(r'rdfs:label\s+"([^"]+)"', text)
+
+        if urn_match and label_match:
+            cid = urn_match.group(1)
+            label = label_match.group(1).strip()
+
+            concepts.append({
+                "id": cid,
+                "label": label
+            })
+
+    return {"concepts": concepts}
