@@ -1,25 +1,39 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-04-24T15:06:00-04:00
+# save-state 2026-04-24T22:13:55-04:00
 # ==========================================
 import os
 import json
 import asyncio
 from typing import List, Dict, Any
 import hashlib
-import re
+import re as regex
+import uuid
 
+from datetime import datetime, timezone
+from rdflib import Graph
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
+from pathlib import Path
 
 from core.map.mapping_runtime import centroid_system
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.perist_reasoning_data import (
+    create_reasoning_data_from_heuristic,
+    serialize_graph_to_turtle,
+    persist_reasoning_data,
+    concept_exists
+)
 
 # Initialize router with proper prefix and tags
 router = APIRouter(prefix="/admin", tags=["admin-review"])
 templates = Jinja2Templates(directory="app/templates")
+
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
+HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
+os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
 
 # -----------------------------
 # Pydantic Models
@@ -143,8 +157,6 @@ async def get_entries_safe_text(payload: EntriesSafeTextPayload):
 
     return {"entries": results}
 
-HEURISTICS_FILE = os.path.join("data", "reasoning_data", "heuristics.json")
-
 def normalize_concept(s: str) -> str:
     if not s:
         return ""
@@ -154,26 +166,24 @@ def normalize_concept(s: str) -> str:
     # centroid alias → canonical id form
     # handles BOTH "centroid 6" and "centroid6"
     if s.startswith("centroid"):
-        import re
-        s = re.sub(r"centroid\s*(\d+)", r"centroid_\1", s)
+        s = regex.sub(r"centroid\s*(\d+)", r"centroid_\1", s)
         return s
 
     # label normalization
     # collapse punctuation + normalize whitespace
-    s = re.sub(r"[^a-z0-9_\s]", "", s)
-    s = re.sub(r"\s+", " ", s).strip()
+    s = regex.sub(r"[^a-z0-9_\s]", "", s)
+    s = regex.sub(r"\s+", " ", s).strip()
     return s
+
 
 @router.post("/create-heuristic")
 async def create_heuristic(payload: CreateHeuristicPayload):
     if not payload.givens or not payload.outputs:
         raise HTTPException(status_code=400, detail="Missing givens or outputs")
 
-
     cleaned_givens = [normalize_concept(g) for g in payload.givens]
 
     cleaned_outputs = []
-
     for o in payload.outputs:
         raw_concept = o.get("concept")
         concept = normalize_concept(raw_concept)
@@ -199,14 +209,13 @@ async def create_heuristic(payload: CreateHeuristicPayload):
             "justification": o.get("justification")
         })
 
-
     heuristic = {
         "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
         "givens": cleaned_givens,
         "outputs": cleaned_outputs
     }
 
-    # load existing
+    # persist heuristic log (unchanged)
     if os.path.exists(HEURISTICS_FILE):
         with open(HEURISTICS_FILE, "r") as f:
             data = json.load(f)
@@ -218,22 +227,62 @@ async def create_heuristic(payload: CreateHeuristicPayload):
     with open(HEURISTICS_FILE, "w") as f:
         json.dump(data, f, indent=2)
 
-    return {"status": "ok", "heuristic": heuristic}
+    heuristic_description = " | ".join(cleaned_givens)
 
+    # ============================================================
+    # NEW BEHAVIOR: ONE OUTPUT → ONE GRAPH → ONE TTL FILE
+    # ============================================================
+    for o in cleaned_outputs:
+        concept_id = o["concept"]
+
+        dt = datetime.now(timezone.utc)
+        file_id = f"{dt.isoformat(timespec='microseconds')[:-3]}Z_{uuid.uuid4().hex[:3]}"
+
+        # IMPORTANT: each output gets its own isolated graph
+        g = Graph()
+
+        already_exists = concept_exists(
+            label=concept_id,
+            description=heuristic_description
+        )
+
+        if not already_exists:
+            create_reasoning_data_from_heuristic(
+                g,
+                heuristic_id=heuristic["heuristic_id"],
+                concept_id=concept_id,
+                file_id=file_id,
+                label=concept_id,
+                description=heuristic_description
+            )
+        else:
+            # concept already exists → skip TTL creation entirely
+            continue
+
+        # nothing to serialize if we didn't add anything
+        if len(g) == 0:
+            continue
+
+        turtle = serialize_graph_to_turtle(g)
+
+        await persist_reasoning_data(
+            file_id,
+            turtle
+        )
+
+    return {"status": "ok", "heuristic": heuristic}
 
 @router.get("/concepts")
 async def get_concepts():
     """
     Return list of concepts from TTL files for autocomplete.
     Each item includes:
-    - id (centroid_id)
+    - id
     - label (human-readable)
     """
-    from pathlib import Path
-    import re
 
     concepts = []
-    ttl_dir = Path("data/reasoning_files")
+    ttl_dir = Path("data/reasoning")
 
     if not ttl_dir.exists():
         return {"concepts": []}
@@ -241,9 +290,13 @@ async def get_concepts():
     for file in ttl_dir.glob("*.ttl"):
         text = file.read_text(encoding="utf-8")
 
-        urn_match = re.search(r"centroid:(centroid_\d+)", text)
-        label_match = re.search(r'rdfs:label\s+"([^"]+)"', text)
+        urn_match = regex.search(
+            r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[a-zA-Z0-9_]+)",
+            text
+        )
 
+        label_match = regex.search(r'rdfs:label\s+"([^"]+)"', text)
+        
         if urn_match and label_match:
             cid = urn_match.group(1)
             label = label_match.group(1).strip()

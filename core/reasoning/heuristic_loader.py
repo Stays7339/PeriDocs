@@ -1,17 +1,21 @@
 # ==========================================
 # core/reasoning/heuristic_loader.py
-# Save-state: 2026-04-24T14:57:05-04:00
+# Save-state: 2026-04-24T17:48:05-04:00
 # ==========================================
 import json
 import os
+import logging
 from pathlib import Path
 from typing import List, Dict, Any
 
-HEURISTICS_FILE = os.path.join("data", "reasoning_data", "heuristics.json")
+logger = logging.getLogger(__name__)
+
+HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 
 
 def load_heuristics() -> List[Dict[str, Any]]:
-    if not HEURISTICS_FILE.exists():
+    if not os.path.exists(HEURISTICS_FILE):
+        logger.info("Heuistics file could not be found!")
         return []
 
     with open(HEURISTICS_FILE, "r", encoding="utf-8") as f:

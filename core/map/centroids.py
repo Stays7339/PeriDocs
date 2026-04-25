@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-23T12:57:10-04:00
+# Save-state: 2026-04-24T21:36:45-04:00
 # ==========================================
 
 import os
@@ -26,7 +26,7 @@ from app.helpers.entry_similarity import (
     safe_load_embedding,
 )
 from core.map.perist_reasoning_data import (
-    build_reasoning_file_for_centroid_state,
+    create_reasoning_data_for_centroid_state,
     serialize_graph_to_turtle,
     persist_reasoning_data
 )
@@ -621,7 +621,7 @@ class CentroidSystem:
             # reasoning_file projection (post-persistence, snapshot-only)
             # ------------------------------------------------------------
 
-            reasoning_file_graph = await build_reasoning_file_for_centroid_state(
+            reasoning_file_graph = await create_reasoning_data_for_centroid_state(
                 centroid_state=c.current,
                 centroid_id=new_id,
             )
@@ -880,20 +880,7 @@ class CentroidSystem:
             # persist to disk
             await self.persist_centroid_data(c)
 
-            # ------------------------------------------------------------
-            # reasoning_file projection (post-persistence, snapshot-only)
-            # ------------------------------------------------------------
 
-            reasoning_file_graph = await build_reasoning_file_for_centroid_state(
-                centroid_state=c.current,
-                centroid_id=centroid_id,
-            )
-
-            reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
-
-            # optional: persist reasoning_file output somewhere (file/db/cache layer)
-            await persist_reasoning_data(centroid_id, reasoning_file_turtle)
-            # ------------------------------------------------------------
 
 
     # ----- review projection & admin utilities -----

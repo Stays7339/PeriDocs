@@ -1,11 +1,15 @@
 # ==========================================
 # core/map/perist_reasoning_data.py
-# Save-state: 2026-04-24T15:54:30-04:00
+# Save-state: 2026-04-24T21:54:00-04:00
 # ==========================================
-
+import os
+import re
+import glob
 import logging
-from typing import Dict, Any, List, Optional
 
+
+from datetime import datetime, timezone
+from typing import Dict, Any, List, Optional
 from rdflib import Graph, URIRef, Literal, Namespace
 from rdflib.namespace import RDF, RDFS, DCTERMS
 
@@ -14,125 +18,93 @@ logger = logging.getLogger(__name__)
 
 PERIDOCS = Namespace("urn:peridocs:")
 
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 
-# ------------------------------------------------------------
-# reasoning_data persistence helper
-# ------------------------------------------------------------
-async def persist_reasoning_data(self, centroid_id: str, reasoning_file_turtle: str) -> None:
+
+
+async def persist_reasoning_data(reasoning_id: str, reasoning_file_turtle: str) -> None:
     """
-    Persist reasoning_file Turtle snapshot for a centroid.
+    Generic TTL persistence layer for ALL reasoning artifacts.
 
-    Characteristics:
-    - Overwrites previous snapshot (no versioning here)
-    - Not authoritative (can be regenerated)
-    - Deterministic given centroid state
+    Naming rules:
+    - centroid_*  → uses centroid_id directly
+    - everything else → ISO-8601 filesystem-safe timestamp
     """
 
-    reasoning_file_DIR = os.path.join(DATA_DIR, "reasoning_file")
+    reasoning_file_DIR = os.path.join(DATA_DIR, "reasoning")
     os.makedirs(reasoning_file_DIR, exist_ok=True)
 
-    final_path = os.path.join(reasoning_file_DIR, f"{centroid_id}.ttl")
+    file_id = reasoning_id
+
+    final_path = os.path.join(reasoning_file_DIR, f"{file_id}.ttl")
     tmp_path = final_path + ".tmp"
 
-    # atomic write (same pattern you're already using elsewhere)
+    # atomic write
     with open(tmp_path, "w", encoding="utf-8") as f:
         f.write(reasoning_file_turtle)
         f.flush()
         os.fsync(f.fileno())
 
     os.replace(tmp_path, final_path)
-# ------------------------------------------------------------
+
+def concept_exists(label: str, description: str) -> bool:
+    ttl_dir = os.path.join(DATA_DIR, "reasoning")
+
+    if not os.path.exists(ttl_dir):
+        return False
+
+    for path in glob.glob(os.path.join(ttl_dir, "*.ttl")):
+        try:
+            g = Graph()
+            g.parse(path, format="turtle")
+
+            for s in g.subjects(RDFS.label, Literal(label)):
+                if (s, DCTERMS.description, Literal(description)) in g:
+                    return True
+
+        except Exception:
+            continue
+
+    return False
 
 # ------------------------------------------------------------
-# EXISTENCE CHECK
+# TTL STUB CREATION (heuristic materialization entrypoint)
 # ------------------------------------------------------------
 
-def concept_exists(graph: Graph, concept_id: str) -> bool:
-    """
-    Checks whether a centroid/concept node already exists in the graph.
-
-    This aligns with:
-      - evaluator expecting stable ConceptSignal keys
-      - admin_routing concept list derived from TTL parsing
-    """
-
-    uri = PERIDOCS[f"centroid:{concept_id}"]
-
-    return (uri, None, None) in graph
-
-
-# ------------------------------------------------------------
-# TTL STUB CREATION (lazy ontology expansion)
-# ------------------------------------------------------------
-
-def create_reasoning_file_stub(
+def create_reasoning_data_from_heuristic(
     graph: Graph,
+    heuristic_id: str,
     concept_id: str,
-    label: Optional[str] = None
+    file_id: str,
+    label: Optional[str] = None,
+    description: Optional[str] = None
 ) -> URIRef:
-    """
-    Ensures a concept exists in the ontology graph.
 
-    If missing:
-        - creates concept_from_heuristic node
-        - assigns rdf:type Concept
-        - optionally adds rdfs:label
+    uri = PERIDOCS[f"concept_from_heuristic:cfh_{file_id}"]
 
-    This is the ONLY safe place in the system to introduce new ontology nodes
-    without breaking determinism elsewhere.
-    """
-
-    uri = PERIDOCS[f"concept_from_heuristic:{concept_id}"]
-
-    if concept_exists(graph, concept_id):
+    exists = (uri, None, None) in graph
+    if exists:
         return uri
 
-    # ------------------------------------------------------------
-    # Create stub node (minimal valid ontology entity)
-    # ------------------------------------------------------------
     graph.add((uri, RDF.type, PERIDOCS.Concept))
+    graph.add((uri, DCTERMS.source, Literal(heuristic_id)))
+    graph.add((uri, DCTERMS.created, Literal(datetime.now(timezone.utc).isoformat())))
 
     if label:
         graph.add((uri, RDFS.label, Literal(label)))
 
-    logger.info(
-        "Created TTL stub for missing concept: %s",
-        concept_id
-    )
+    if description:
+        graph.add((uri, DCTERMS.description, Literal(description)))
 
     return uri
 
-# ------------------------------------------------------------
-# Main Entry Point
-# ------------------------------------------------------------
 
-async def build_reasoning_file_for_centroid_state(
+
+async def create_reasoning_data_for_centroid_state(
     centroid_state,
     centroid_id: str,
 ) -> Graph:
-    """
-    Build reasoning_file graph from an in-memory CentroidState object.
-
-    This function:
-        - DOES NOT read disk
-        - DOES NOT mutate system state
-        - IS fully deterministic from input state
-        - IS intended to be called after centroid approval/persistence
-
-    Parameters
-    ----------
-    centroid_state:
-        In-memory CentroidState instance (source of truth input snapshot)
-
-    centroid_id:
-        Active centroid identifier (post-approval ID)
-
-    Returns
-    -------
-    reasoning_filelib.Graph
-        Fully constructed reasoning_file graph representation of centroid + metadata
-    """
-
+    
     graph = Graph()
     graph.bind("peridocs", PERIDOCS)
 
