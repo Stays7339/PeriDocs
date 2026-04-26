@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-04-26T13:32:05-04:00
+# save-state 2026-04-26T15:52:15-04:00
 # ==========================================
 
 
@@ -177,11 +177,11 @@ async def process_entry_async(
 
         centroid_links = []
 
-        for cid, similarity in applied_sorted:
+        for cid, similarity, event_index in applied_sorted:
             centroid_links.append({
                 "centroid_id": cid,
                 "similarity": similarity,
-                "event_index": None  # filled later during reconciliation if needed
+                "event_index": event_index
             })
 
         entry["centroids"] = centroid_links
@@ -217,10 +217,10 @@ async def process_entry_async(
     # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
 
     # hash stored server-side
-    delete_token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
+    hash_from_token_for_deleting_entries = hashlib.sha256(delete_token.encode()).hexdigest()
 
     # persist only the hash
-    entry["delete_token_hash"] = delete_token_hash
+    entry["hash_from_token_for_deleting_entries"] = hash_from_token_for_deleting_entries
 
     report_progress()  # 10 / total_steps
 

@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-03-24T13:51:40-04:00
+// save-state 2026-04-26T16:31:05-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -64,7 +64,8 @@ function renderQueue() {
         })
       });
 
-      fetchQueue();
+      await fetchQueue();
+      await loadConceptList();
     });
 
     rejectBtn.addEventListener("click", async () => {

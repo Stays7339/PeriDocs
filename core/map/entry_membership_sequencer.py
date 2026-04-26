@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-26T13:30:30-04:00
+# Save-state: 2026-04-26T15:55:30-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -150,8 +150,8 @@ async def link_entry(
 
     for cand in centroid_candidates:
         try:
-            await system.add_entry_to_centroid(cand.centroid_id, entry_id, cand.similarity)
-            applied.append((cand.centroid_id, cand.similarity))
+            event_index = await system.add_entry_to_centroid(cand.centroid_id, entry_id, cand.similarity)
+            applied.append((cand.centroid_id, cand.similarity, event_index))
         except Exception as e:
             logger.warning(
                 "Failed to link entry to centroid: centroid=%s entry=%s err=%s",
@@ -204,7 +204,7 @@ async def link_entry(
                     "Entry %s already exists in precentroid %s, skipping append.",
                     entry_id, precentroid_id
                 )
-                applied.append((precentroid_id, sim))  # still mark as applied
+                applied.append((precentroid_id, sim, event_index))  # still mark as applied
                 return applied  # <-- return early, do NOT append a new CentroidState
                 
             seen = set()
@@ -243,7 +243,7 @@ async def link_entry(
             raise  # propagate loudly
 
     if precentroid_id:
-        applied.append((precentroid_id, sim))
+        applied.append((precentroid_id, sim, event_index))
 
     return applied
 

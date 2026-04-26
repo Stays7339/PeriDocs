@@ -275,7 +275,7 @@ async def delete_entry_page(request: Request):
 async def delete_entry_api(request: Request, delete_token: str = Form(...)):
     token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
     all_entries = load_data(entries_FILE)
-    entry = next((e for e in all_entries if e.get("delete_token_hash") == token_hash), None)
+    entry = next((e for e in all_entries if e.get("hash_from_token_for_deleting_entries") == token_hash), None)
 
     if not entry:
         return templates.TemplateResponse(

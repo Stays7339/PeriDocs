@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-04-05T14:00:50-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-04-26T18:10:15-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -28,7 +28,10 @@ ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 
 _ledger: IdentifierLedger = IdentifierLedger()
 _centroid_system: CentroidSystem = CentroidSystem(_ledger)
-_entry_runtime: EntryWritingRuntime = EntryWritingRuntime()
+_entry_runtime: EntryWritingRuntime = EntryWritingRuntime(_ledger) 
+# (_ledger) is used so that if integrity fails, you can trace causality directly:
+# “ledger state caused entry validation failure” 
+# rather than: “some global singleton state was inconsistent somewhere”
 
 _initialized: bool = False
 
@@ -97,6 +100,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     logger.info("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
     logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
     await entry_runtime.initialize()
+    await entry_runtime._verify_integrity_on_startup()
 
     _initialized = True
 
@@ -108,23 +112,25 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     # Schedule periodic check after initialization
     asyncio.create_task(periodic_integrity_check())
     
-# Define one central interval
-PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300  # 5 minutes, change this once
+# Recheck that all the files are in order every once in a while
+# In seconds
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 5
 
 async def periodic_integrity_check():
     """
     Periodically verify centroid integrity and create a zip backup if checks pass.
     """
-    backup_dir = Path.cwd()  # project root
-    backups_folder = backup_dir / "backups-for-the-main-data-folder"
+    project_root = Path.cwd()  # project root
+    backups_folder = project_root / "backups-for-the-main-data-folder"
     backups_folder.mkdir(exist_ok=True)
 
     while True:
         try:
             # Verify integrity
             await _centroid_system._verify_integrity_on_startup()
+            await _entry_runtime._verify_integrity_on_startup()
 
-            # Create zip backup of full data folder
+            # Create name for the zip file backup of full data folder
             timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
             backup_name = backups_folder / f"peridocs_data_folder_backup_{timestamp}.zip"
 

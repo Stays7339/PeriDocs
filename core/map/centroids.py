@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-24T21:36:45-04:00
+# Save-state: 2026-04-26T16:08:40-04:00
 # ==========================================
 
 import os
@@ -824,7 +824,7 @@ class CentroidSystem:
         centroid_id: str,
         entry_id: str,
         similarity: float
-    ) -> None:
+    ) -> int:
         """
         Adds an entry to an existing centroid.  
         Recomputes centroid vector, appends a new CentroidState, and records the event.
@@ -879,6 +879,7 @@ class CentroidSystem:
 
             # persist to disk
             await self.persist_centroid_data(c)
+            return event_index 
 
 
 

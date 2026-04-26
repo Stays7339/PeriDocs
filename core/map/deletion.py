@@ -233,12 +233,12 @@ class DeletionManager:
         # --- Locate the target entry ---
         target = None
         for entry in entries:
-            if entry.get("delete_token_hash") == token_hash:
+            if entry.get("hash_from_token_for_deleting_entries") == token_hash:
                 target = entry
                 break
 
         if not target:
-            logger.warning("Entry with matching delete_token_hash not found during metadata purge.")
+            logger.warning("Entry with matching hash_from_token_for_deleting_entries not found during metadata purge.")
             return
 
         # --- Strip all fields except minimal surviving ones ---

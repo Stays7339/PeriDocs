@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-24T15:22:20-04:00
+## Canonical Project Directory as of 2026-04-26T17:11:00-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -308,7 +308,7 @@ PeriDocs/                         # Root project folder
 │  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  ├─  top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │  └─ __pycache__/  
 │  │
 │  │
@@ -356,10 +356,13 @@ PeriDocs/                         # Root project folder
 │
 ├─backups-for-the-main-data-folder
 │   └─peridocs_backup_[YYYY]-[MM]-[DD]T[HH]-[mm]-[ss]Z.zip
+│
+│
+│
 ├─ core/
 │   ├─ map/
+│   │   ├─ __init__.py                    # to avoid having to redfine the same value everywhere, this is being used as a config file for this specific package
 │   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
-│   │   ├─ config.py                      # to avoid having to redfine the same value everywhere
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
@@ -379,6 +382,8 @@ PeriDocs/                         # Root project folder
 │   |   ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
 │   |   ├─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding centroid assignment, crisis check.
 │   |   └─ __pycache__/
+│   | 
+│   | 
 │   └─ reasoning/
 │           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
 │           ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
