@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-04-05T13:56:10-04:00
+# Save-state: 2026-04-26T12:09:35-04:00
 # ==========================================
 import asyncio
 import copy
@@ -110,42 +110,6 @@ class EntryWritingRuntime:
 
             await self.persist()
         # --- APPENDED END ---
-
-    async def replace_precentroid_with_centroid(self, centroid_id: str, entry_ids: List[str]) -> None:
-        """
-        Strict replacement:
-        - For given entry_ids
-        - Replace precentroid_X with centroid_X
-        - Does not modify event_index
-
-        Assumptions:
-        - entry_ids come from authoritative centroid state
-        - centroids field exists and is a list
-        """
-
-        # --- APPENDED START: derive matching precentroid id ---
-        precentroid_id = centroid_id.replace("centroid_", "precentroid_")
-        # --- APPENDED END ---
-
-        async with self._lock:
-
-            updated = False
-
-            for entry in self._entries:
-                if entry.get("entry_id") not in entry_ids:
-                    continue
-
-                centroids_list = entry.get("centroids", [])
-                if not isinstance(centroids_list, list):
-                    continue
-
-                for c in centroids_list:
-                    if c.get("centroid_id") == precentroid_id:
-                        c["centroid_id"] = centroid_id
-                        updated = True
-
-            if updated:
-                await self.persist()
 
     async def get_embedding(self, entry_id: str):
         """

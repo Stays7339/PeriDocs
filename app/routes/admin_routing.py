@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-04-24T22:13:55-04:00
+# save-state 2026-04-25T23:29:55-04:00
 # ==========================================
 import os
 import json
@@ -175,18 +175,27 @@ def normalize_concept(s: str) -> str:
     s = regex.sub(r"\s+", " ", s).strip()
     return s
 
+def extract_concept_id(value: str) -> str:
+    """
+    Converts:
+    'label (concept_from_heuristic:cfh_2026...)'
+    → 'concept_from_heuristic:cfh_2026...'
+
+    If no parentheses, returns original string.
+    """
+    match = regex.search(r"\(([^)]+)\)$", value)
+    return match.group(1) if match else value
 
 @router.post("/create-heuristic")
 async def create_heuristic(payload: CreateHeuristicPayload):
     if not payload.givens or not payload.outputs:
         raise HTTPException(status_code=400, detail="Missing givens or outputs")
 
-    cleaned_givens = [normalize_concept(g) for g in payload.givens]
+    cleaned_givens = [extract_concept_id(g.strip()) for g in payload.givens]
 
     cleaned_outputs = []
     for o in payload.outputs:
-        raw_concept = o.get("concept")
-        concept = normalize_concept(raw_concept)
+        concept = extract_concept_id(o.get("concept", "").strip())
 
         if not concept:
             raise HTTPException(status_code=400, detail="Output concept missing")
@@ -236,7 +245,7 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         concept_id = o["concept"]
 
         dt = datetime.now(timezone.utc)
-        file_id = f"{dt.isoformat(timespec='microseconds')[:-3]}Z_{uuid.uuid4().hex[:3]}"
+        file_id = f"{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
 
         # IMPORTANT: each output gets its own isolated graph
         g = Graph()
@@ -291,7 +300,7 @@ async def get_concepts():
         text = file.read_text(encoding="utf-8")
 
         urn_match = regex.search(
-            r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[a-zA-Z0-9_]+)",
+            r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
             text
         )
 

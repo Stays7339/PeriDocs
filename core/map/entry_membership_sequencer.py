@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-22T20:25:00-04:00
+# Save-state: 2026-04-26T13:30:30-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -131,7 +131,7 @@ async def link_entry(
     *,
     min_similarity: float = MINIMUM_SIMILARITY_THRESHOLD,
     max_affiliations: int | None = None,
-) -> List[Tuple[str, float]]:
+) -> List[Tuple[str, float, int]]:
     """
     Orchestrates linking an entry:
     1. Try centroids first
@@ -140,7 +140,7 @@ async def link_entry(
     Returns list of (centroid_id, similarity) applied
     """
     system = centroid_system
-    applied: List[Tuple[str, float]] = []
+    applied: List[Tuple[str, float, int]] = []
     # --- Step 1: Centroids ---
     centroid_candidates = await evaluate_centroid_candidates(
         entry_id,
@@ -183,7 +183,7 @@ async def link_entry(
                 entry_id, precentroid_id
             )
             event_index = await system._ledger.record_event({
-                "type": "LINK_CANDIDATE_PRECENTROID",
+                "type": "ADD_ENTRY_TO_PRECENTROID",
                 "centroid_id": precentroid_id,
                 "entry_id": entry_id,
                 "similarity": sim,

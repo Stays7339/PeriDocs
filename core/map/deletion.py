@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-04-19T16:37:10-10:00
+# Save-state: 2026-04-26T12:01:10-10:00
 # ==========================================
 
 """
@@ -182,7 +182,7 @@ class DeletionManager:
             return {}
         if affected:
             await self._ledger.record_event({
-                "type": "DELETE_entry",
+                "type": "DELETE_ENTRY",
                 "entry_id": entry_id,
             })
 

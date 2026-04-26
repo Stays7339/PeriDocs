@@ -381,7 +381,7 @@ PeriDocs/                         # Root project folder
 │   |   └─ __pycache__/
 │   └─ reasoning/
 │           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
-│           ├─ build_evaluation_state.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
+│           ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
 │           ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
 │           ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
 │           ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.

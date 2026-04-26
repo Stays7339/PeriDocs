@@ -108,12 +108,12 @@ def path_diversity(signal: ConceptSignal) -> float:
 # -----------------------------
 
 def evaluate_heuristic(
-    state: Dict[str, ConceptSignal],
+    pool_of_active_concepts: Dict[str, ConceptSignal],
     heuristic: Dict[str, Any],
     step: int
 ) -> List[Inference]:
     """
-    Executes a single heuristic over the current concept state.
+    Executes a single heuristic over the current concept pool_of_active_concepts.
 
     Produces INFERENCES (ephemeral reasoning edges).
     """
@@ -129,7 +129,7 @@ def evaluate_heuristic(
     resolved_inputs: List[str] = []
 
     for concept in givens:
-        signal = state.get(concept)
+        signal = pool_of_active_concepts.get(concept)
         if not signal:
             continue
 
@@ -207,23 +207,23 @@ def apply_path_diversity_bonus(signal: ConceptSignal, weight: float) -> float:
 # -----------------------------
 
 def integrate_inference(
-    state: Dict[str, ConceptSignal],
+    pool_of_active_concepts: Dict[str, ConceptSignal],
     inference: Inference
 ) -> bool:
     """
-    Inserts inference into state with:
+    Inserts inference into pool_of_active_concepts with:
     - damping
     - path tracking
     - diversity weighting
 
-    Returns whether it meaningfully changed state.
+    Returns whether it meaningfully changed pool_of_active_concepts.
     """
 
     from .damping import apply_damping  # local import to avoid cycles
 
     concept = inference.output_concept
 
-    signal = state.setdefault(concept, ConceptSignal(concept))
+    signal = pool_of_active_concepts.setdefault(concept, ConceptSignal(concept))
 
     # -----------------------------
     # DAMPING (repetition decay)
@@ -259,11 +259,11 @@ def integrate_inference(
 
 
 # -----------------------------
-# STATE UPDATE FROM HEURISTICS
+# pool_of_active_concepts UPDATE FROM HEURISTICS
 # -----------------------------
 
 def run_heuristics_step(
-    state: Dict[str, ConceptSignal],
+    pool_of_active_concepts: Dict[str, ConceptSignal],
     heuristics: List[Dict[str, Any]],
     step: int
 ) -> List[Inference]:
@@ -274,7 +274,7 @@ def run_heuristics_step(
     all_inferences: List[Inference] = []
 
     for h in heuristics:
-        inferences = evaluate_heuristic(state, h, step)
+        inferences = evaluate_heuristic(pool_of_active_concepts, h, step)
         all_inferences.extend(inferences)
 
     return all_inferences
@@ -285,17 +285,17 @@ def run_heuristics_step(
 # -----------------------------
 
 def apply_inferences(
-    state: Dict[str, ConceptSignal],
+    pool_of_active_concepts: Dict[str, ConceptSignal],
     inferences: List[Inference]
 ) -> List[Inference]:
     """
-    Applies all inferences into state and returns only those that changed state.
+    Applies all inferences into pool_of_active_concepts and returns only those that changed pool_of_active_concepts.
     """
 
     applied: List[Inference] = []
 
     for inf in inferences:
-        changed = integrate_inference(state, inf)
+        changed = integrate_inference(pool_of_active_concepts, inf)
         if changed:
             applied.append(inf)
 
