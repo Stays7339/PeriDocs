@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-04-26T17:58:10-04:00
+# Save-state: 2026-04-27T02:06:08-04:00
 # ==========================================
 import asyncio
 import copy
@@ -10,10 +10,22 @@ import os
 import logging
 import numpy as np
 from typing import List, Dict, Any
-
-from app.helpers.file_ops import load_data, save_data
+from datetime import datetime, timezone
+from app.helpers.json_safe import json_safe
 
 logger = logging.getLogger(__name__)
+
+
+
+def get_npz_window_path(base_name: str) -> str:
+    now = datetime.now(timezone.utc)
+    window = now.hour // 6
+    timestamp = now.strftime("%Y%m%d") + f"_{window}"
+
+    return f"data/entries/{base_name}_dump_{timestamp}.npz"
+
+EMBEDDING_DIM = 1024
+entries_mean_embed_file = get_npz_window_path("entries_mean_embeddings")
 
 class EntryWritingRuntime:
     """
@@ -37,11 +49,8 @@ class EntryWritingRuntime:
         self._entries: List[Dict[str, Any]] = []
         self._embeddings: Dict[str, Any] = {}
         self._initialized: bool = False
-        
-
-        # --- APPENDED START: async lock for all mutations ---
+        self._npz_path = get_npz_window_path("entries_mean_embeddings")     
         self._lock = asyncio.Lock()
-        # --- APPENDED END ---
 
     async def initialize(self) -> None:
         """
@@ -54,7 +63,7 @@ class EntryWritingRuntime:
             if self._initialized:
                 return
 
-            self._entries = load_data(self._entries_path)
+            self._entries = self._load_entries_from_disk()
             self._initialized = True
         logger.info("[EntryWritingRuntime] Finished initialize()")
 
@@ -78,7 +87,7 @@ class EntryWritingRuntime:
 
         For integrity of Entries:
 
-        ALWAYS load from disk (load_data() or direct JSON read)
+        ALWAYS load from _load_entries_from_disk
         NEVER rely on _entries, because Even though _entries is initialized in initialize(), 
         your integrity check runs in a startup phase where:
         _entries may still be empty
@@ -103,9 +112,9 @@ class EntryWritingRuntime:
         entries_path = self._entries_path
         entries_dir = os.path.dirname(entries_path)
 
-        clause_pattern = "entries_clause_embeddings_dump*_*.npz"
-        mean_pattern = "entries_mean_embeddings_dump*_*.npz"
-        standout_pattern = "entries_standout_flags_dump*_*.npz"
+        clause_pattern = "entries_clause_embeddings_dump_*.npz"
+        mean_pattern = "entries_mean_embeddings_dump_*_*.npz"
+        standout_pattern = "entries_standout_flags_dump_*_*.npz"
 
         # ------------------------------------------------------------
         # LOAD LEDGER SNAPSHOT
@@ -166,18 +175,12 @@ class EntryWritingRuntime:
         mean_files = glob.glob(os.path.join(entries_dir, mean_pattern))
         standout_files = glob.glob(os.path.join(entries_dir, standout_pattern))
 
-        # --- APPENDED START: strict file existence + emptiness validation ---
-        if not clause_files:
-            raise RuntimeError("[entry_runtime] No clause embedding dump files found")
-
+        # --- strict file existence + emptiness validation ---
         if not mean_files:
             raise RuntimeError("[entry_runtime] No mean embedding dump files found")
 
-        if not standout_files:
-            raise RuntimeError("[entry_runtime] No standout embedding dump files found")
-
         # ensure files are not empty / unreadable at OS level
-        for f in clause_files + mean_files + standout_files:
+        for f in mean_files:
             try:
                 if os.path.getsize(f) == 0:
                     raise RuntimeError(f"Empty embedding file detected: {f}")
@@ -252,65 +255,195 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         # IF SUCCESSFUL
         # ------------------------------------------------------------
-        logger.info("[entry_runtime] Entry + embedding integrity check passed successfully.")
+        logger.info("[entry_runtime] All entries passed integrity check.")
 
-
-    async def reload(self) -> None:
-        """
-        Force reload from disk.
-        """
-
-        # --- APPENDED START: lock-protected reload ---
-        async with self._lock:
-            self._entries = load_data(self._entries_path)
-            self._initialized = True
-        # --- APPENDED END ---
-
-    async def persist(self) -> None:
-        """
-        Persist current in-memory entries to disk.
-
-        NOTE:
-        Caller should already be inside lock when calling this
-        to avoid nested lock acquisition.
-        """
-
-        # --- APPENDED START: no lock acquisition here (assumed upstream) ---
-        save_data(self._entries, self._entries_path)
-        # --- APPENDED END ---
-
-    def get_all_entries(self) -> List[Dict[str, Any]]:
-        """
-        Return in-memory entries.
-
-        NOTE:
-        Returns direct reference. Caller must not mutate outside lock.
-        """
-        # --- return deep copy to protect internal state ---
-        return copy.deepcopy(self._entries)
-        # ------
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
         """
         Append a new entry and persist.
 
-        Mirrors existing append_entry behavior but routed through runtime.
+        Memory is authoritative. Disk is write-only durability.
+        No runtime reconciliation against disk is performed.
         """
 
-        # --- APPENDED START: full mutation under lock ---
         async with self._lock:
 
-            # preserve existing safety checks
+            # ----------------------------
+            # Strict safety validation
+            # ----------------------------
+            if not isinstance(entry, dict):
+                raise RuntimeError("Invalid entry type: must be dict")
+
             if entry.get("crisis_flag") is True:
                 return
 
             if entry.get("safe_text") is None:
                 return
 
+            if "entry_id" not in entry and "id" not in entry:
+                raise RuntimeError("Entry missing identifier field")
+
+            entry_id = entry.get("entry_id") or entry.get("id")
+
+            # ----------------------------
+            # In-memory uniqueness awareness (non-enforcing)
+            # ----------------------------
+            existing_ids = {e.get("entry_id") or e.get("id") for e in self._entries}
+
+            if entry_id in existing_ids:
+                logger.warning(
+                    "[EntryRuntime] duplicate entry_id detected (appending anyway): %s",
+                    entry_id
+                )
+
+            # ----------------------------
+            # Append to runtime memory (source of truth)
+            # ----------------------------
             self._entries.append(entry)
 
+            # ----------------------------
+            # Persist snapshot (one-way write)
+            # ----------------------------
             await self.persist()
-        # --- APPENDED END ---
+
+    async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
+        """
+        Contract enforcement layer for embeddings.
+
+        Responsibilities:
+        - enforce type correctness
+        - enforce canonical dtype/shape
+        - enforce mathematical validity
+        - guarantee runtime invariants BEFORE storage
+
+        After this function succeeds:
+        - embedding is safe for all downstream systems
+        - persist() must never validate again
+        """
+
+        async with self._lock:
+
+            # ------------------------------------------
+            # TYPE ENFORCEMENT (strict, no coercion yet)
+            # ------------------------------------------
+            if not isinstance(embedding, np.ndarray):
+                raise RuntimeError(
+                    f"[EmbeddingContract] expected np.ndarray | eid={entry_id} "
+                    f"got={type(embedding)}"
+                )
+
+            # ------------------------------------------
+            # CANONICAL CONVERSION (explicit boundary)
+            # ------------------------------------------
+            embedding = np.asarray(embedding, dtype=np.float32)
+
+            # ------------------------------------------
+            # SHAPE CONTRACT (system invariant)
+            # ------------------------------------------
+            if embedding.shape != (EMBEDDING_DIM,):
+                raise RuntimeError(
+                    f"[EmbeddingContract] invalid shape={embedding.shape} "
+                    f"expected={(EMBEDDING_DIM,)} | eid={entry_id}"
+                )
+
+            # ------------------------------------------
+            # NUMERIC VALIDITY CHECKS
+            # ------------------------------------------
+            if np.isnan(embedding).any():
+                logger.error("[EmbeddingContract] NaN detected | eid=%s", entry_id)
+                raise RuntimeError("Embedding contains NaN")
+
+            if np.isinf(embedding).any():
+                logger.error("[EmbeddingContract] Inf detected | eid=%s", entry_id)
+                raise RuntimeError("Embedding contains Inf")
+
+            # ------------------------------------------
+            # ZERO VECTOR IS INVALID STATE
+            # ------------------------------------------
+            if np.all(embedding == 0):
+                logger.error("[EmbeddingContract] zero-vector rejected | eid=%s", entry_id)
+                raise RuntimeError("Zero-vector embedding not allowed")
+
+            # ------------------------------------------
+            # STORE CANONICALIZED RESULT
+            # ------------------------------------------
+            self._embeddings[entry_id] = embedding
+    
+    async def persist(self) -> None:
+        """
+        Deterministic snapshot persistence.
+
+        Guarantees:
+        - JSON is atomically written
+        - NPZ is atomically written
+        - no partial state is ever visible
+        - no validation or coercion occurs here
+        """
+
+        async with self._lock:
+
+            # ------------------------------------------
+            # JSON SNAPSHOT (source of truth)
+            # ------------------------------------------
+            snapshot = json_safe(self._entries)
+
+            json_tmp = self._entries_path + ".tmp"
+
+            with open(json_tmp, "w", encoding="utf-8") as f:
+                json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(json_tmp, self._entries_path)
+
+            # ------------------------------------------
+            # NPZ SNAPSHOT (derived embeddings cache)
+            # ------------------------------------------
+            npz_path = entries_mean_embed_file
+            npz_tmp = npz_path + ".tmp"
+
+            # IMPORTANT:
+            # assumes embeddings are already validated at set_embedding()
+            embedding_snapshot = self._embeddings
+
+            np.savez_compressed(npz_tmp, **embedding_snapshot)
+            os.sync()  # coarse-grained but safe fallback
+            os.replace(npz_tmp, npz_path)
+
+            logger.info(
+                "[PersistOK] entries=%d embeddings=%d",
+                len(self._entries),
+                len(self._embeddings),
+            )
+
+    def _load_entries_from_disk(self) -> List[Dict[str, Any]]:
+        """
+        Strict loader used ONLY at initialization / reload.
+
+        Differences from file_ops.load_data:
+        - No silent failure
+        - No implicit fallback to []
+        - Raises on corruption
+        """
+
+        if not os.path.exists(self._entries_path):
+            # explicit empty state allowed ONLY at boot
+            return []
+
+        try:
+            with open(self._entries_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            raise RuntimeError(f"Failed to load entries.json: {e}")
+
+        if not isinstance(data, list):
+            raise RuntimeError("entries.json must be a list")
+
+        # preserve your flatten behavior if needed
+        if data and isinstance(data[0], list):
+            data = [item for sublist in data for item in sublist]
+
+        return data
 
     async def get_embedding(self, entry_id: str):
         """
@@ -321,11 +454,68 @@ class EntryWritingRuntime:
         async with self._lock:
             return self._embeddings.get(entry_id)
 
-    async def set_embedding(self, entry_id: str, embedding):
-        """
-        Safe in-memory embedding write.
-
-        Stores canonical float32 numpy array.
-        """
+    async def get_all_embeddings(self):
         async with self._lock:
-            self._embeddings[entry_id] = embedding
+            return copy.deepcopy(self._embeddings)
+
+    def get_all_entries(self) -> List[Dict[str, Any]]: 
+        """ Return in-memory entries. 
+        NOTE: Returns direct reference. 
+        Caller must not mutate outside lock. """ 
+        # --- return deep copy to protect internal state --- 
+        return copy.deepcopy(self._entries) 
+        # ------
+
+    async def purge_entry_metadata(
+        self,
+        *,
+        entry_id: str,
+        token_hash: str,
+    ) -> bool:
+        """
+        Runtime-coherent entry redaction.
+
+        Returns:
+            True  -> entry was found, stripped, and persisted
+            False -> no-op (not found or nothing changed)
+        """
+
+        async with self._lock:
+
+            # ----------------------------
+            # FIND TARGET IN MEMORY
+            # ----------------------------
+            target = None
+            for entry in self._entries:
+                if entry.get("hash_from_token_for_deleting_entries") == token_hash:
+                    target = entry
+                    break
+
+            if not target:
+                logger.warning(
+                    "[EntryRuntime] Entry not found during strip_entry."
+                )
+                return False
+
+            # ----------------------------
+            # STRIP
+            # ----------------------------
+            stripped = {
+                "entry_id": target.get("entry_id") or target.get("id"),
+                "embedding_file": target.get("embedding_file"),
+                "crisis_flag": target.get("crisis_flag"),
+            }
+
+            index = self._entries.index(target)
+            self._entries[index] = stripped
+
+            # ----------------------------
+            # PERSIST
+            # ----------------------------
+            await self.persist()
+
+            logger.info(f"[EntryRuntime] Entry {entry_id} stripped and persisted.")
+
+            return True
+    def get_current_embedding_file(self) -> str:
+        return self._npz_path

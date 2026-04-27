@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-26T16:08:40-04:00
+# Save-state: 2026-04-27T02:19:15-04:00
 # ==========================================
 
 import os
@@ -20,11 +20,6 @@ from concurrent.futures import ThreadPoolExecutor
 
 from core.map.ledger import IdentifierLedger
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
-from app.helpers.entry_similarity import (
-    cosine_similarity,
-    deterministic_mean,
-    safe_load_embedding,
-)
 from core.map.perist_reasoning_data import (
     create_reasoning_data_for_centroid_state,
     serialize_graph_to_turtle,
@@ -46,6 +41,53 @@ os.makedirs(STATE_DIR, exist_ok=True)
 os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
 os.makedirs(ARCHIVE_DIR, exist_ok=True)
 logger.info(f"Ensuring centroid state directory exists at {STATE_DIR}")
+
+def deterministic_mean(vectors: List[np.ndarray]) -> np.ndarray:
+    if not vectors:
+        raise ValueError("Empty vector list")
+    stacked = np.stack(vectors)
+    return stacked.mean(axis=0)
+
+def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
+    """
+    Runtime-first embedding resolution.
+
+    Order of truth:
+        1. EntryWritingRuntime memory (authoritative during request)
+        2. NPZ dumps (cold fallback only for startup / integrity checks)
+    """
+
+    # ----------------------------
+    # 1. FAST PATH: runtime memory
+    # ----------------------------
+    embedding = entry_runtime._embeddings.get(entry_id)
+
+    if embedding is not None:
+        return embedding.astype(np.float32)
+
+    # ----------------------------
+    # 2. FALLBACK: disk (ONLY if runtime missed it)
+    # ----------------------------
+
+    npz_files = sorted(
+        glob.glob(os.path.join(ENTRIES_DIR, "entries_mean_embeddings_dump_*.npz"))
+    )
+
+    found = None
+
+    for f in npz_files:
+        with np.load(f, allow_pickle=False) as data:
+            if entry_id in data:
+                if found is not None:
+                    raise RuntimeError(
+                        f"Duplicate embedding found across dumps for {entry_id}"
+                    )
+                found = data[entry_id].astype(np.float32)
+
+    if found is None:
+        raise RuntimeError(f"Embedding not found for entry_id {entry_id}")
+
+    return found
 
 # ---------- models ----------
 
@@ -524,7 +566,7 @@ class CentroidSystem:
         entry_ids = entry_ids_unique                    
 
         # prepare deterministic embedding vector
-        vectors = [safe_load_embedding(j) for j in entry_ids]
+        vectors = [safe_load_embedding(j, self.entry_runtime) for j in entry_ids]
         vector = deterministic_mean(vectors)
         logger.debug(f"[CREATE_PRECENTROID] Deterministic mean vector shape: {vector.shape if hasattr(vector,'shape') else 'scalar'}")
 
@@ -704,7 +746,7 @@ class CentroidSystem:
             entry_ids = c.current.entry_ids
 
             # Load embeddings safely
-            vectors = np.stack([safe_load_embedding(j) for j in entry_ids])
+            vectors = [safe_load_embedding(j, self.entry_runtime) for j in entry_ids]
 
             # Record burst intent before mutation
             await self._ledger.record_event({

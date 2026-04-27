@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-04-26T12:01:10-10:00
+# Save-state: 2026-04-27T00:08:20-04:00
 # ==========================================
 
 """
@@ -29,6 +29,7 @@ from app.helpers.entry_similarity import (
 )
 from core.map.centroids import CentroidSystem
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,6 +50,7 @@ class DeletionManager:
     ):
         self._ledger = ledger
         self._centroids = centroids
+        self._entry_runtime = entry_runtime
 
     
     async def unlink_entry_from_centroid(
@@ -162,98 +164,40 @@ class DeletionManager:
         token_hash: str,
         data_dir: str,
     ) -> Dict[str, List[str]]:
-        """
-        Canonical entry deletion sequence.
-
-        Order:
-        1. Record DELETE_ENTRY ledger event
-        2. Remove from centroids
-
-        Crash-safe.
-        Replay-consistent.
-        """
 
         await self._centroids._assert_ledger_ready()
 
-        # --- Remove centroid membership ---
+        # ------------------------------------------------------------
+        # STEP 1: REMOVE FROM CENTROIDS
+        # ------------------------------------------------------------
         affected = await self.remove_entry_globally(entry_id=entry_id)
+
         if not affected:
-            logger.info(f"No-op delete for {entry_id}")
-            return {}
-        if affected:
+            logger.warning(
+                f"[DELETE_ENTRY] No centroids contained entry {entry_id} (no-op or already missing)."
+            )
+        else:
+            logger.info(
+                f"[DELETE_ENTRY] Entry {entry_id} removed from centroids: {list(affected.keys())}"
+            )
+
+        # ------------------------------------------------------------
+        # STEP 2: PURGE METADATA
+        # ------------------------------------------------------------
+        purge_result = await self._entry_runtime.purge_entry_metadata(
+            entry_id=entry_id,
+            token_hash=token_hash,
+        )
+
+        # IMPORTANT: purge_result must be a boolean for this to be meaningful
+        if purge_result:
             await self._ledger.record_event({
                 "type": "DELETE_ENTRY",
                 "entry_id": entry_id,
             })
-
-        logger.info(
-            f"Entry {entry_id} deleted. Affected centroids: {list(affected.keys())}"
-        )
-
-        await self._purge_entry_metadata(
-            entry_id=entry_id,
-            token_hash=token_hash,
-            data_dir=data_dir
-        )
+        else:
+            logger.warning(
+                f"[DELETE_ENTRY] Entry {entry_id} metadata purge did NOT complete or no-op."
+            )
 
         return affected
-
-    async def _purge_entry_metadata(
-        self,
-        *,
-        entry_id: str,
-        token_hash: str,
-        data_dir: str,
-    ) -> None:
-        """
-        Strip a single entry down to only minimal surviving fields:
-        entry_id, embedding_file, crisis_flag.
-        All other fields are removed from this entry only.
-        Other entries in the file are untouched.
-        """
-
-        path = os.path.join(data_dir, "entries", "entries.json")
-
-        if not os.path.exists(path):
-            # Nothing to do if the file does not exist
-            return
-
-        # --- Load all entries ---
-        with open(path, "r", encoding="utf-8") as f:
-            try:
-                entries = json.load(f)
-            except json.JSONDecodeError:
-                logger.error("entries.json is corrupted, cannot purge metadata.")
-                return
-
-        if not isinstance(entries, list):
-            logger.error("entries.json must contain a list of entries.")
-            return
-
-        # --- Locate the target entry ---
-        target = None
-        for entry in entries:
-            if entry.get("hash_from_token_for_deleting_entries") == token_hash:
-                target = entry
-                break
-
-        if not target:
-            logger.warning("Entry with matching hash_from_token_for_deleting_entries not found during metadata purge.")
-            return
-
-        # --- Strip all fields except minimal surviving ones ---
-        stripped = {
-            "entry_id": target.get("entry_id") or target.get("id"),
-            "embedding_file": target.get("embedding_file"),
-            "crisis_flag": target.get("crisis_flag"),
-        }
-
-        # Replace the original entry with stripped version
-        index = entries.index(target)
-        entries[index] = stripped
-
-        # --- Write back full entries list safely ---
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(entries, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"Entry {entry_id} metadata purged successfully. only minimal fields remain.")

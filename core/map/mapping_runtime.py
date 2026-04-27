@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-04-26T18:10:15-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-04-27T02:19:45-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -26,12 +26,16 @@ ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 # Singleton Instances
 # ---------------------------------------------------------------------
 
-_ledger: IdentifierLedger = IdentifierLedger()
-_centroid_system: CentroidSystem = CentroidSystem(_ledger)
-_entry_runtime: EntryWritingRuntime = EntryWritingRuntime(_ledger) 
+_ledger = IdentifierLedger()
+_centroid_system = CentroidSystem(_ledger)
+_entry_runtime = EntryWritingRuntime(_ledger)
+
+# inject after construction
+_centroid_system.entry_runtime = _entry_runtime
 # (_ledger) is used so that if integrity fails, you can trace causality directly:
 # “ledger state caused entry validation failure” 
 # rather than: “some global singleton state was inconsistent somewhere”
+
 
 _initialized: bool = False
 
@@ -114,7 +118,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     
 # Recheck that all the files are in order every once in a while
 # In seconds
-PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 5
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300
 
 async def periodic_integrity_check():
     """

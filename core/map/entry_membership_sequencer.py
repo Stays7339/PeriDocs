@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-26T15:55:30-04:00
+# Save-state: 2026-04-26T18:48:30-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -24,10 +24,9 @@ from app.helpers.entry_similarity import (
     deterministic_mean, 
     safe_load_embedding,
 )
-from core.map.mapping_runtime import centroid_system
+from core.map.mapping_runtime import centroid_system, entry_runtime
 from core.map.centroids import CentroidState
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
-from core.map.mapping_runtime import entry_runtime
 
 logger = logging.getLogger(__name__)
 
@@ -321,6 +320,13 @@ async def reconcile_centroid_membership_after_approval(
     summary_entries: list of entry dicts representing the authoritative snapshot
                      (already in memory, no disk I/O)
     """
+    logger.info(
+        "[reconcile] start centroid=%s event_index=%s entries=%d",
+        centroid_suffix,
+        event_index,
+        len(entry_runtime._entries),
+    )
+    
     # Extract entry_ids from summary snapshot
     entry_ids = {e["entry_id"] for e in summary_entries}
 
@@ -332,6 +338,12 @@ async def reconcile_centroid_membership_after_approval(
         updated = False
 
         for entry in entry_runtime._entries:
+
+            logger.info(
+                "[reconcile] inspecting entry=%s centroids=%s",
+                entry.get("entry_id"),
+                len(entry.get("centroids", []))
+            )
             if entry.get("entry_id") not in entry_ids:
                 continue
 
@@ -347,4 +359,5 @@ async def reconcile_centroid_membership_after_approval(
                     updated = True
 
         if updated:
+            logger.info("[reconcile] updated=%s", updated)
             await entry_runtime.persist()

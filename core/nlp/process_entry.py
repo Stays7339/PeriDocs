@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-04-26T15:52:15-04:00
+# save-state 2026-04-27T01:51:00-04:00
 # ==========================================
 
 
@@ -25,22 +25,12 @@ from .hash_utils import full_hash
 from .crisis_detector import crisis_notification_async
 from .crisis_recorder import append_crisis_record
 from .clause_utils import split_into_clauses, sliding_window_clauses
-from core.map.mapping_runtime import centroid_system
+from core.map.mapping_runtime import centroid_system, entry_runtime
 from core.map import entry_membership_sequencer
-from app.helpers.file_ops import load_data
+
 from app.helpers.entry_similarity import highlight_standout_clauses
 from core.reasoning.reasoning_runtime import run_reasoning
 
-
-# ---- BACKUP / TIMESTAMPED EMBEDDINGS ----
-now = datetime.now(timezone.utc)
-window = now.hour // 6
-BACKUP_TIMESTAMP = now.strftime("%Y%m%d") + f"_{window}"
-entries_EMBED_FILE = f"data/entries/entries_mean_embeddings_dump{BACKUP_TIMESTAMP}.npz"
-
-# Glob for existing embeddings (to validate file location / expected path)
-existing_embed_files = sorted(glob("data/entries/entries_mean_embeddings_dump*.npz"))
-entries_CLAUSE_EMBED_FILE = f"data/entries/entries_clause_embeddings_dump{BACKUP_TIMESTAMP}.npz"
 
 EMBEDDING_DIM = 1024
 logger = logging.getLogger(__name__)
@@ -82,18 +72,43 @@ async def process_entry_async(
 
     # ---------------- GENERATE EMBEDDING ----------------
     clause_embeddings = await get_embedding_async(windows)
+    
     doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
-    if np.all(doc_embedding == 0) or np.isnan(doc_embedding).any():
-        doc_embedding = np.zeros(EMBEDDING_DIM, dtype=np.float32)
-    logger.debug("DOC EMBEDDING NORM:", np.linalg.norm(doc_embedding))
 
-    if not clause_embeddings or any(e.size == 0 for e in clause_embeddings):
-        clause_embeddings = [np.zeros(EMBEDDING_DIM, dtype=np.float32) for _ in (clause_embeddings or [0])]
-        logger.warning("Empty or zero-length clause embeddings detected; using zero vector fallback.")
+    # ensure embedding exists
+    if doc_embedding is None:
+        logger.error("[EmbeddingError] doc_embedding is None")
+        raise RuntimeError("Embedding generation returned None")
 
-    # --- intra-entry standout clause flags ---
-    clause_embeddings_array = np.stack(clause_embeddings) if clause_embeddings else np.zeros((1, EMBEDDING_DIM), dtype=np.float32)
-    standout_flags = highlight_standout_clauses(clause_embeddings_array, threshold=0.65)
+    # enforce correct type
+    if not isinstance(doc_embedding, np.ndarray):
+        logger.error("[EmbeddingError] invalid type=%s", type(doc_embedding))
+        raise RuntimeError("Embedding is not a numpy array")
+
+    # enforce correct dimensionality
+    if doc_embedding.shape != (EMBEDDING_DIM,):
+        logger.error("[EmbeddingError] invalid shape=%s", doc_embedding.shape)
+        raise RuntimeError(f"Invalid embedding shape: {doc_embedding.shape}")
+
+    # detect NaNs (hard failure)
+    if np.isnan(doc_embedding).any():
+        logger.error("[EmbeddingError] NaN detected in embedding")
+        raise RuntimeError("NaN detected in embedding vector")
+
+    # detect zero vector (INVALID STATE in new system)
+    if np.all(doc_embedding == 0):
+        logger.error(
+            "[EmbeddingError] zero-vector detected | norm=0 | entry staging failure"
+        )
+        raise RuntimeError("Zero-vector embedding detected (invalid state)")
+
+    # optional: log distribution stats for observability
+    logger.debug(
+        "[EmbeddingOK] norm=%.6f mean=%.6f std=%.6f",
+        float(np.linalg.norm(doc_embedding)),
+        float(np.mean(doc_embedding)),
+        float(np.std(doc_embedding)),
+    )
 
     report_progress()  # 3 / total_steps
 
@@ -117,7 +132,7 @@ async def process_entry_async(
         "encrypted_raw_text": encrypted_safe_text,
         "crisis_flag": bool(crisis_msg),
         "safe_text": "" if crisis_msg else safe_text,
-        "embedding_file": None if crisis_msg else entries_EMBED_FILE,
+        "embedding_file": None if crisis_msg else entry_runtime.get_current_embedding_file(),
         "embedding": None if crisis_msg else doc_embedding
     }
 
@@ -133,37 +148,7 @@ async def process_entry_async(
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
     if not crisis_msg:
-        Path("data/entries").mkdir(parents=True, exist_ok=True)
-
-        # --- Persist document embeddings as .npz ---
-        npz_path = entries_EMBED_FILE
-
-        if Path(npz_path).exists():
-            # load safely, NO pickling
-            loaded = dict(np.load(npz_path, allow_pickle=False))
-
-            # validate keys
-            for k in loaded.keys():
-                if not isinstance(k, str) or not all(c in "0123456789abcdef" for c in k.lower()):
-                    raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
-
-            npz_dump = loaded
-        else:
-            npz_dump = {}
-
-        npz_dump[entry_id] = doc_embedding
-        np.savez_compressed(npz_path, **npz_dump)
-
-        Path(entries_CLAUSE_EMBED_FILE).parent.mkdir(parents=True, exist_ok=True)
-        clause_dump = dict(np.load(entries_CLAUSE_EMBED_FILE, allow_pickle=False)) if Path(entries_CLAUSE_EMBED_FILE).exists() else {}
-        clause_dump[entry_id] = clause_embeddings_array
-        np.savez_compressed(entries_CLAUSE_EMBED_FILE, **clause_dump)
-
-        
-        standout_path = f"data/entries/entries_standout_flags_dump{BACKUP_TIMESTAMP}.npz"
-        loaded_flags = dict(np.load(standout_path, allow_pickle=False)) if Path(standout_path).exists() else {}
-        loaded_flags[entry_id] = np.array(standout_flags, dtype=bool)
-        np.savez_compressed(standout_path, **loaded_flags)
+        await entry_runtime.set_embedding(entry_id, doc_embedding)
 
     report_progress()  # 7 / total_steps
 
