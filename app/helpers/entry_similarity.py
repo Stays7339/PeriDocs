@@ -1,7 +1,7 @@
 
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-03-24T18:25:15-04:00
+# Save-state: 2026-04-05T19:20:20-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -12,7 +12,7 @@ import logging
 from typing import Optional, Sequence
 from pathlib import Path
 
-logger = logging.getLogger("peridocs.entry_similarity")
+logger = logging.getLogger(__name__)
 
 # Base data directory (can be overridden with environment variable)
 DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
@@ -67,7 +67,7 @@ def safe_load_embedding(entry_id: str, data_dir: str = DATA_DIR) -> np.ndarray:
                     raise RuntimeError(f"Unexpected key in NPZ dump: {k}")
 
             if entry_id in data: 
-                logger.info(
+                logger.debug(
                     "Embedding key match in NPZ file: entry_id=%s file=%s total_keys=%d",
                     entry_id, f, len(data.keys())
                 )
@@ -124,7 +124,7 @@ def highlight_standout_clauses(clause_embeddings: np.ndarray, threshold: float =
     standout_flags = []
     for i in range(n):
         other_embeddings = np.delete(clause_embeddings, i, axis=0)
-        mean_other = other_embeddings.mean(axis=0)
+        mean_other = clause_embeddings[i] if other_embeddings.size == 0 else other_embeddings.mean(axis=0)
         sim = cosine_similarity(clause_embeddings[i], mean_other)
         standout_flags.append(sim < threshold)
 

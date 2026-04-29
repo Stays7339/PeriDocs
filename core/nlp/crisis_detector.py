@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_detector.py
-# Save-state updated 202512241847 (YYYYMMDDhhmm)
+# Save-state updated 2026-04-05T14:01:15-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 """
@@ -71,6 +71,9 @@ from typing import List
 from .orthography import token_lemmas
 import re
 from difflib import SequenceMatcher
+import logging
+
+logger = logging.getLogger(__name__)
 
 # ========================
 # Crisis phrase blacklist
@@ -157,7 +160,6 @@ _VERB_BASES = {
     "shoot": {"shoot", "shoots", "shooting", "shot"},
     "cut": {"cut", "cuts", "cutting"},
     "poison": {"poison", "poisons", "poisoning", "poisoned"},
-    "fall": {"fall", "falls", "falling", "fell"},
     "drown": {"drown", "drowns", "drowning", "drowned"},
 }
 
@@ -170,7 +172,7 @@ def normalize_token_morphology(token: str) -> str:
 # Anchor vocabularies
 # ========================
 SELF_HARM_ANCHORS = {"die", "dead", "kill", "suicide", "unalive"}
-RISK_INDICATOR_BASES = {"hang", "jump", "overdose", "shoot", "cut", "poison", "fall", "drown"}
+RISK_INDICATOR_BASES = {"hang", "jump", "overdose", "shoot", "cut", "poison", "drown"}
 SELF_REFERENT_ANCHORS = {"i", "me", "my", "myself", "life"}
 THIRD_PERSON_ANCHORS = {"he", "she", "they", "him", "her", "them"}
 COGNITIVE_INTENT_VERBS = {
@@ -271,7 +273,7 @@ async def check_crisis_phrases_async(
                     continue
                 hits.append(phrase)
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Token match '{phrase}' via {window}")
+                    logger.warning(f"[CRISIS DEBUG] Token match '{phrase}' via {window}")
                 break
 
     # CHANNEL 2: compressed-text substring detection
@@ -280,7 +282,7 @@ async def check_crisis_phrases_async(
         if phrase_comp in compressed:
             hits.append(phrase)
             if DEBUG:
-                print(f"[CRISIS DEBUG] Compressed match '{phrase}' in '{compressed}'")
+                logger.warning(f"[CRISIS DEBUG] Compressed match '{phrase}' in '{compressed}'")
 
     # CHANNEL 3: implicit self-harm anchors
     for i, tok in enumerate(tokens):
@@ -290,7 +292,7 @@ async def check_crisis_phrases_async(
             if self_ref_present and (any(t in TEMPORAL_COMMITMENTS for t in window) or any(t in COGNITIVE_INTENT_VERBS for t in window)):
                 hits.append(f"implicit:{tok}")
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Implicit anchor '{tok}' with context {window}")
+                    logger.warning(f"[CRISIS DEBUG] Implicit anchor '{tok}' with context {window}")
 
     # CHANNEL 4: risk-indicator detection (self or others)
     for i, tok in enumerate(tokens):
@@ -306,7 +308,7 @@ async def check_crisis_phrases_async(
             # SAFE bigram → hard ignore
             if tok == "hang" and bigram in SAFE_HANG_BIGRAMS:
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Safe hang bigram ignored: {bigram}")
+                    logger.warning(f"[CRISIS DEBUG] Safe hang bigram ignored: {bigram}")
                 continue
 
             # RISK bigram → force elevation
@@ -328,7 +330,7 @@ async def check_crisis_phrases_async(
                 label = "risk:self" if self_ref else "risk:other"
                 hits.append(f"{label}:{tok}")
                 if DEBUG:
-                    print(
+                    logger.warning(
                         f"[CRISIS DEBUG] Risk indicator '{tok}' ({label}) "
                         f"via {'bigram' if force_risk else 'context'} "
                         f"with window {window}"
@@ -342,19 +344,19 @@ async def check_crisis_phrases_async(
                 self_ref_present = any(t in SELF_REFERENT_ANCHORS for t in tokens[max(0, i-3):i+5])
                 hits.append(f"intent:{target_verb}")
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Intent phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
+                    logger.warning(f"[CRISIS DEBUG] Intent phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
 
     # CHANNEL 6: chemical and pool ingestion
     if any(t in CHEMICAL_INGESTION for t in tokens) and any(t in SELF_REFERENT_ANCHORS for t in tokens):
         hits.append("risk:self:chemical")
         if DEBUG:
-            print(f"[CRISIS DEBUG] Chemical ingestion detected with tokens {tokens}")
+            logger.warning(f"[CRISIS DEBUG] Chemical ingestion detected with tokens {tokens}")
 
     if "pool" in tokens or "backyard" in tokens:
         if any(t in SELF_REFERENT_ANCHORS for t in tokens):
             hits.append("risk:self:pool")
             if DEBUG:
-                print(f"[CRISIS DEBUG] Pool drowning phrase detected with tokens {tokens}")
+                logger.warning(f"[CRISIS DEBUG] Pool drowning phrase detected with tokens {tokens}")
 
     # CHANNEL 7: human-abuse / illegal activity detection
     for i, tok in enumerate(tokens):
@@ -363,7 +365,7 @@ async def check_crisis_phrases_async(
             if any(t in CONTROL_ANCHORS for t in window) and any(t in SELF_REFERENT_ANCHORS for t in window) and not any(t in SAFE_CONTEXT for t in window):
                 hits.append("risk:self:abuse")
                 if DEBUG:
-                    print(f"[CRISIS DEBUG] Human-abuse phrase detected with window {window}")
+                    logger.warning(f"[CRISIS DEBUG] Human-abuse phrase detected with window {window}")
 
     return list(dict.fromkeys(hits))
 

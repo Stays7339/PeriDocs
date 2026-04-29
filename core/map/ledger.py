@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-03-24T14:55:30-04:00
+# Save-state: 2026-04-19T14:38:27-04:00
 # ==========================================
 
 """
@@ -28,7 +28,7 @@ LEDGER_PATH = DATA_DIR / "ledger.json"
 _ledger_lock = asyncio.Lock()
 _ledger_cache: Dict[str, Any] | None = None
 
-logger = logging.getLogger("peridocs.core.map.ledeger")
+logger = logging.getLogger(__name__)
 
 def _initial_ledger() -> Dict[str, Any]:
     return {
@@ -84,7 +84,7 @@ class IdentifierLedger:
     Identifier allocation is a state transition.
     """
 
-    VALID_KINDS = ("precentroid", "centroid_from_split")
+    VALID_KINDS = ("precentroid", "centroid", "centroid_from_split")
     VALID_TRANSITIONS = {
         "precentroid": ("centroid",),
         "centroid_from_split": ("centroid",),
@@ -104,7 +104,7 @@ class IdentifierLedger:
             ledger["next_centroid_id"] += 1
             ledger["issued_suffixes"][str(suffix)] = {
                 "kind": kind,
-                "consumed": False,       # <-- track lifecycle
+                "reviewed_by_a_human": False,       
                 "approved": False,
                 "rejected": False
             }
@@ -120,7 +120,7 @@ class IdentifierLedger:
             await _save(ledger)
             return suffix
 
-    async def approve_suffix(self, suffix: int) -> None:
+    async def approve_suffix(self, suffix: int, kind: str) -> None:
         async with _ledger_lock:
             ledger = await _load()
             record = ledger["issued_suffixes"].get(str(suffix))
@@ -132,7 +132,8 @@ class IdentifierLedger:
                 raise RuntimeError(f"Cannot approve rejected suffix {suffix}")
 
             record["approved"] = True
-            record["consumed"] = True
+            record["reviewed_by_a_human"] = True
+            record["kind"] = kind
 
             event_index = await self._allocate_event_index_locked(ledger)
             ledger["events"].append({
@@ -154,7 +155,7 @@ class IdentifierLedger:
                 raise RuntimeError(f"Suffix {suffix} already rejected")
 
             record["rejected"] = True
-            record["consumed"] = True
+            record["reviewed_by_a_human"] = True
 
             event_index = await self._allocate_event_index_locked(ledger)
             ledger["events"].append({
@@ -176,16 +177,17 @@ class IdentifierLedger:
         event_type = payload["type"]
         required_fields: Dict[str, set] = {
             "ISSUE_SUFFIX": {"suffix", "kind"},
-            "APPROVE_SUFFIX": {"suffix"},
+            "APPROVE_SUFFIX": {"suffix", "kind"},
             "REJECT_SUFFIX": {"suffix"},
             "CREATE_PRECENTROID": {"centroid_id", "entry_ids"},
-            "APPROVE_PRECENTROID": {"from", "to", "label", "nne"},
-            "ADD_SAAJE": {"centroid_id", "entry_id", "similarity"},
-            "REMOVE_SAAJE": {"centroid_id", "entry_id"},
+            "APPROVE_PRECENTROID": {"from", "to", "description_from_human_moderator", "title_from_human_moderator"},
             "REJECT_PRECENTROID": {"centroid_id", "failed_threshold"},
             "BURST_PRECENTROID": {"centroid_id", "threshold"},
             "SUGGEST_SPLIT": {"centroid_id", "threshold", "min_similarity"},
             "DELETE_ENTRY": {"entry_id"},
+            "UNLINK_ENTRY": {"centroid_id", "entry_id"},
+            "LINK_ENTRY": {"centroid_id", "entry_id"},
+            "NEW_ENTRY_INGESTED": {"entry_id"},
             # Extend as needed
         }
 
@@ -299,6 +301,6 @@ class IdentifierLedger:
                         )
 
         # Optionally: log success
-        logging.getLogger("peridocs.mapping_runtime").info(
+        logger.info(
             f"Verified {len(centroids._centroids)} centroids successfully against ledger."
         )

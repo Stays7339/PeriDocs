@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-03-24T17:42:15-04:00
+# Save-state: 2026-04-29T03:31:55-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -12,7 +12,9 @@ This module orchestrates:
 - full auditability, full precision
 - ensures entry "snobbery": once in a centroid, entry avoids precentroids
 """
-
+import os
+import json
+import numpy as np
 from typing import Dict, List, Tuple
 import logging
 from datetime import datetime, timezone
@@ -22,11 +24,11 @@ from app.helpers.entry_similarity import (
     deterministic_mean, 
     safe_load_embedding,
 )
-from core.map.mapping_runtime import centroid_system
+from core.map.mapping_runtime import centroid_system, entry_runtime
 from core.map.centroids import CentroidState
-from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 
-logger = logging.getLogger("peridocs.entry_membership_sequencer")
+logger = logging.getLogger(__name__)
 
 
 class CandidateDecision:
@@ -39,6 +41,38 @@ class CandidateDecision:
         self.centroid_id = centroid_id
         self.similarity = similarity
 
+# ---------------- Runtime-backed embedding access ----------------
+
+async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
+    """
+    Runtime-aware embedding fetch.
+
+    Behavior:
+    1. Prefer in-memory embedding (fast path)
+    2. Fallback to safe_load_embedding (full validation path)
+    3. Cache result into runtime for future calls
+
+    Guarantees:
+    - Preserves duplicate detection and validation from safe_load_embedding
+    - Never silently returns None
+    """
+
+    # ---- Step 1: Try runtime (fast path) ----
+    emb = await entry_runtime.get_embedding(entry_id)
+    if emb is not None:
+        return emb
+
+    # ---- Step 2: Fallback to canonical loader (disk + validation) ----
+    emb = await centroid_system.run_sync_in_thread(
+        safe_load_embedding,
+        entry_id
+    )
+
+    # ---- Step 3: Cache into runtime (so next call is memory-only) ----
+    # This does NOT skip validation, it only memoizes after validation
+    await entry_runtime.set_embedding(entry_id, emb)
+
+    return emb
 
 async def evaluate_centroid_candidates(
     entry_id: str,
@@ -50,7 +84,7 @@ async def evaluate_centroid_candidates(
     Evaluate entry against all existing centroids.
     Returns list of CandidateDecision objects sorted by similarity.
     """
-    entry_vec = safe_load_embedding(entry_id)
+    entry_vec = await get_embedding_for_entry(entry_id)
     system = centroid_system
 
     decisions: List[CandidateDecision] = []
@@ -62,6 +96,8 @@ async def evaluate_centroid_candidates(
         ]
 
     for c in centroids:
+        logger.debug("entry_vec:", type(entry_vec))
+        logger.debug("centroid_vec:", type(c.current.vector))
         try:
             sim = cosine_similarity(entry_vec, c.current.vector)
         except ValueError:
@@ -94,7 +130,7 @@ async def link_entry(
     *,
     min_similarity: float = MINIMUM_SIMILARITY_THRESHOLD,
     max_affiliations: int | None = None,
-) -> List[Tuple[str, float]]:
+) -> List[Tuple[str, float, int]]:
     """
     Orchestrates linking an entry:
     1. Try centroids first
@@ -103,8 +139,7 @@ async def link_entry(
     Returns list of (centroid_id, similarity) applied
     """
     system = centroid_system
-    applied: List[Tuple[str, float]] = []
-
+    applied: List[Tuple[str, float, int]] = []
     # --- Step 1: Centroids ---
     centroid_candidates = await evaluate_centroid_candidates(
         entry_id,
@@ -114,8 +149,8 @@ async def link_entry(
 
     for cand in centroid_candidates:
         try:
-            await system.add_saaje(cand.centroid_id, entry_id, cand.similarity)
-            applied.append((cand.centroid_id, cand.similarity))
+            event_index = await system.add_entry_to_centroid(cand.centroid_id, entry_id, cand.similarity)
+            applied.append((cand.centroid_id, cand.similarity, event_index))
         except Exception as e:
             logger.warning(
                 "Failed to link entry to centroid: centroid=%s entry=%s err=%s",
@@ -129,10 +164,17 @@ async def link_entry(
         return applied
 
     # --- Step 2: Precentroids ---
-    precentroid_id, sim = await suggest_precentroid_for_entry(
+    precentroid_result = await suggest_precentroid_for_entry(
         entry_id,
         threshold=min_similarity
     )
+
+    if precentroid_result is None:
+        # nothing to link, return early
+        return applied
+
+    precentroid_id, sim = precentroid_result
+
     if precentroid_id:
         try:
             logger.debug(
@@ -140,7 +182,7 @@ async def link_entry(
                 entry_id, precentroid_id
             )
             event_index = await system._ledger.record_event({
-                "type": "LINK_CANDIDATE_PRECENTROID",
+                "type": "ADD_ENTRY_TO_PRECENTROID",
                 "centroid_id": precentroid_id,
                 "entry_id": entry_id,
                 "similarity": sim,
@@ -157,11 +199,11 @@ async def link_entry(
             
             # ------------------ FIX: skip duplicate append ------------------
             if entry_id in c.current.entry_ids:
-                logger.warning(
+                logger.debug(
                     "Entry %s already exists in precentroid %s, skipping append.",
                     entry_id, precentroid_id
                 )
-                applied.append((precentroid_id, sim))  # still mark as applied
+                applied.append((precentroid_id, sim, event_index))  # still mark as applied
                 return applied  # <-- return early, do NOT append a new CentroidState
                 
             seen = set()
@@ -171,7 +213,7 @@ async def link_entry(
                     new_entry_ids.append(eid)                   
                     seen.add(eid)                                
                 
-            vectors = [safe_load_embedding(j) for j in new_entry_ids]
+            vectors = [await get_embedding_for_entry(j) for j in new_entry_ids]
             vector = deterministic_mean(vectors)
             logger.debug(
                 "[LINK_ENTRY] New entry_ids: %s, vector shape: %s",
@@ -182,15 +224,14 @@ async def link_entry(
                     event_index=event_index,
                     entry_ids=new_entry_ids,
                     vector=vector,
-                    saajes=None,
                     metadata=c.current.metadata.copy()
                 )
             )
-            logger.info(
+            logger.debug(
                 "[LINK_ENTRY] Appended entry %s to precentroid %s, total states=%d",
                 entry_id, precentroid_id, len(c.states)
             )
-            await system._persist(c)
+            await system.persist_centroid_data(c)
             logger.debug("[LINK_ENTRY] Persisted precentroid %s to disk", precentroid_id)
             
         except Exception as e:
@@ -201,7 +242,7 @@ async def link_entry(
             raise  # propagate loudly
 
     if precentroid_id:
-        applied.append((precentroid_id, sim))
+        applied.append((precentroid_id, sim, event_index))
 
     return applied
 
@@ -215,7 +256,7 @@ async def unlink_entry(
     Ledger-backed, audit-safe.
     """
     try:
-        await centroid_system.remove_saaje(centroid_id, entry_id)
+        await centroid_system.unlink_entry_from_centroid(centroid_id, entry_id)
         logger.info("Entry %s unlinked from centroid %s", entry_id, centroid_id)
     except Exception as e:
         logger.error("Failed to unlink entry: entry=%s centroid=%s err=%s", entry_id, centroid_id, e)
@@ -230,11 +271,10 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
     system = centroid_system
 
     try:
-        entry_vec = await system.run_sync_in_thread(safe_load_embedding, entry_id)
+        entry_vec = await get_embedding_for_entry(entry_id)
 
         # ---- DEBUG: print entry norm ----
-        import numpy as np
-        print("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
+        logger.debug("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
 
         async with system._lock:
             if not system._centroids:
@@ -245,7 +285,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
 
                 # ---- DEBUG: print centroid norm ----
                 centroid_norm = np.linalg.norm(c.current.vector)
-                print("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
+                logger.debug("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
 
                 sim = cosine_similarity(entry_vec, c.current.vector)
 
@@ -265,3 +305,59 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
     except Exception as e:
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
         raise
+
+async def reconcile_centroid_membership_after_approval(
+    centroid_suffix: str,
+    event_index: int,
+    *,
+    summary_entries: list[dict]
+) -> None:
+    """
+    Update entries.json in-memory to reflect that the precentroid has been approved.
+
+    centroid_suffix: e.g., "10" if precentroid_10 → centroid_10
+    event_index: ledger event index for this approval
+    summary_entries: list of entry dicts representing the authoritative snapshot
+                     (already in memory, no disk I/O)
+    """
+    logger.info(
+        "[reconcile] start centroid=%s event_index=%s entries=%d",
+        centroid_suffix,
+        event_index,
+        len(entry_runtime._entries),
+    )
+    
+    # Extract entry_ids from summary snapshot
+    entry_ids = {e["entry_id"] for e in summary_entries}
+
+    centroid_id = f"centroid_{centroid_suffix}"
+    precentroid_id = f"precentroid_{centroid_suffix}"
+
+    # Lock the runtime before mutating entries
+    async with entry_runtime._lock:
+        updated = False
+
+        for entry in entry_runtime._entries:
+
+            logger.info(
+                "[reconcile] inspecting entry=%s centroids=%s",
+                entry.get("entry_id"),
+                len(entry.get("centroids", []))
+            )
+            if entry.get("entry_id") not in entry_ids:
+                continue
+
+            centroids_list = entry.get("centroids", [])
+            if not isinstance(centroids_list, list):
+                continue
+
+            for c in centroids_list:
+                if c.get("centroid_id") == precentroid_id:
+                    c["centroid_id"] = centroid_id
+                    c["event_index"] = event_index
+                    logger.debug("Just so you know, reconcile_centroid_membership_after_approval ran just now.")
+                    updated = True
+
+        if updated:
+            logger.info("[reconcile] updated=%s", updated)
+            await entry_runtime._persist()

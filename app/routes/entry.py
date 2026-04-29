@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-03-24T19:57:40-04:00
+# save-state 2026-04-28T14:5720 -04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -15,29 +15,20 @@ import os
 import logging
 
 from app.routes import app
-from app.helpers.file_ops import load_data, append_entry
 from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 from core.map.deletion import DeletionManager
-from core.map.mapping_runtime import ledger, centroid_system 
+from core.map.mapping_runtime import ledger, centroid_system , entry_runtime
 
 
 
 
 templates = Jinja2Templates(directory="app/templates")
-entries_FILE = "data/entries/entries.json"
-DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-logger = logging.getLogger("peridocs.app.routes.entry.py")
+logger = logging.getLogger(__name__)
 
-# ---------------- Load embeddings_index via globbing ----------------
-embeddings_index = {}
-for path_str in sorted(glob("data/entries/entries_mean_embeddings_dump*.npz")):
-    path = Path(path_str)
-    if path.exists():
-        npz_data = np.load(path, allow_pickle=False)
-        for k in npz_data.keys():
-            embeddings_index[k] = np.array(npz_data[k], dtype=np.float32)
+
+
 
 # ---------------- In-memory progress tracker ----------------
 progress_dict: dict[str, float] = {}  # key: entry_id, value: 0.0-1.0
@@ -61,9 +52,8 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
         user_ip=user_ip,
         progress_callback=wrapped_progress
     )
-    # Map temp ID → real entry_id
+
     real_entry_id = example_variable["entry_id"]
-    temp_to_real_entry_id[entry_id] = real_entry_id
 
     # Store delete_token in memory if it exists
     if example_variable.get("delete_token"):
@@ -91,26 +81,21 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
     entry_for_journal.pop("embedding", None)
     entry_for_journal.pop("clause_embeddings", None)
     entry_for_journal.pop("delete_token", None)  # token not persisted
-    append_entry(entry_for_journal, entries_FILE)
+    await entry_runtime.append_entry(entry_for_journal)
+
+    os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
+    logger.info("Entries in memory: %d", len(entry_runtime.get_all_entries()))
 
     # ---------------- Update embeddings_index and persist to NPZ ----------------
     if example_variable.get("embedding") is not None:
-        eid = example_variable["entry_id"]
-        emb = example_variable["embedding"]
+        await entry_runtime.set_embedding(
+            example_variable["entry_id"],
+            example_variable["embedding"]
+        )
 
-        # Update in-memory index
-        embeddings_index[eid] = emb.tolist()  # convert to list for JSON-safe storage
-
-        # Persist to .npz
-        npz_path = example_variable.get("embedding_file")
-        if npz_path:
-            Path(npz_path).parent.mkdir(parents=True, exist_ok=True)
-            if Path(npz_path).exists():
-                loaded = dict(np.load(npz_path, allow_pickle=False))
-            else:
-                loaded = {}
-            loaded[eid] = emb
-            np.savez_compressed(npz_path, **loaded)
+    await entry_runtime._persist() 
+    # it is very important to persist entries regularly;
+    # otherwise data is lost the moment power is cut.
 
     # ---------------- Mark progress as complete ----------------
     progress_dict[entry_id] = 1.0
@@ -140,6 +125,8 @@ async def submit_entry(
     # ---------------- Start background processing ----------------
     background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id)
 
+    logger.debug("Submit function triggered for temp_id=%s", temp_entry_id)
+
     # Immediate response for the user (entry submitted toast)
     return JSONResponse({
         "status": "ok",
@@ -158,10 +145,13 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
             real_id = temp_to_real_entry_id.get(entry_id, entry_id)
             progress = progress_dict.get(entry_id, 0.0)
 
-            # Fetch entry if needed
-            all_entries = load_data(entries_FILE)
-            entry = next((e for e in all_entries if e.get("entry_id") == real_id), {})
-            crisis_flag = entry.get("crisis_flag", False)
+            # Fetch entry if needed (real_id for this specific circumstance)
+            entry = entry_runtime.get_entry_by_id(real_id)
+
+            if entry is None:
+                crisis_flag = None  # unknown state, not False
+            else:
+                crisis_flag = entry.get("crisis_flag")
 
             # --- MINIMAL OPTION A: push crisis immediately ---
             if crisis_flag and not crisis_triggered:
@@ -205,36 +195,34 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
 async def submit_success(request: Request, id: str):
     # ---------------- Resolve temp ID → real entry_id ----------------
     id = temp_to_real_entry_id.get(id, id)
-    all_entries = load_data(entries_FILE)
-    entry = next(
-        (
-            e for e in reversed(all_entries)
-            if (e.get("entry_id") == id or e.get("id") == id)
-            and e.get("safe_text")
-        ),
-        None
-    )
+    entry = entry_runtime.get_entry_by_id(id)
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
         )
 
-    # Similarity search
-    entry_vec = embeddings_index.get(id)
-    if entry_vec is None:
-        # fallback to avoid zero vector crash
-        entry_vec = np.zeros(1024, dtype=np.float32)
-    else:
-        entry_vec = np.array(entry_vec, dtype=np.float32)
+    # ---------------- Similarity search (runtime-backed) ----------------
+    embeddings = await entry_runtime.get_all_embeddings()
+
+    entry_id = entry.get("entry_id") or entry.get("id")
+    entry_vec = embeddings.get(entry_id)
+
     scored_entries = []
 
-    for eid, vec in embeddings_index.items():
-        if eid == id:
-            continue
-        sim = cosine_similarity(entry_vec, np.array(vec))
-        match_entry = next((e for e in all_entries if e.get("entry_id") == eid or e.get("id") == eid), None)
-        if match_entry:
-            scored_entries.append({"entry": match_entry, "score": sim})
+    if entry_vec is not None:
+        for eid, vec in embeddings.items():
+            if eid == entry_id:
+                continue
+
+            sim = cosine_similarity(entry_vec, vec)
+
+            match_entry = entry_runtime.get_entry_by_id(eid)
+
+            if match_entry:
+                scored_entries.append({
+                    "entry": match_entry,
+                    "score": sim
+                })
 
     top_matches_formatted = [
         {
@@ -248,6 +236,8 @@ async def submit_success(request: Request, id: str):
 
 
     delete_token = delete_tokens_memory.pop(entry.get("entry_id", entry.get("id")), None)
+
+    logger.info("Submit_success function triggered for id=%s", id)
 
     return templates.TemplateResponse(
         "submit-success.html",
@@ -274,8 +264,10 @@ async def delete_entry_page(request: Request):
 @app.post("/delete", response_class=HTMLResponse)
 async def delete_entry_api(request: Request, delete_token: str = Form(...)):
     token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
-    all_entries = load_data(entries_FILE)
-    entry = next((e for e in all_entries if e.get("delete_token_hash") == token_hash), None)
+
+    
+
+    entry = entry_runtime.get_entry_by_token_hash(token_hash)
 
     if not entry:
         return templates.TemplateResponse(
@@ -286,11 +278,20 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
     entry_id = entry.get("entry_id") or entry.get("id")
 
     try:
-        dm = DeletionManager(ledger=ledger, centroids=centroid_system)
+        # This is an injection, which helps specify which exact instance to use; 
+        # even if it is a singleton, this one works like handing someone an exact physical object,
+        # rather than describing the unique details of an exact physical object for them to find on their own.
+        # Injection is different from importing, and requires attributes to be passed from function to function,
+        # rather than from module to module.
+        dm = DeletionManager(   
+            ledger=ledger,
+            centroids=centroid_system,
+            entry_runtime=entry_runtime
+        )
         await dm.delete_entry(
             entry_id=entry_id,
             token_hash=token_hash,
-            data_dir=DATA_DIR
+            data_dir=os.getenv("PERIDOCS_DATA_DIR", "data")
         )
         # This is a *permutation* not a combination!
         # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.

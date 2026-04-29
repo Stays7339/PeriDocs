@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-03-24T22:39:45-04:00
+// save-state 2026-04-29T04:32:10-04:00
 // ==========================================
 
 /* Notes:

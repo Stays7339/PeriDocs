@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-03-24T17:41:55-04:00
+# Save-state: 2026-04-29T02:55:20-04:00
 # ==========================================
 
 import os
@@ -17,28 +17,77 @@ from numpy.linalg import norm
 from scipy.cluster.hierarchy import linkage, fcluster
 from concurrent.futures import ThreadPoolExecutor
 
+
 from core.map.ledger import IdentifierLedger
-from core.map.config import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
-from app.helpers.entry_similarity import (
-    cosine_similarity,
-    deterministic_mean,
-    safe_load_embedding,
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.perist_reasoning_data import (
+    create_reasoning_data_for_centroid_state,
+    serialize_graph_to_turtle,
+    persist_reasoning_data
 )
 
 
 
-logger = logging.getLogger("peridocs.core.map.centroids")
+logger = logging.getLogger(__name__)
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 ENTRIES_DIR = os.path.join(DATA_DIR, "entries")
 STATE_DIR = os.path.join(DATA_DIR, "centroids")
-SUGGESTIONS_DIR = os.path.join(DATA_DIR, "suggestions")
-ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
+SUGGESTIONS_DIR = os.path.join(STATE_DIR, "suggestions")
+ARCHIVE_DIR = os.path.join(STATE_DIR, "archive")
 
 # Ensure directories exist at startup
 os.makedirs(STATE_DIR, exist_ok=True)
 os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
+os.makedirs(ARCHIVE_DIR, exist_ok=True)
 logger.info(f"Ensuring centroid state directory exists at {STATE_DIR}")
+
+def deterministic_mean(vectors: List[np.ndarray]) -> np.ndarray:
+    if not vectors:
+        raise ValueError("Empty vector list")
+    stacked = np.stack(vectors)
+    return stacked.mean(axis=0)
+
+def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
+    """
+    Runtime-first embedding resolution.
+
+    Order of truth:
+        1. EntryWritingRuntime memory (authoritative during request)
+        2. NPZ dumps (cold fallback only for startup / integrity checks)
+    """
+
+    # ----------------------------
+    # 1. FAST PATH: runtime memory
+    # ----------------------------
+    embedding = entry_runtime._embeddings.get(entry_id)
+
+    if embedding is not None:
+        return embedding.astype(np.float32)
+
+    # ----------------------------
+    # 2. FALLBACK: disk (ONLY if runtime missed it)
+    # ----------------------------
+
+    npz_files = sorted(
+        glob.glob(os.path.join(ENTRIES_DIR, "entries_mean_embeddings_dump.npz"))
+    )
+
+    found = None
+
+    for f in npz_files:
+        with np.load(f, allow_pickle=False) as data:
+            if entry_id in data:
+                if found is not None:
+                    raise RuntimeError(
+                        f"Duplicate embedding found across dumps for {entry_id}"
+                    )
+                found = data[entry_id].astype(np.float32)
+
+    if found is None:
+        raise RuntimeError(f"Embedding not found for entry_id {entry_id}")
+
+    return found
 
 # ---------- models ----------
 
@@ -46,9 +95,8 @@ class CentroidState:
     def __init__(
         self,
         event_index: int,
-        entry_ids: List[str],
+        entry_ids: List[str] | None,
         vector: np.ndarray,
-        saajes: Dict[str, float] | None = None,
         metadata: Dict | None = None,
     ):
         self.event_index = event_index
@@ -71,8 +119,8 @@ class CentroidState:
 class Centroid:
     def __init__(self, centroid_id: str):
         self.centroid_id = centroid_id
-        self.label: str | None = None
-        self.nne: str | None = None
+        self.description_from_human_moderator: str | None = None
+        self.title_from_human_moderator: str | None = None
         self.states: List[CentroidState] = []
 
     @property
@@ -84,8 +132,8 @@ class Centroid:
     def serialize(self) -> Dict:
         return {
             "centroid_id": self.centroid_id,
-            "label": self.label,
-            "nne": self.nne,
+            "description_from_human_moderator": self.description_from_human_moderator,
+            "title_from_human_moderator": self.title_from_human_moderator,
             "states": [s.serialize() for s in self.states],
         }
 
@@ -94,11 +142,15 @@ class Centroid:
 
 class CentroidSystem:
     """
-    Lifecycle interpreter. Ledger is historical spine.
+    Lifecycle interpreter. 
+    Ledger is historical spine for the data of the entries to mean something. 
+    Entry runtime is a material spine for the history of the ledger to mean something. 
+    Both are necessary.
     """
 
-    def __init__(self, ledger: IdentifierLedger):
+    def __init__(self, ledger: IdentifierLedger, entry_runtime):
         self._ledger = ledger
+        self.entry_runtime = entry_runtime
         self._centroids: Dict[str, Centroid] = {}
         self._lock = asyncio.Lock()
         self._split_suggestions: Dict[str, Dict[int, Dict]] = {}  
@@ -134,7 +186,7 @@ class CentroidSystem:
                 f"new event_index {new_event_index} <= last {last_index}"
             )
     
-    async def _assert_prefix_matches_ledger(self, centroid_id: str) -> None:
+    async def _check_if_identifier_is_consistent_with_ledger(self, centroid_id: str) -> None:
         """
         Validates that a loaded centroid/precentroid ID matches the authoritative
         suffix state recorded in the ledger.
@@ -178,16 +230,18 @@ class CentroidSystem:
 
     async def _verify_integrity_on_startup(self) -> None:
         """
-        Comprehensive startup-time integrity check for centroids.
+        Comprehensive startup-time integrity check for centroids, production-ready.
 
         Checks performed:
         1. Ledger must be loaded.
         2. In-memory centroids:
-            - JSON exists and matches centroid_id
-            - .npz exists and vectors are valid/non-zero
-            - States exist
+        - JSON and NPZ exist in either STATE_DIR or ARCHIVE_DIR
+        - JSON 'centroid_id' matches centroid ID
+        - Vectors exist and are non-zero
+        - States exist
         3. Ledger → disk consistency:
-            - Every issued suffix in ledger must have corresponding JSON/NPZ on disk
+        - Every issued suffix in ledger must have corresponding JSON/NPZ
+            in STATE_DIR or ARCHIVE_DIR
         4. Logs all errors before raising RuntimeError
         5. Zero vectors found during checks are recorded to zero_vector_flags.json
         """
@@ -204,10 +258,28 @@ class CentroidSystem:
         # --- check in-memory centroids ---
         async with self._lock:
             for cid, centroid in self._centroids.items():
-                json_path = os.path.join(STATE_DIR, f"{cid}_summary.json")
-                npz_path = os.path.join(STATE_DIR, f"{cid}.npz")
+                # Define candidate paths
+                candidates = [
+                    {
+                        "json": os.path.join(STATE_DIR, f"{cid}_summary.json"),
+                        "npz": os.path.join(STATE_DIR, f"{cid}.npz"),
+                    },
+                    {
+                        "json": os.path.join(ARCHIVE_DIR, f"{cid}_summary.json"),
+                        "npz": os.path.join(ARCHIVE_DIR, f"{cid}.npz"),
+                    }
+                ]
 
-                if not os.path.exists(json_path) or not os.path.exists(npz_path):
+                # Find first location where both files exist
+                found = False
+                for candidate in candidates:
+                    json_path = candidate["json"]
+                    npz_path = candidate["npz"]
+                    if os.path.exists(json_path) and os.path.exists(npz_path):
+                        found = True
+                        break
+
+                if not found:
                     missing_files.append(cid)
                     continue
 
@@ -240,12 +312,52 @@ class CentroidSystem:
 
         # --- check ledger → disk consistency ---
         ledger_snapshot = await self._ledger.snapshot()
-        for suffix_str, record in ledger_snapshot["issued_suffixes"].items():
-            cid = f"precentroid_{suffix_str}"
-            json_path = os.path.join(STATE_DIR, f"{cid}_summary.json")
-            npz_path = os.path.join(STATE_DIR, f"{cid}.npz")
-            if not os.path.exists(json_path) or not os.path.exists(npz_path):
-                ledger_missing_on_disk.append(cid)
+        next_id = ledger_snapshot.get("next_centroid_id", 0)
+
+        for suffix_str in ledger_snapshot["issued_suffixes"].keys():
+            # Find all matching files in either STATE_DIR or ARCHIVE_DIR
+            npz_matches = glob.glob(os.path.join(STATE_DIR, f"*_{suffix_str}.npz")) + \
+                        glob.glob(os.path.join(ARCHIVE_DIR, f"*_{suffix_str}.npz"))
+
+            json_matches = glob.glob(os.path.join(STATE_DIR, f"*_{suffix_str}_summary.json")) + \
+                        glob.glob(os.path.join(ARCHIVE_DIR, f"*_{suffix_str}_summary.json"))
+
+            if len(npz_matches) != 1 or len(json_matches) != 1:
+                ledger_missing_on_disk.append({
+                    "suffix": suffix_str,
+                    "npz_matches": npz_matches,
+                    "json_matches": json_matches,
+                })
+
+        # Also enforce no stray files beyond next_centroid_id in both dirs
+        for dir_path in [STATE_DIR, ARCHIVE_DIR]:
+            for path in glob.glob(os.path.join(dir_path, "*_*.npz")):
+                try:
+                    suffix = self._numeric_suffix(os.path.basename(path))
+                    if suffix >= next_id:
+                        ledger_missing_on_disk.append({
+                            "unexpected_file": path,
+                            "reason": "suffix exceeds next_centroid_id",
+                        })
+                except Exception:
+                    ledger_missing_on_disk.append({
+                        "unexpected_file": path,
+                        "reason": "invalid filename format",
+                    })
+
+            for path in glob.glob(os.path.join(dir_path, "*_summary.json")):
+                try:
+                    suffix = self._numeric_suffix(os.path.basename(path))
+                    if suffix >= next_id:
+                        ledger_missing_on_disk.append({
+                            "unexpected_file": path,
+                            "reason": "suffix exceeds next_centroid_id",
+                        })
+                except Exception:
+                    ledger_missing_on_disk.append({
+                        "unexpected_file": path,
+                        "reason": "invalid filename format",
+                    })
 
         # --- aggregate errors ---
         errors = []
@@ -261,7 +373,7 @@ class CentroidSystem:
             errors.append(f"Ledger has issued suffixes but disk files missing: {ledger_missing_on_disk}")
 
         # persist zero vector flags
-        await self.persist_zero_vector_flags()
+        await self.perisist_flags_for_zero_vector()
 
         if errors:
             for err in errors:
@@ -270,7 +382,7 @@ class CentroidSystem:
 
         logger.info("[_verify_integrity] All centroids passed startup integrity check.")
         
-    async def persist_zero_vector_flags(self):
+    async def perisist_flags_for_zero_vector(self):
         if hasattr(self, "_zero_vector_flags") and self._zero_vector_flags:
             with open(self._zero_vector_flags_file, "w", encoding="utf-8") as f:
                 json.dump(self._zero_vector_flags, f, indent=2)
@@ -299,6 +411,11 @@ class CentroidSystem:
         - Handles missing .npz files gracefully (fallback to zero vector).
         - Enforces ledger checks and event order.
         """
+        from core.map.mapping_runtime import is_runtime_ready, is_runtime_starting
+        if not is_runtime_ready() and not is_runtime_starting():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
+        if not hasattr(self, "entry_runtime") or self.entry_runtime is None:
+            raise RuntimeError("CentroidSystem missing entry_runtime dependency during load_state")
         await self._assert_ledger_ready()
         async with self._lock:
             self._centroids.clear()
@@ -335,54 +452,78 @@ class CentroidSystem:
                     except Exception as e:
                         logger.error("[load_state] Failed to read NPZ %s: %s", npz_path, e)
                 else:
-                    logger.warning("[load_state] Missing NPZ for centroid %s, using fallback zero vectors", centroid_id)
+                    raise RuntimeError("[load_state] Missing NPZ for centroid %s", centroid_id)
 
                 # Reconstruct centroid
                 c = Centroid(payload["centroid_id"])
-                await self._assert_prefix_matches_ledger(c.centroid_id)
-                c.label = payload.get("label")
-                c.nne = payload.get("nne")
+                await self._check_if_identifier_is_consistent_with_ledger(c.centroid_id)
+                c.description_from_human_moderator = payload.get("description_from_human_moderator")
+                c.title_from_human_moderator = payload.get("title_from_human_moderator")
 
-                for s in payload.get("states", []):
+                
+
+                for s_idx, s in enumerate(payload.get("states", [])):
                     self._assert_event_order(c, s["event_index"])
                     entry_ids = s.get("entry_ids", [])
 
-                    # MODIFIED: Build vector for this state by fetching entry embeddings
-                    vector_arrays = []
-                    for eid in entry_ids:
-                        try:
-                            vec_array = safe_load_embedding(eid, data_dir=DATA_DIR)  # MODIFIED
-                        except Exception:
-                            logger.warning(
-                                "[load_state] Missing embedding for entry_id %s in centroid %s, using zero vector",
-                                eid, centroid_id
+                    state_vector = None  # explicit single output slot
+
+                    # -------------------------
+                    # CASE 1: Ghost Town
+                    # -------------------------
+                    # City Analogy (Ghost Town with A Past):
+                    # This district within a larger is not defined by its citizens anymore. 
+                    # It's given a quasi-arbitrary definition from the authorities.
+                    if not entry_ids:
+                        state_vector = vectors.get(f"{centroid_id}_state{s_idx}")
+
+                        if state_vector is None:
+                            raise RuntimeError(
+                                f"[load_state] Missing ghost town vector for state {s_idx} in centroid {centroid_id}"
                             )
-                            vec_array = np.zeros(1024, dtype=np.float32)  # MODIFIED
-                        vector_arrays.append(vec_array)
 
-                    if vector_arrays:
-                        state_vector = deterministic_mean(vector_arrays)  # MODIFIED
+                    # -------------------------
+                    # CASE 2: entry-backed state
+                    # -------------------------
                     else:
-                        logger.warning("[load_state] State has no entry_ids in centroid %s, using zero vector", centroid_id)
-                        state_vector = np.zeros(1024, dtype=np.float32)
+                        vector_arrays = []
 
-                    # Saajes & metadata
-                    saajes = s.get("saajes", {})
+                        for eid in entry_ids:
+                            try:
+                                vec_array = safe_load_embedding(eid, self.entry_runtime)
+                                vector_arrays.append(vec_array)
+                            except Exception:
+                                raise RuntimeError(
+                                    "[load_state] Missing embedding for entry_id %s in centroid %s"
+                                    % (eid, centroid_id)
+                                )
+
+                        if not vector_arrays:
+                            raise RuntimeError(
+                                f"[load_state] Entry-backed state has empty embeddings in centroid {centroid_id}"
+                            )
+
+                        state_vector = deterministic_mean(vector_arrays)
+
+                    # -------------------------
+                    # single unified commit point
+                    # -------------------------
                     metadata = s.get("metadata", {})
 
-                    c.states.append(CentroidState(
-                        s["event_index"],
-                        entry_ids,
-                        state_vector,
-                        saajes=saajes,
-                        metadata=metadata
-                    ))
+                    c.states.append(
+                        CentroidState(
+                            s["event_index"],
+                            entry_ids,
+                            state_vector,
+                            metadata=metadata
+                        )
+                    )
 
                 self._centroids[c.centroid_id] = c
                 logger.info("[load_state] Loaded centroid %s with %d states", c.centroid_id, len(c.states))
 
 
-    async def _persist(self, centroid: Centroid) -> None:
+    async def persist_centroid_data(self, centroid: Centroid) -> None:
         os.makedirs(STATE_DIR, exist_ok=True)
 
         npz_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}.npz")
@@ -390,22 +531,20 @@ class CentroidSystem:
         tmp_npz = npz_path.replace(".npz", ".tmp.npz")
         tmp_json = json_path + ".tmp"
 
-        # MODIFIED: Only store one vector per state (mean/cached)
+        # Only store one vector per state (mean/cached)
         npz_dump = {}
         for state_idx, state in enumerate(centroid.states):
             if state.vector is None or not isinstance(state.vector, np.ndarray):
-                logger.warning("[_persist] State %d in %s has invalid vector, using zero vector", state_idx, centroid.centroid_id)
-                state_vector = np.zeros(1024, dtype=np.float32)
+                raise RuntimeError("[persist_centroid_data] State %d in %s has invalid vector", state_idx, centroid.centroid_id)
             else:
                 state_vector = state.vector
 
-            # MODIFIED: Use single key per state
-            key = f"{centroid.centroid_id}_state{state_idx}"  # MODIFIED
-            npz_dump[key] = state_vector  # MODIFIED
+            # Use single key per state
+            key = f"{centroid.centroid_id}_state{state_idx}" 
+            npz_dump[key] = state_vector 
 
         if not npz_dump:
-            logger.info("[_persist] Centroid %s has no valid vectors, writing single zero vector", centroid.centroid_id)
-            npz_dump["empty"] = np.zeros(1024, dtype=np.float32)
+            raise RuntimeError ("[persist_centroid_data] Centroid %s has no valid vectors", centroid.centroid_id)
 
         # --- Save NPZ safely ---
         try:
@@ -413,16 +552,16 @@ class CentroidSystem:
             if not os.path.exists(tmp_npz):
                 raise RuntimeError(f"NPZ tmp file {tmp_npz} was not created!")
             os.replace(tmp_npz, npz_path)
-            logger.debug("[_persist] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
+            logger.debug("[persist_centroid_data] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
         except Exception as e:
-            logger.error("[_persist] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
+            logger.error("[persist_centroid_data] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
             raise
 
         # --- JSON summary ---
         summary_payload = centroid.serialize()
         for s_idx, s in enumerate(summary_payload["states"]):
             s["metadata"] = dict(s.get("metadata", {}))
-            s["vector"] = f"{npz_path} (state_index={s_idx})"  # MODIFIED: persist NPZ path instead of per-entry vector
+            s["vector"] = f"{npz_path} (state_index={s_idx})"  # persist NPZ path instead of per-entry vector
 
         try:
             with open(tmp_json, "w", encoding="utf-8") as f:
@@ -430,9 +569,9 @@ class CentroidSystem:
                 f.flush()
                 os.fsync(f.fileno())
             os.replace(tmp_json, json_path)
-            logger.debug("[_persist] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
+            logger.debug("[persist_centroid_data] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
         except Exception as e:
-            logger.error("[_persist] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
+            logger.error("[persist_centroid_data] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
             raise
             
     async def create_precentroid(self, entry_ids: List[str]) -> str:
@@ -442,6 +581,9 @@ class CentroidSystem:
         - Enforces SAAJE cannot exist yet
         - Adds default metadata for admin review
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         logger.debug(f"[CREATE_PRECENTROID] Called with entry_ids={entry_ids}")
         await self._assert_ledger_ready()
         # allocate a ledger-backed precentroid suffix
@@ -450,7 +592,7 @@ class CentroidSystem:
         logger.debug(f"[CREATE_PRECENTROID] Allocated centroid_id={cid}")
 
 
-        # --- FIXED: Deduplicate while preserving first-seen order ---
+        # --- Deduplicate while preserving first-seen order ---
         seen = set()
         entry_ids_unique = []
         for eid in entry_ids:                          
@@ -460,7 +602,7 @@ class CentroidSystem:
         entry_ids = entry_ids_unique                    
 
         # prepare deterministic embedding vector
-        vectors = [safe_load_embedding(j) for j in entry_ids]
+        vectors = [safe_load_embedding(j, self.entry_runtime) for j in entry_ids]
         vector = deterministic_mean(vectors)
         logger.debug(f"[CREATE_PRECENTROID] Deterministic mean vector shape: {vector.shape if hasattr(vector,'shape') else 'scalar'}")
 
@@ -475,9 +617,9 @@ class CentroidSystem:
         # attach default metadata for review queue
         metadata = {
             "review_status": "pending",
-            "created_at": datetime.now(timezone.utc).isoformat(),
-            "human_note": "",
-            "human_labels": [],
+            "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
+            "title_from_human_moderator": "",
+            "description_from_human_moderator": [],
         }
 
         
@@ -485,22 +627,25 @@ class CentroidSystem:
         c = Centroid(cid)
         logger.debug(f"[CREATE_PRECENTROID] _centroids keys now: {list(self._centroids.keys())}")
         self._assert_event_order(c, event_index)
-        c.states.append(CentroidState(event_index, entry_ids, vector, saajes=None, metadata=metadata))
+        c.states.append(CentroidState(event_index, entry_ids, vector, metadata=metadata))
         self._centroids[cid] = c
 
         # persist safely
-        await self._persist(c)
+        await self.persist_centroid_data(c)
 
         return cid
 
 
-    async def approve_precentroid(self, precentroid_id: str, *, label: str, nne: str) -> str:
+    async def approve_precentroid(self, precentroid_id: str, *, description_from_human_moderator: str, title_from_human_moderator: str) -> str:
         """
         Approve a precentroid:
         - Ledger-backed approval
         - Converts to a full centroid
         - Archives precentroid state
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         async with self._lock:
             c = self._centroids.pop(precentroid_id, None)
@@ -508,7 +653,7 @@ class CentroidSystem:
                 raise RuntimeError(f"Unknown precentroid {precentroid_id}")
 
             suffix = int(precentroid_id.split("_")[1])
-            await self._ledger.approve_suffix(suffix)
+            await self._ledger.approve_suffix(suffix, kind="centroid")
             new_id = f"centroid_{suffix}"
 
             # assert new centroid is recognized by ledger
@@ -518,33 +663,80 @@ class CentroidSystem:
                 "type": "APPROVE_PRECENTROID",
                 "from": precentroid_id,
                 "to": new_id,
-                "label": label,
-                "nne": nne,
+                "description_from_human_moderator": description_from_human_moderator,
+                "title_from_human_moderator": title_from_human_moderator,
             })
 
+            metadata = {
+                "review_status": "approved",
+                "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
+                "title_from_human_moderator": title_from_human_moderator,
+                "description_from_human_moderator": description_from_human_moderator,
+            }
+
             c.centroid_id = new_id
-            c.label = label
-            c.nne = nne
+            c.description_from_human_moderator = description_from_human_moderator
+            c.title_from_human_moderator = title_from_human_moderator
             self._assert_event_order(c, event_index)
 
-            # preserve embedding & saajes, promote metadata
+            # preserve embedding & promote metadata
+            # Build new metadata snapshot (authoritative for this event)
+            new_metadata = {
+                "review_status": "approved",
+                "most_recent_promotion": datetime.now(timezone.utc).isoformat(),
+                "title_from_human_moderator": title_from_human_moderator,
+                "description_from_human_moderator": description_from_human_moderator,
+            }
+
             c.states.append(CentroidState(
                 event_index,
                 c.current.entry_ids,
                 c.current.vector,
-                c.current.saajes,
-                metadata=c.current.metadata  # retain metadata if needed
+                metadata=new_metadata
             ))
 
             self._centroids[new_id] = c
-            await self._persist(c)
+            await self.persist_centroid_data(c)
 
+            # ------------------------------------------------------------
+            # reasoning_file projection (post-persistence, snapshot-only)
+            # ------------------------------------------------------------
+
+            reasoning_file_graph = await create_reasoning_data_for_centroid_state(
+                centroid_state=c.current,
+                centroid_id=new_id,
+            )
+
+            reasoning_file_turtle = serialize_graph_to_turtle(reasoning_file_graph)
+
+            # optional: persist reasoning_file output somewhere (file/db/cache layer)
+            await persist_reasoning_data(new_id, reasoning_file_turtle)
+            # ------------------------------------------------------------
+
+            logging.info("Reconcile entries metadata nomenclature start")
+            # Reconcile entries.json with approved centroid
+            from core.map.entry_membership_sequencer import reconcile_centroid_membership_after_approval
+
+            await reconcile_centroid_membership_after_approval(
+                centroid_suffix=str(suffix),
+                event_index=event_index,
+                summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
+            )
+
+            logging.info("Archive previous centroid type 'shed skin' start")
             # archive precentroid JSON safely
-            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}.json")
+            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
             try:
                 os.remove(precentroid_path)
             except FileNotFoundError:
-                pass
+                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
+
+            # archive precentroid JSON safely
+            precentroid_path_for_npz = os.path.join(STATE_DIR, f"{precentroid_id}.npz")
+            try:
+                os.remove(precentroid_path_for_npz)
+            except FileNotFoundError:
+                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
 
             return new_id
 
@@ -553,27 +745,20 @@ class CentroidSystem:
         self,
         precentroid_id: str,
         *,
-        similarities: List[float],
         threshold: float,
     ) -> None:
         """
-        Reject a precentroid:
-        - Archives its state
-        - Records REJECT_PRECENTROID ledger event
-        - Safely removes precentroid from runtime state and disk
+        Thin wrapper / thin caller function for the rest of the process, just so that we can easily call
+        this function rather than always remembering to call a specific type of function with minor variations
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
-        async with self._lock:
-            c = self._centroids.pop(precentroid_id, None)
-            if c is None:
-                raise RuntimeError(f"Unknown precentroid {precentroid_id}")
-
-            await self._finalize_precentroid_rejection(
-                precentroid_id=precentroid_id,
-                c=c,
-                similarities=similarities,
-                threshold=threshold,
-            )
+        await self.burst_precentroid(
+            precentroid_id=precentroid_id,
+            threshold=threshold,
+        )
 
     async def burst_precentroid(
         self,
@@ -593,17 +778,20 @@ class CentroidSystem:
         - Assign stricter local similarity threshold to metadata.
         - Finalize rejection and archive burst details.
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         async with self._lock:
             if precentroid_id not in self._centroids:
                 raise RuntimeError(f"Precentroid {precentroid_id} not found")
-
-            # Pop precentroid from runtime
+            
+            # **This is missing in your latest code**
             c = self._centroids.pop(precentroid_id)
             entry_ids = c.current.entry_ids
 
             # Load embeddings safely
-            vectors = np.stack([safe_load_embedding(j) for j in entry_ids])
+            vectors = [safe_load_embedding(j, self.entry_runtime) for j in entry_ids]
 
             # Record burst intent before mutation
             await self._ledger.record_event({
@@ -617,7 +805,6 @@ class CentroidSystem:
                 await self._finalize_precentroid_rejection(
                     precentroid_id=precentroid_id,
                     c=c,
-                    similarities=[],
                     threshold=threshold,
                     extra_archive={
                         "note": "single entry, archived without burst"
@@ -646,7 +833,6 @@ class CentroidSystem:
             await self._finalize_precentroid_rejection(
                 precentroid_id=precentroid_id,
                 c=c,
-                similarities=[],
                 threshold=threshold,
                 extra_archive={
                     "new_precentroids": new_precentroids,
@@ -655,82 +841,139 @@ class CentroidSystem:
             )
 
             return new_precentroids
-
-
-    # ----- drift & split suggestion -----
-
-    async def analyze_and_suggest_split(self, centroid_id: str, threshold: float) -> None:
+            
+    async def _finalize_precentroid_rejection(
+        self,
+        *,
+        precentroid_id: str,
+        c: Centroid,
+        threshold: float,
+        extra_archive: dict,
+    ) -> None:
         """
-        Perform drift analysis on a centroid.
+        Finalize rejection of a precentroid.
 
-        If drift falls below threshold:
-            - Record a SUGGEST_SPLIT ledger event
-            - Persist an atomic suggestion artifact to disk
-
-        This method is:
-            - Deterministic
-            - Ledger-backed
-            - Crash-safe
-            - Replay-auditable
+        Guarantees:
+        - Append terminal state with rejection metadata
+        - Persist final state
+        - Move files to archive
+        - No reintroduction into runtime
         """
 
+        # --- Record rejection event in ledger (distinct, explicit lifecycle event) ---
+        event_index = await self._ledger.record_event({
+            "type": "REJECT_PRECENTROID",
+            "centroid_id": precentroid_id,
+            "failed_threshold": threshold, 
+            "extra_archive": extra_archive,
+        })
+
+        # --- Build final metadata snapshot ---
+        # IMPORTANT: copy to avoid mutating previous state metadata
+        prev_metadata = dict(c.current.metadata or {})
+
+        rejection_metadata = {
+            **prev_metadata,
+            "review_status": "rejected",
+            "rejection_threshold": threshold,
+            **extra_archive,
+        }
+
+        # --- Append terminal state ---
+        self._assert_event_order(c, event_index)
+
+        c.states.append(CentroidState(
+            event_index,
+            c.current.entry_ids,
+            c.current.vector,
+            metadata=rejection_metadata,
+        ))
+
+        # --- Persist final state BEFORE archiving ---
+        await self.persist_centroid_data(c)
+
+        # --- Move files to archive ---
+
+        summary_src = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
+        npz_src = os.path.join(STATE_DIR, f"{precentroid_id}.npz")
+
+        summary_dst = os.path.join(ARCHIVE_DIR, f"{precentroid_id}_summary.json")
+        npz_dst = os.path.join(ARCHIVE_DIR, f"{precentroid_id}.npz")
+
+        if os.path.exists(summary_src):
+            os.replace(summary_src, summary_dst)
+
+        if os.path.exists(npz_src):
+            os.replace(npz_src, npz_dst)
+
+    async def add_entry_to_centroid(
+        self,
+        centroid_id: str,
+        entry_id: str,
+        similarity: float
+    ) -> int:
+        """
+        Adds an entry to an existing centroid.  
+        Recomputes centroid vector, appends a new CentroidState, and records the event.
+
+        Raises:
+            RuntimeError if centroid_id is a precentroid or entry already exists.
+        """
+        from core.map.entry_membership_sequencer import get_embedding_for_entry
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
-
         async with self._lock:
-            if centroid_id not in self._centroids:
-                raise RuntimeError(f"Unknown centroid {centroid_id}")
+            if centroid_id.startswith("precentroid_"):
+                raise RuntimeError("Cannot attach entry to precentroid via this method")
 
+            # fetch current centroid
             c = self._centroids[centroid_id]
-            history = c.states
+            prev_state = c.current
 
-            if len(history) < 2:
-                return
+            # skip duplicates
+            if entry_id in prev_state.entry_ids:
+                raise RuntimeError(f"Entry {entry_id} already exists in {centroid_id}")
 
-            sims = [
-                cosine_similarity(history[i - 1].vector, history[i].vector)
-                for i in range(1, len(history))
-            ]
+            # new list of entry IDs
+            new_entry_ids = sorted(prev_state.entry_ids + [entry_id])
 
-            min_sim = min(sims)
+            # recompute centroid vector
+            vectors = [await get_embedding_for_entry(j) for j in new_entry_ids]
+            vector = deterministic_mean(vectors)
 
-            if min_sim >= threshold:
-                return
+            # update entry → similarity mapping
+            entry_similarity_to_centroid = dict(getattr(prev_state, "entry_similarity_to_centroid", {}))
+            entry_similarity_to_centroid[entry_id] = similarity
 
-            # --- Ledger event (authoritative) ---
+            # record ledger event
             event_index = await self._ledger.record_event({
-                "type": "SUGGEST_SPLIT",
+                "type": "ADD_ENTRY_TO_CENTROID",
                 "centroid_id": centroid_id,
-                "threshold": threshold,
-                "min_similarity": min_sim,
+                "entry_id": entry_id,
+                "similarity": similarity,
             })
 
-            # --- Durable artifact ---
-            os.makedirs(SUGGESTIONS_DIR, exist_ok=True)
+            self._assert_event_order(c, event_index)
 
-            payload = {
-                "event_index": event_index,
-                "centroid_id": centroid_id,
-                "label": c.label,
-                "nne": c.nne,
-                "similarities": sims,
-                "threshold": threshold,
-                "min_similarity": min_sim,
-            }
-
-            final_path = os.path.join(
-                SUGGESTIONS_DIR,
-                f"{centroid_id}_split_{event_index}.json",
+            # append new state
+            c.states.append(
+                CentroidState(
+                    event_index=event_index,
+                    entry_ids=new_entry_ids,
+                    vector=vector,
+                    metadata={**prev_state.metadata, "entry_similarity_to_centroid": entry_similarity_to_centroid}
+                )
             )
-            tmp_path = final_path + ".tmp"
 
-            with open(tmp_path, "w", encoding="utf-8") as f:
-                json.dump(payload, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
+            # persist to disk
+            await self.persist_centroid_data(c)
+            return event_index 
 
-            os.replace(tmp_path, final_path)
 
-    
+
+
     # ----- review projection & admin utilities -----
 
     async def build_review_queue(self) -> list[dict]:
@@ -754,7 +997,7 @@ class CentroidSystem:
                 metadata = getattr(c.current, "metadata", {})
                 if not isinstance(metadata, dict):
                     metadata = {}
-                    c.current.metadata = metadata  # optional: patch runtime state
+                    c.current.metadata = metadata
 
                 # Default review status for precentroids
                 review_status = metadata.get("review_status")
@@ -766,29 +1009,30 @@ class CentroidSystem:
                     continue
 
                 # Default frontend fields
-                human_note = metadata.get("human_note", "")
-                human_labels = metadata.get("human_labels", [])
-                created_at = metadata.get("created_at") or None
+                title_from_human_moderator = metadata.get("title_from_human_moderator", "")
+                description_from_human_moderator = metadata.get("description_from_human_moderator", [])
+                most_recent_promotion = metadata.get("most_recent_promotion") or None
                 summary = metadata.get("summary") or f"{len(c.current.entry_ids)} entry(s) attached."
 
                 queue.append({
-                    "id": centroid_id,
-                    "type": "precentroid" if centroid_id.startswith("precentroid_") else "centroid",
-                    "summary": summary,
-                    "meta": {
-                        "entry_count": len(c.current.entry_ids),
-                        "label": getattr(c, "label", None),
-                        "nne": getattr(c, "nne", None),
-                        **metadata,  # includes human_note, human_labels, created_at, etc.
-                    },
-                    "status": review_status,
-                    "human_note": human_note,
-                    "human_labels": human_labels,
-                    "created_at": created_at,
-                })
+                        "id": centroid_id,
+                        "type": "precentroid" if centroid_id.startswith("precentroid_") else "centroid",
+                        "summary": summary,
+                        "meta": {
+                            "entry_count": len(c.current.entry_ids),
+                            "entry_ids": list(c.current.entry_ids),
+                            "description_from_human_moderator": getattr(c, "description_from_human_moderator", None),
+                            "title_from_human_moderator": getattr(c, "title_from_human_moderator", None),
+                            **metadata,
+                        },
+                        "status": review_status,
+                        "title_from_human_moderator": title_from_human_moderator,
+                        "description_from_human_moderator": description_from_human_moderator,
+                        "most_recent_promotion": most_recent_promotion,
+                    })
 
             # Optional: sort queue by creation time for deterministic ordering
-            queue.sort(key=lambda x: x.get("created_at") or "", reverse=False)
+            queue.sort(key=lambda x: x.get("most_recent_promotion") or "", reverse=False)
 
             logger.info(f"Built review queue with {len(queue)} items.")
             return queue
@@ -814,3 +1058,4 @@ class CentroidSystem:
             raise TypeError(f"Expected a callable, got {type(func)}: {func}")
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
+

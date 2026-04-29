@@ -1,57 +1,318 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 202601012209
+# save-state 2026-04-25T23:29:55-04:00
 # ==========================================
+import os
+import json
+import asyncio
+from typing import List, Dict, Any
+import hashlib
+import re as regex
+import uuid
+
+from datetime import datetime, timezone
+from rdflib import Graph
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from typing import List, Dict, Any
-from core.map import centroids
-from core.map import admin_review_helpers as review
+from pydantic import BaseModel, Field
+from pathlib import Path
 
+from core.map.mapping_runtime import centroid_system
+from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
+from core.map.perist_reasoning_data import (
+    create_reasoning_data_from_heuristic,
+    serialize_graph_to_turtle,
+    persist_reasoning_data,
+    concept_exists
+)
+
+# Initialize router with proper prefix and tags
 router = APIRouter(prefix="/admin", tags=["admin-review"])
 templates = Jinja2Templates(directory="app/templates")
 
-# ---------------- Page ----------------
-@router.get("", response_class=HTMLResponse)
-async def admin_review_page(request: Request):
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
+HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
+os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
+
+# -----------------------------
+# Pydantic Models
+# -----------------------------
+class ApprovePrecentroidPayload(BaseModel):
+    id: str
+    description_from_human_moderator: str
+    title_from_human_moderator: str
+
+
+class RejectPrecentroidPayload(BaseModel):
+    id: str
+
+
+class EntriesSafeTextPayload(BaseModel):
+    entry_ids: List[str] = Field(..., description="List of entry IDs to fetch safe_text")
+
+class CreateHeuristicPayload(BaseModel):
+    givens: List[str]
+    outputs: List[Dict[str, Any]]  # {concept, likelihood, justification?}
+# -----------------------------
+# Admin HTML Dashboard Route
+# -----------------------------
+@router.get("/", response_class=HTMLResponse)
+async def review_dashboard(request: Request):
+    """
+    Render the admin review dashboard page with Jinja template.
+    """
     return templates.TemplateResponse("admin-review.html", {"request": request})
 
-# ---------------- Queue JSON ----------------
-@router.get("/review-queue-json")
-async def get_review_queue_json():
-    # Ensure queue is initialized
-    await review.initialize_review_queue()
-    items = await review.list_review_queue(status="pending")
 
-    out = []
-    for r in items:
-        # Determine card type
-        if r["suggestion_type"] == "new_centroid":
-            card_type = "precentroid"
-        elif r["suggestion_type"] == "split_centroid":
-            card_type = "split_suggestion"
+# -----------------------------
+# Review Queue & Precentroid Endpoints
+# -----------------------------
+@router.get("/review-queue")
+async def get_review_queue():
+    """
+    Retrieve all centroids/precentroids pending human review as JSON.
+    """
+    return await centroid_system.build_review_queue()
+
+
+@router.post("/approve-precentroid")
+async def approve_precentroid(payload: ApprovePrecentroidPayload):
+    """
+    Approve a precentroid and convert it into a full centroid.
+    """
+    new_id = await centroid_system.approve_precentroid(
+        payload.id,
+        description_from_human_moderator=payload.description_from_human_moderator,
+        title_from_human_moderator=payload.title_from_human_moderator
+    )
+    return {"status": "ok", "new_id": new_id}
+
+
+@router.post("/reject-precentroid")
+async def reject_precentroid(payload: RejectPrecentroidPayload):
+    """
+    Reject a precentroid.
+    """
+    await centroid_system.reject_precentroid(
+        payload.id,
+        threshold=BURST_PRECENTROID_STARTING_THRESHOLD
+    )
+    return {"status": "ok"}
+
+
+# -----------------------------
+# Entry Safe Text Fetch (async + caching)
+# -----------------------------
+ENTRIES_FILE = os.path.join("data", "entries", "entries.json")
+ENTRIES_INDEX: List[Dict] = []
+
+
+async def load_entries_index() -> List[Dict]:
+    """
+    Async load all entries from JSON file into memory.
+    Returns list of dicts (entries).
+    """
+    global ENTRIES_INDEX
+    if ENTRIES_INDEX:
+        return ENTRIES_INDEX
+
+    try:
+        loop = asyncio.get_event_loop()
+        data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
+        if isinstance(data, list):
+            ENTRIES_INDEX = data
         else:
-            card_type = "unknown"
+            ENTRIES_INDEX = []
+    except Exception:
+        ENTRIES_INDEX = []
 
-        # Construct summary from first sample if available
-        samples = r.get("samples", [])
-        summary = samples[0] if samples else r.get("human_note") or "No summary available."
+    return ENTRIES_INDEX
 
-        # Build meta dictionary
-        meta = {
-            "centroid_id": r["centroid_id"],
-            "metrics": r.get("metrics", {}),
-            "status": r["status"],
-            "human_labels": r.get("human_labels", []),
-            "created_at": r.get("created_at"),
-        }
 
-        out.append({
-            "id": r["suggestion_id"],
-            "type": card_type,
-            "summary": summary,
-            "meta": meta
+async def find_entry_by_id(entry_id: str) -> Dict:
+    """
+    Search loaded entries for a given entry_id.
+    Returns dict or empty dict if not found.
+    """
+    entries = await load_entries_index()
+    for entry in entries:
+        if entry.get("entry_id") == entry_id:
+            return entry
+    return {}
+
+
+@router.post("/entries-safe-text")
+async def get_entries_safe_text(payload: EntriesSafeTextPayload):
+    """
+    Given a list of entry_ids, return their safe_text for human moderation.
+    """
+    results = []
+    for eid in payload.entry_ids:
+        entry = await find_entry_by_id(eid)
+        results.append({
+            "entry_id": eid,
+            "safe_text": entry.get("safe_text", "")
         })
 
-    return out
+    return {"entries": results}
+
+def normalize_concept(s: str) -> str:
+    if not s:
+        return ""
+
+    s = s.strip().lower()
+
+    # centroid alias → canonical id form
+    # handles BOTH "centroid 6" and "centroid6"
+    if s.startswith("centroid"):
+        s = regex.sub(r"centroid\s*(\d+)", r"centroid_\1", s)
+        return s
+
+    # label normalization
+    # collapse punctuation + normalize whitespace
+    s = regex.sub(r"[^a-z0-9_\s]", "", s)
+    s = regex.sub(r"\s+", " ", s).strip()
+    return s
+
+def extract_concept_id(value: str) -> str:
+    """
+    Converts:
+    'label (concept_from_heuristic:cfh_2026...)'
+    → 'concept_from_heuristic:cfh_2026...'
+
+    If no parentheses, returns original string.
+    """
+    match = regex.search(r"\(([^)]+)\)$", value)
+    return match.group(1) if match else value
+
+@router.post("/create-heuristic")
+async def create_heuristic(payload: CreateHeuristicPayload):
+    if not payload.givens or not payload.outputs:
+        raise HTTPException(status_code=400, detail="Missing givens or outputs")
+
+    cleaned_givens = [extract_concept_id(g.strip()) for g in payload.givens]
+
+    cleaned_outputs = []
+    for o in payload.outputs:
+        concept = extract_concept_id(o.get("concept", "").strip())
+
+        if not concept:
+            raise HTTPException(status_code=400, detail="Output concept missing")
+
+        likelihood = o.get("likelihood", 0)
+
+        try:
+            likelihood = float(likelihood)
+        except:
+            raise HTTPException(status_code=400, detail="Invalid likelihood")
+
+        if likelihood > 1:
+            likelihood = likelihood / 100.0
+        if likelihood < 0:
+            likelihood = 0.0
+
+        cleaned_outputs.append({
+            "concept": concept,
+            "likelihood": float(likelihood),
+            "justification": o.get("justification")
+        })
+
+    heuristic = {
+        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
+        "givens": cleaned_givens,
+        "outputs": cleaned_outputs
+    }
+
+    # persist heuristic log (unchanged)
+    if os.path.exists(HEURISTICS_FILE):
+        with open(HEURISTICS_FILE, "r") as f:
+            data = json.load(f)
+    else:
+        data = []
+
+    data.append(heuristic)
+
+    with open(HEURISTICS_FILE, "w") as f:
+        json.dump(data, f, indent=2)
+
+    heuristic_description = " | ".join(cleaned_givens)
+
+    # ============================================================
+    # NEW BEHAVIOR: ONE OUTPUT → ONE GRAPH → ONE TTL FILE
+    # ============================================================
+    for o in cleaned_outputs:
+        concept_id = o["concept"]
+
+        dt = datetime.now(timezone.utc)
+        file_id = f"{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
+
+        # IMPORTANT: each output gets its own isolated graph
+        g = Graph()
+
+        already_exists = concept_exists(
+            label=concept_id,
+            description=heuristic_description
+        )
+
+        if not already_exists:
+            create_reasoning_data_from_heuristic(
+                g,
+                heuristic_id=heuristic["heuristic_id"],
+                concept_id=concept_id,
+                file_id=file_id,
+                label=concept_id,
+                description=heuristic_description
+            )
+        else:
+            # concept already exists → skip TTL creation entirely
+            continue
+
+        # nothing to serialize if we didn't add anything
+        if len(g) == 0:
+            continue
+
+        turtle = serialize_graph_to_turtle(g)
+
+        await persist_reasoning_data(
+            file_id,
+            turtle
+        )
+
+    return {"status": "ok", "heuristic": heuristic}
+
+@router.get("/concepts")
+async def get_concepts():
+    """
+    Return list of concepts from TTL files for autocomplete.
+    Each item includes:
+    - id
+    - label (human-readable)
+    """
+
+    concepts = []
+    ttl_dir = Path("data/reasoning")
+
+    if not ttl_dir.exists():
+        return {"concepts": []}
+
+    for file in ttl_dir.glob("*.ttl"):
+        text = file.read_text(encoding="utf-8")
+
+        urn_match = regex.search(
+            r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
+            text
+        )
+
+        label_match = regex.search(r'rdfs:label\s+"([^"]+)"', text)
+        
+        if urn_match and label_match:
+            cid = urn_match.group(1)
+            label = label_match.group(1).strip()
+
+            concepts.append({
+                "id": cid,
+                "label": label
+            })
+
+    return {"concepts": concepts}

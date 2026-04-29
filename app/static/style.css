@@ -1,4 +1,7 @@
-/* ---------------------- PeriDocs-code/app/static/style.css  - save-state 2026-03-21T20:40:30-04:00 ---------------------- */
+/* ---------------------- 
+PeriDocs/app/static/style.css 
+save-state 2026-04-23T14:35:37-04:00 
+---------------------- */
 
 /* ---------------------- Fonts ---------------------- */
 @font-face{font-family:'Cabinet Grotesk';font-weight:100;src:url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff2') format('woff2'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.woff') format('woff'),url('/static/CabinetGrotesk_Complete/Fonts/WEB/fonts/CabinetGrotesk-Thin.ttf') format('truetype');}
@@ -459,6 +462,7 @@ html[data-theme='dark'] .brand-logo {
   align-items: center;
   gap: 1rem;
   font-size: 0.9rem;
+  transform: translateY(10px);
 }
 
 /* Hamburger toggle */

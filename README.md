@@ -13,7 +13,7 @@ Users may actively choose to rigorously describe their perspective of the world,
 
 1. Install Homebrew (if not already installed):
 
-   ```bash (Terminal)
+```bash (Terminal)
    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
@@ -36,7 +36,7 @@ Official site: [https://brew.sh](https://brew.sh)
 
 ---
 
-#### For Linux (Ubuntu/Debian-based)
+#### For Linux (OpenSUSE is preferred for its backups and OS-level version control)
 
 1. Update and install dependencies:
 
@@ -82,11 +82,11 @@ Official site: [https://brew.sh](https://brew.sh)
 
 ### Step 1. Clone the Repository
 
-Choose a folder to hold the project (for example, Desktop/ or Documents/ or PeriDocs-code/).
+Choose a folder to hold the project (for example, PeriDocs/).
 
 ```bash
 git clone https://github.com/Stays7339/PeriDocs.git
-cd PeriDocs-code
+cd PeriDocs
 ```
 
 > Note: This repository should remain set to private. Only collaborators with access can clone it or pull from it.
@@ -141,14 +141,13 @@ Create a `.env` file in the project root with your local keys:
 
 ```
 PERIDOCS_AES_KEY=your-secret-key
-ADMIN_TOKEN=your-admin-token
 ```
 
 > Do **not** commit `.env` to GitHub.
 
 For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
-You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs-code`
+You **should** put a file simply titled `.gitignore` directly within the first level of the root folder `PeriDocs`
 The .gitignore file should exist with no characters before the `.`, and within the `.gitignore` file, all of the following should be included:
 
 # Important: check what is *CRUCIAL* to add into .gitignore before continuing
@@ -295,21 +294,22 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-03-24T18:05:30-04:00
+## Canonical Project Directory as of 2026-04-29T01:57:10-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
-PeriDocs-code/                         # Root project folder
+PeriDocs/                         # Root project folder
 │
 ├─ app/                                # Backend + frontend application code
 │  │
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
 │  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  └─  top_matches.py                # API-ready top matches + JSON-safe outputs
-│  │
+│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│  │  └─ __pycache__/  
 │  │
 │  │
 ├─ routes/
@@ -321,7 +321,8 @@ PeriDocs-code/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
-│  │  ├─ admin-review.js                 # Allows humans to dictate what counts and what doesn't with centroids and semantic auto-groups
+│  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
+│  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ favicon.png
 │  │  ├─ peridocs-logo-v1-white.png
@@ -332,52 +333,68 @@ PeriDocs-code/                         # Root project folder
 │  │  ├─ peridocs-wordmark-and-logo-202602232100.png
 │  │  ├─ peridocs-wordmark-and-logo-202602232133.png
 │  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
+│  │  ├─ [a few more as the logo has been marginally iterated upon]
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
-│  ├─ templates/                        # Jinja2 HTML templates
-│  │  ├─ about.html                     # About page template
-│  │  ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
-│  │  ├─ base.html                      # Layout template
-│  │  ├─ index.html                     # Main homepage template
-│  │  ├─ privacy.html                   # Privacy policy page template
-│  │  ├─ submit-success.html            # Submission success page template
-│  │  ├─ terms-of-service.html          # Terms of Service page template
-│  │  └─ includes/                      # Partial web-page templates
-│  │      ├─ modal-crisis.html
-│  │      └─ modal-feedback.html
-│  │
-│  │
-│  └─ __pycache__/                       # Python compiled bytecode cache
+│  └─ templates/                        # Jinja2 HTML templates
+│   ├─ about.html                     # About page template
+│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
+│   ├─ base.html                      # Layout template
+│   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
+│   ├─ index.html                     # Main homepage template
+│   ├─ privacy.html                   # Privacy policy page template
+│   ├─ submit-success.html            # Submission success page template
+│   ├─ terms-of-service.html          # Terms of Service page template
+│   └─ includes/                      # Partial web-page templates
+│      ├─ modal-crisis.html
+│      └─ modal-feedback.html
+│
+│
 │
 ├─backups-for-the-main-data-folder
 │   └─peridocs_backup_[YYYY]-[MM]-[DD]T[HH]-[mm]-[ss]Z.zip
+│
+│
+│
 ├─ core/
 │   ├─ map/
-│   │   ├─ admin_review_helpers.py        # The Moderation Layer - logic for creating a dashboard for human administrators at PeriDocs.
+│   │   ├─ __init__.py                    # to avoid having to redfine the same value everywhere, this is being used as a config file for this specific package
 │   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
-│   │   └─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
+│   │   ├─ mapping_runtime.py             # The Instantiation Boundary - Prevents against excessive coupling, repo fragility, and code sprawl.
+│   │   ├─ perist_reasoning_data.py       # Used so that we can switch between JSON and TTL files for the sake of helping for ontology quieries.
+│   │   ├─ subregion_detector.py          # Used to detect areas of notable density inside of what's defined as technically one centroids. That way, the system has the ability to lightly suggest the potential of multiple centroids being made from that larger conglomerate of a given centroid.
+│   │   └─ __pycache__/
 │   │
-│   │
-│   │
-│   └─ nlp/
-│      ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
-│      ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
-│      ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
-│      ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
-│      ├─ embeddings.py                   # Manages all encryption, SentenceTransformer model, embedding computation, and caching.
-│      ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
-│      ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
-│      ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
-│      └─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding, centroid assignment, crisis check.
-│
-│
-│
+│   ├─  nlp/
+│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
+│   |   ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
+│   |   ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
+│   |   ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
+│   |   ├─ embeddings.py                   # Manages all encryption, SentenceTransformer model, embedding computation, and caching.
+│   |   ├─ hash_utils.py                   # Generates SHA hashes for unique IDs and text integrity tracking.
+│   |   ├─ orthography.py                  # Dictates choices for norms of spelling, punctuation, boundaries of phrases, capitalization, hyphenation, etc.
+│   |   ├─ pii.py                          # redact_pii, pattern library for emails, phone numbers, addresses, etc.
+│   |   ├─ process_entry.py                # Orchestrates NLP workflow per journal entry: embedding centroid assignment, crisis check.
+│   |   └─ __pycache__/
+│   | 
+│   | 
+│   └─ reasoning/
+│           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
+│           ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
+│           ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
+│           ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
+│           ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
+│           ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
+│           ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
+│           └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│ 
+│           
 │
 ├─ data/                                  # Local data storage
 │  ├─ centroids/
@@ -387,7 +404,11 @@ PeriDocs-code/                         # Root project folder
 │  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
 │  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
+│  ├─ reasoning_data/                        # Stored entries
+│  │   ├─ heuristics.json
+│  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
 │  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
@@ -427,19 +448,13 @@ PeriDocs-code/                         # Root project folder
 │
 │
 │
-├─ test-and-debug/                     
-│    ├─ debug_embeddings.py             # Debugging for running emebeddings only, not the full suite
-│    ├─ test_crisis_flag_detection.py   # Testing benchmarks for crisis detection
-│    ├─ test_dsmx.py                    # OBSOLETE
-│    ├─ test_embeddings_similarity.py   # now contains multi-faceted embedding similarity analysis
-│    ├─ test_mps.py                     # testing for Apples GPUs, NVIDIA GPUs, and CPUs from AMD and Intel.
-│    └─ test_pipeline.py                # Comprehensive test suite for NLP pipeline modules (unit + integration).
 │
 ├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
+├─ list_the_table_of_contents_for_this_npz_file.py
 ├─ requirements.txt          # Pinned Python dependencies
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 ```
@@ -453,7 +468,7 @@ PeriDocs-code/                         # Root project folder
 ## Notes
 
 * The `--reload` flag automatically restarts the server when code changes.
-* `data/entries.json` is intentionally ignored by Git for local user data.
+* `data/` is intentionally ignored by Git for local user data.
 * Virtual environment: `venv/` (excluded from Git since it only is used to install libraries and and just run the code once until deleted. PeriDocs proprietary code is not stored in `venv/` and libraries can be redownloaded from their third-party severs with ```pip install -r requirements.txt``` )
 
 ## Miscellaneous FAQ

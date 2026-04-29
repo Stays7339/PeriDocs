@@ -1,76 +1,27 @@
-{# PeriDocs-code/app/templates/admin-review.html save-state 202602251923 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-04-24T14:04:00-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
 {% block content %}
-<div class="card admin-review-card">
-  <div class="card-content">
-    <h1>Centroid Review Dashboard</h1>
-
-    {% if flash %}
-      <div class="flash-message">{{ flash }}</div>
-    {% endif %}
-
-    <!-- ---------------- Swiping Card Interface ---------------- -->
-    <div id="review-card-container" class="swipe-card">
-      <h2 id="card-title">Loading...</h2>
-      <p id="card-summary"></p>
-
-      <!-- Meta info -->
-      <ul id="card-meta"></ul>
-
-      <!-- Editable human note -->
-      <div id="card-note-container" style="display:none; margin-top:1em;">
-        <label for="card-note">Reviewer Note:</label>
-        <textarea id="card-note" class="note-input" data-max="1000"></textarea>
-        <div id="note-count" class="char-counter">0 / 1000 chars</div>
-      </div>
-
-      <!-- Editable human labels -->
-      <div id="card-label-container" style="display:none; margin-top:1em;">
-        <label for="card-labels">Labels (comma-separated):</label>
-        <input type="text" id="card-labels" class="label-input" data-max="100" />
-        <div id="label-count" class="char-counter">0 / 100 chars</div>
-      </div>
-
-      <div id="card-details" style="display:none; margin-top:1em;"></div>
-
-      <div class="card-actions" style="margin-top:1em;">
-        <button id="read-more-btn" class="btn primary">Read more</button>
-        <button id="approve-btn" class="btn primary">Approve</button>
-        <button id="reject-btn" class="btn primary">Reject</button>
-      </div>
-    </div>
-
-    <hr>
-
-    <div id="queue-stats">
-      <p>Loading review queue stats...</p>
-    </div>
-
-    <!-- ---------------- Character counter script ---------------- -->
-    <script>
-      function attachCharCounters() {
-        const noteEl = document.getElementById("card-note");
-        const noteCount = document.getElementById("note-count");
-        if(noteEl && noteCount){
-          noteEl.addEventListener("input", ()=> {
-            noteCount.textContent = noteEl.value.length + " / " + noteEl.dataset.max + " chars";
-          });
-        }
-        const labelEl = document.getElementById("card-labels");
-        const labelCount = document.getElementById("label-count");
-        if(labelEl && labelCount){
-          labelEl.addEventListener("input", ()=> {
-            labelCount.textContent = labelEl.value.length + " / " + labelEl.dataset.max + " chars";
-          });
-        }
-      }
-      document.addEventListener("DOMContentLoaded", attachCharCounters);
-    </script>
-
-    <!-- ---------------- Include admin_review.js ---------------- -->
-    <script src="/static/admin_review.js" defer></script>
-  </div>
+<div class="card">
+  <h1>Review Queue</h1>
+  <div id="review-list" class="card-content"></div>
 </div>
+
+<div class="card">
+  <h2>Create Heuristic</h2>
+
+  <div id="givens-container"></div>
+  <button class="btn" onclick="addGiven()">+ Add Given</button>
+
+  <hr>
+
+  <div id="outputs-container"></div>
+  <button class="btn" onclick="addOutput()">+ Add Output</button>
+
+  <br><br>
+  <button class="btn primary" onclick="submitHeuristic()">Submit</button>
+
+</div>
+<script src="/static/admin_review_ux.js" defer></script>
 {% endblock %}

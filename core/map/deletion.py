@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-03-19T16:46:30-04:00
+# Save-state: 2026-04-28T14:49:45-04:00
 # ==========================================
 
 """
@@ -21,15 +21,18 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 import numpy as np
-
-from core.map.ledger import IdentifierLedger
 from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
+from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
+from app.helpers.entry_writing_runtime import EntryWritingRuntime
+# importing class definitions, rather than the injection itself; both are necessary; injections are further on.
+# if importing is considered using vocabulary, in this case, then injections are like using an exact physical object.
 
-logger = logging.getLogger("peridocs.deletion")
+
+logger = logging.getLogger(__name__)
 
 
 class DeletionManager:
@@ -46,15 +49,15 @@ class DeletionManager:
         *,
         ledger: IdentifierLedger,
         centroids: CentroidSystem,
+        entry_runtime: EntryWritingRuntime
     ):
         self._ledger = ledger
         self._centroids = centroids
+        self._entry_runtime = entry_runtime
+        
 
-    # ------------------------------------------------------------
-    # SAAJE REMOVAL
-    # ------------------------------------------------------------
-
-    async def remove_saaje(
+    
+    async def unlink_entry_from_centroid(
         self,
         *,
         centroid_id: str,
@@ -77,25 +80,28 @@ class DeletionManager:
             c = self._centroids._centroids[centroid_id]
             prev = c.current
 
-            if entry_id not in prev.saajes:
-                raise RuntimeError("SAAJE not present")
+            # NO-OP CHECK (effect-based)
+            if entry_id not in prev.entry_ids:
+                return
 
             # recompute membership
             entry_ids = [j for j in prev.entry_ids if j != entry_id]
 
-            if not entry_ids:
-                raise RuntimeError(
-                    f"Cannot remove last entry from centroid {centroid_id}"
+            last_vector = prev.vector  # preserve prior state
+
+            if entry_ids:
+                vectors = [safe_load_embedding(j) for j in entry_ids]
+                vector = deterministic_mean(vectors)
+            else:
+                logger.info(
+                    f"Final remaining plain text entry for {centroid_id} deleted in best effort to stay consistent with data privacy laws."
                 )
+                vector = last_vector
 
-            vectors = [safe_load_embedding(j) for j in entry_ids]
-            vector = deterministic_mean(vectors)
-
-            saajes = dict(prev.saajes)
-            del saajes[entry_id]
+            metadata = dict(prev.metadata)
 
             event_index = await self._ledger.record_event({
-                "type": "REMOVE_SAAJE",
+                "type": "UNLINK_ENTRY",
                 "centroid_id": centroid_id,
                 "entry_id": entry_id,
             })
@@ -105,13 +111,13 @@ class DeletionManager:
             c.states.append(
                 type(prev)(
                     event_index,
-                    sorted(entry_ids),
+                    entry_ids,
                     vector,
-                    saajes,
+                    metadata,
                 )
             )
 
-            await self._centroids._persist(c)
+            await self._centroids.persist_centroid_data(c)
 
     # ------------------------------------------------------------
     # GLOBAL ENTRY REMOVAL (CENTROID LAYER)
@@ -134,11 +140,16 @@ class DeletionManager:
         removed: Dict[str, List[str]] = {}
 
         async with self._centroids._lock:
+            # Take all centroids currently loaded in memory and iterates through each one.
+            # It does not pre-filter, and it does not use an index.
+            # It brute force checks every centroid. 
+            # This is to remain compliant with data privacy laws as best as possible, 
+            # even if the cenetroid assignment is buggy.
             centroids_list = list(self._centroids._centroids.values())
 
         for c in centroids_list:
             if entry_id in c.current.entry_ids:
-                await self._remove_entry_from_centroid(
+                await self.unlink_entry_from_centroid(
                     centroid_id=c.centroid_id,
                     entry_id=entry_id,
                 )
@@ -157,131 +168,40 @@ class DeletionManager:
         token_hash: str,
         data_dir: str,
     ) -> Dict[str, List[str]]:
-        """
-        Canonical entry deletion sequence.
-
-        Order:
-        1. Record DELETE_entry ledger event
-        2. Remove from centroids
-
-        Crash-safe.
-        Replay-consistent.
-        """
 
         await self._centroids._assert_ledger_ready()
 
-        # --- Ledger first ---
-        await self._ledger.record_event({
-            "type": "DELETE_entry",
-            "entry_id": entry_id,
-        })
-
-        # --- Remove centroid membership ---
+        # ------------------------------------------------------------
+        # STEP 1: REMOVE FROM CENTROIDS
+        # ------------------------------------------------------------
         affected = await self.remove_entry_globally(entry_id=entry_id)
 
-        logger.info(
-            f"entry {entry_id} deleted. Affected centroids: {list(affected.keys())}"
-        )
+        if not affected:
+            logger.warning(
+                f"[DELETE_ENTRY] No centroids contained entry {entry_id} (no-op or already missing)."
+            )
+        else:
+            logger.info(
+                f"[DELETE_ENTRY] Entry {entry_id} removed from centroids: {list(affected.keys())}"
+            )
 
-        await self._purge_entry_metadata(
+        # ------------------------------------------------------------
+        # STEP 2: PURGE METADATA
+        # ------------------------------------------------------------
+        purge_result = await self._entry_runtime.purge_entry_metadata(
             entry_id=entry_id,
             token_hash=token_hash,
-            data_dir=data_dir
         )
 
+        # IMPORTANT: purge_result must be a boolean for this to be meaningful
+        if purge_result:
+            await self._ledger.record_event({
+                "type": "DELETE_ENTRY",
+                "entry_id": entry_id,
+            })
+        else:
+            logger.warning(
+                f"[DELETE_ENTRY] Entry {entry_id} metadata purge did NOT complete or no-op."
+            )
+
         return affected
-
-    async def _purge_entry_metadata(
-        self,
-        *,
-        entry_id: str,
-        token_hash: str,
-        data_dir: str,
-    ) -> None:
-        """
-        Strip a single entry down to only minimal surviving fields:
-        entry_id, embedding_file, crisis_flag.
-        All other fields are removed from this entry only.
-        Other entries in the file are untouched.
-        """
-
-        path = os.path.join(data_dir, "entries", "entries.json")
-
-        if not os.path.exists(path):
-            # Nothing to do if the file does not exist
-            return
-
-        # --- Load all entries ---
-        with open(path, "r", encoding="utf-8") as f:
-            try:
-                entries = json.load(f)
-            except json.JSONDecodeError:
-                logger.error("entries.json is corrupted, cannot purge metadata.")
-                return
-
-        if not isinstance(entries, list):
-            logger.error("entries.json must contain a list of entries.")
-            return
-
-        # --- Locate the target entry ---
-        target = None
-        for entry in entries:
-            if entry.get("delete_token_hash") == token_hash:
-                target = entry
-                break
-
-        if not target:
-            logger.warning("Entry with matching delete_token_hash not found during metadata purge.")
-            return
-
-        # --- Strip all fields except minimal surviving ones ---
-        stripped = {
-            "entry_id": target.get("entry_id") or target.get("id"),
-            "embedding_file": target.get("embedding_file"),
-            "crisis_flag": target.get("crisis_flag"),
-        }
-
-        # Replace the original entry with stripped version
-        index = entries.index(target)
-        entries[index] = stripped
-
-        # --- Write back full entries list safely ---
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(entries, f, ensure_ascii=False, indent=2)
-
-        logger.info(f"Entry {entry_id} metadata purged successfully. only minimal fields remain.")
-    
-    async def _remove_entry_from_centroid(
-        self,
-        *,
-        centroid_id: str,
-        entry_id: str,
-    ) -> None:
-        """
-        Remove an entry from a centroid safely.
-        """
-        try:
-            async with self._centroids._lock:
-                c = self._centroids._centroids.get(centroid_id)
-                if not c:
-                    logger.warning(f"Centroid {centroid_id} not found")
-                    return
-
-                prev = c.current
-                entry_ids = [e for e in prev.entry_ids if e != entry_id]
-
-                if not entry_ids:
-                    logger.warning(f"Cannot remove last entry from centroid {centroid_id}")
-                    return
-
-                vectors = [safe_load_embedding(e) for e in entry_ids]
-                vector = deterministic_mean(vectors)
-
-                c.states.append(
-                    type(prev)(prev.event_index + 1, entry_ids, vector)
-                )
-
-                await self._centroids._persist(c)
-
-        except Exception as e:
-            logger.exception(f"Failed to remove {entry_id} from centroid {centroid_id}: {e}")
