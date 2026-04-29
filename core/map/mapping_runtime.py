@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-04-27T02:19:45-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-04-28T21:59:05-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -27,27 +27,37 @@ ARCHIVE_DIR = os.path.join(DATA_DIR, "archive")
 # ---------------------------------------------------------------------
 
 _ledger = IdentifierLedger()
-_centroid_system = CentroidSystem(_ledger)
 _entry_runtime = EntryWritingRuntime(_ledger)
+_centroid_system = CentroidSystem(_ledger, _entry_runtime)
 
-# inject after construction
-_centroid_system.entry_runtime = _entry_runtime
+
 # (_ledger) is used so that if integrity fails, you can trace causality directly:
 # “ledger state caused entry validation failure” 
 # rather than: “some global singleton state was inconsistent somewhere”
 
 
 _initialized: bool = False
+_runtime_ready: bool = False  
+_boot_in_progress: bool = False
 
 
 ledger = _ledger
 centroid_system = _centroid_system
 entry_runtime = _entry_runtime
-
+"""
+# We're redefining here so that we can add in additional functions 
+# if we'd in the future, without needing to find and replace the variable.
+"""
 
 # ---------------------------------------------------------------------
 # Initialization
 # ---------------------------------------------------------------------
+
+def is_runtime_ready() -> bool:
+    return _runtime_ready
+
+def is_runtime_starting() -> bool:
+    return _boot_in_progress
 
 async def initialize_runtime(force_reload: bool = False, verify: bool = False) -> None:
     """
@@ -72,53 +82,45 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     Safe to call multiple times.
     """
 
-    global _initialized
+    global _initialized, _runtime_ready, _boot_in_progress
 
     if _initialized and not force_reload:
-        logger.info("Mapping runtime already initialized.")
         return
 
-    logger.info("Initializing mapping runtime...")
-    logger.info("Centroids loaded: %s", list(centroid_system._centroids.keys()))
+    _boot_in_progress = True
 
     # Load ledger into memory
     await ledger.load()
 
-    # Reconstruct centroid state from disk
-    await centroid_system.load_state()
-
-    # --- VERIFY centroids against ledger ---
-    try:
-        await ledger.verify_runtime_state(centroid_system)
-        # Startup-level integrity check (JSON/NPZ)
-        await centroid_system._verify_integrity_on_startup()
-    except Exception as e:
-        logger.error("[initialize_runtime] Centroid/Ledger mismatch or file integrity failure: %s", e)
-        # Flush user entries safely here if needed (optional)
-        # For a non-literal skeletal example: await entry.flush_pending_entries()
-        raise RuntimeError("Mapping runtime startup aborted due to integrity failure")
-
-    # Preload burst/split suggestions
-    await centroid_system._load_split_suggestions()
-
+    # entries should always load before centroids, since centroids are derived from entries
+    await entry_runtime.initialize()
+    await entry_runtime._verify_integrity_on_startup()
     logger.info("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
     logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
+
+    await centroid_system.load_state()
+
+    await ledger.verify_runtime_state(centroid_system)
+
+    await centroid_system._verify_integrity_on_startup()
+
+    # second pass just to confirm
     await entry_runtime.initialize()
     await entry_runtime._verify_integrity_on_startup()
 
     _initialized = True
-
-    if verify:
-        await ledger.verify_runtime_state(_centroid_system)
-    logger.info("Centroids loaded: %s", list(centroid_system._centroids.keys()))
-    logger.info("Mapping runtime initialized successfully.")
+    _runtime_ready = True
+    _boot_in_progress = False
+    logger.info("Mapping runtime is now READY.")
 
     # Schedule periodic check after initialization
     asyncio.create_task(periodic_integrity_check())
-    
+
+
 # Recheck that all the files are in order every once in a while
 # In seconds
-PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 150
+
 
 async def periodic_integrity_check():
     """

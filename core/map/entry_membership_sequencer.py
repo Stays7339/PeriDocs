@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-26T18:48:30-04:00
+# Save-state: 2026-04-29T03:31:55-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -360,4 +360,4 @@ async def reconcile_centroid_membership_after_approval(
 
         if updated:
             logger.info("[reconcile] updated=%s", updated)
-            await entry_runtime.persist()
+            await entry_runtime._persist()

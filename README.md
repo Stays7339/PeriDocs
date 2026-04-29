@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-26T17:11:00-04:00
+## Canonical Project Directory as of 2026-04-29T01:57:10-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -454,6 +454,7 @@ PeriDocs/                         # Root project folder
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
+├─ list_the_table_of_contents_for_this_npz_file.py
 ├─ requirements.txt          # Pinned Python dependencies
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
 ```

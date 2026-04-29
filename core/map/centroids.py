@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-27T02:19:15-04:00
+# Save-state: 2026-04-29T02:55:20-04:00
 # ==========================================
 
 import os
@@ -70,7 +70,7 @@ def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
     # ----------------------------
 
     npz_files = sorted(
-        glob.glob(os.path.join(ENTRIES_DIR, "entries_mean_embeddings_dump_*.npz"))
+        glob.glob(os.path.join(ENTRIES_DIR, "entries_mean_embeddings_dump.npz"))
     )
 
     found = None
@@ -95,7 +95,7 @@ class CentroidState:
     def __init__(
         self,
         event_index: int,
-        entry_ids: List[str],
+        entry_ids: List[str] | None,
         vector: np.ndarray,
         metadata: Dict | None = None,
     ):
@@ -142,11 +142,15 @@ class Centroid:
 
 class CentroidSystem:
     """
-    Lifecycle interpreter. Ledger is historical spine.
+    Lifecycle interpreter. 
+    Ledger is historical spine for the data of the entries to mean something. 
+    Entry runtime is a material spine for the history of the ledger to mean something. 
+    Both are necessary.
     """
 
-    def __init__(self, ledger: IdentifierLedger):
+    def __init__(self, ledger: IdentifierLedger, entry_runtime):
         self._ledger = ledger
+        self.entry_runtime = entry_runtime
         self._centroids: Dict[str, Centroid] = {}
         self._lock = asyncio.Lock()
         self._split_suggestions: Dict[str, Dict[int, Dict]] = {}  
@@ -407,6 +411,11 @@ class CentroidSystem:
         - Handles missing .npz files gracefully (fallback to zero vector).
         - Enforces ledger checks and event order.
         """
+        from core.map.mapping_runtime import is_runtime_ready, is_runtime_starting
+        if not is_runtime_ready() and not is_runtime_starting():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
+        if not hasattr(self, "entry_runtime") or self.entry_runtime is None:
+            raise RuntimeError("CentroidSystem missing entry_runtime dependency during load_state")
         await self._assert_ledger_ready()
         async with self._lock:
             self._centroids.clear()
@@ -443,7 +452,7 @@ class CentroidSystem:
                     except Exception as e:
                         logger.error("[load_state] Failed to read NPZ %s: %s", npz_path, e)
                 else:
-                    logger.warning("[load_state] Missing NPZ for centroid %s, using fallback zero vectors", centroid_id)
+                    raise RuntimeError("[load_state] Missing NPZ for centroid %s", centroid_id)
 
                 # Reconstruct centroid
                 c = Centroid(payload["centroid_id"])
@@ -451,38 +460,64 @@ class CentroidSystem:
                 c.description_from_human_moderator = payload.get("description_from_human_moderator")
                 c.title_from_human_moderator = payload.get("title_from_human_moderator")
 
-                for s in payload.get("states", []):
+                
+
+                for s_idx, s in enumerate(payload.get("states", [])):
                     self._assert_event_order(c, s["event_index"])
                     entry_ids = s.get("entry_ids", [])
 
-                    # Build vector for this state by fetching entry embeddings
-                    vector_arrays = []
-                    for eid in entry_ids:
-                        try:
-                            vec_array = safe_load_embedding(eid, data_dir=DATA_DIR)  # MODIFIED
-                        except Exception:
-                            logger.warning(
-                                "[load_state] Missing embedding for entry_id %s in centroid %s, using zero vector",
-                                eid, centroid_id
+                    state_vector = None  # explicit single output slot
+
+                    # -------------------------
+                    # CASE 1: Ghost Town
+                    # -------------------------
+                    # City Analogy (Ghost Town with A Past):
+                    # This district within a larger is not defined by its citizens anymore. 
+                    # It's given a quasi-arbitrary definition from the authorities.
+                    if not entry_ids:
+                        state_vector = vectors.get(f"{centroid_id}_state{s_idx}")
+
+                        if state_vector is None:
+                            raise RuntimeError(
+                                f"[load_state] Missing ghost town vector for state {s_idx} in centroid {centroid_id}"
                             )
-                            vec_array = np.zeros(1024, dtype=np.float32)
-                        vector_arrays.append(vec_array)
 
-                    if vector_arrays:
-                        state_vector = deterministic_mean(vector_arrays)
+                    # -------------------------
+                    # CASE 2: entry-backed state
+                    # -------------------------
                     else:
-                        logger.warning("[load_state] State has no entry_ids in centroid %s, using zero vector", centroid_id)
-                        state_vector = np.zeros(1024, dtype=np.float32)
+                        vector_arrays = []
 
-                    # Metadata
+                        for eid in entry_ids:
+                            try:
+                                vec_array = safe_load_embedding(eid, self.entry_runtime)
+                                vector_arrays.append(vec_array)
+                            except Exception:
+                                raise RuntimeError(
+                                    "[load_state] Missing embedding for entry_id %s in centroid %s"
+                                    % (eid, centroid_id)
+                                )
+
+                        if not vector_arrays:
+                            raise RuntimeError(
+                                f"[load_state] Entry-backed state has empty embeddings in centroid {centroid_id}"
+                            )
+
+                        state_vector = deterministic_mean(vector_arrays)
+
+                    # -------------------------
+                    # single unified commit point
+                    # -------------------------
                     metadata = s.get("metadata", {})
 
-                    c.states.append(CentroidState(
-                        s["event_index"],
-                        entry_ids,
-                        state_vector,
-                        metadata=metadata
-                    ))
+                    c.states.append(
+                        CentroidState(
+                            s["event_index"],
+                            entry_ids,
+                            state_vector,
+                            metadata=metadata
+                        )
+                    )
 
                 self._centroids[c.centroid_id] = c
                 logger.info("[load_state] Loaded centroid %s with %d states", c.centroid_id, len(c.states))
@@ -500,8 +535,7 @@ class CentroidSystem:
         npz_dump = {}
         for state_idx, state in enumerate(centroid.states):
             if state.vector is None or not isinstance(state.vector, np.ndarray):
-                logger.warning("[persist_centroid_data] State %d in %s has invalid vector, using zero vector", state_idx, centroid.centroid_id)
-                state_vector = np.zeros(1024, dtype=np.float32)
+                raise RuntimeError("[persist_centroid_data] State %d in %s has invalid vector", state_idx, centroid.centroid_id)
             else:
                 state_vector = state.vector
 
@@ -510,8 +544,7 @@ class CentroidSystem:
             npz_dump[key] = state_vector 
 
         if not npz_dump:
-            logger.info("[persist_centroid_data] Centroid %s has no valid vectors, writing single zero vector", centroid.centroid_id)
-            npz_dump["empty"] = np.zeros(1024, dtype=np.float32)
+            raise RuntimeError ("[persist_centroid_data] Centroid %s has no valid vectors", centroid.centroid_id)
 
         # --- Save NPZ safely ---
         try:
@@ -548,6 +581,9 @@ class CentroidSystem:
         - Enforces SAAJE cannot exist yet
         - Adds default metadata for admin review
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         logger.debug(f"[CREATE_PRECENTROID] Called with entry_ids={entry_ids}")
         await self._assert_ledger_ready()
         # allocate a ledger-backed precentroid suffix
@@ -607,6 +643,9 @@ class CentroidSystem:
         - Converts to a full centroid
         - Archives precentroid state
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         async with self._lock:
             c = self._centroids.pop(precentroid_id, None)
@@ -712,6 +751,9 @@ class CentroidSystem:
         Thin wrapper / thin caller function for the rest of the process, just so that we can easily call
         this function rather than always remembering to call a specific type of function with minor variations
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         await self.burst_precentroid(
             precentroid_id=precentroid_id,
@@ -736,6 +778,9 @@ class CentroidSystem:
         - Assign stricter local similarity threshold to metadata.
         - Finalize rejection and archive burst details.
         """
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         async with self._lock:
             if precentroid_id not in self._centroids:
@@ -875,6 +920,9 @@ class CentroidSystem:
             RuntimeError if centroid_id is a precentroid or entry already exists.
         """
         from core.map.entry_membership_sequencer import get_embedding_for_entry
+        from core.map.mapping_runtime import is_runtime_ready
+        if not is_runtime_ready():
+            raise RuntimeError("CentroidSystem called before runtime is ready")
         await self._assert_ledger_ready()
         async with self._lock:
             if centroid_id.startswith("precentroid_"):

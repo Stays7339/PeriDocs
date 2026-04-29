@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-04-27T00:08:20-04:00
+# Save-state: 2026-04-28T14:49:45-04:00
 # ==========================================
 
 """
@@ -21,13 +21,15 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 import numpy as np
-
-from core.map.ledger import IdentifierLedger
 from app.helpers.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
+from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
+from app.helpers.entry_writing_runtime import EntryWritingRuntime
+# importing class definitions, rather than the injection itself; both are necessary; injections are further on.
+# if importing is considered using vocabulary, in this case, then injections are like using an exact physical object.
 
 
 logger = logging.getLogger(__name__)
@@ -47,10 +49,12 @@ class DeletionManager:
         *,
         ledger: IdentifierLedger,
         centroids: CentroidSystem,
+        entry_runtime: EntryWritingRuntime
     ):
         self._ledger = ledger
         self._centroids = centroids
         self._entry_runtime = entry_runtime
+        
 
     
     async def unlink_entry_from_centroid(

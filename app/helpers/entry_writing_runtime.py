@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-04-27T02:06:08-04:00
+# Save-state: 2026-04-29T03:24:39-04:00
 # ==========================================
 import asyncio
 import copy
@@ -24,8 +24,9 @@ def get_npz_window_path(base_name: str) -> str:
 
     return f"data/entries/{base_name}_dump_{timestamp}.npz"
 
+DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 EMBEDDING_DIM = 1024
-entries_mean_embed_file = get_npz_window_path("entries_mean_embeddings")
+entries_mean_embed_file = os.path.join(DATA_DIR, "entries", "entries_mean_embeddings_dump.npz")
 
 class EntryWritingRuntime:
     """
@@ -49,8 +50,10 @@ class EntryWritingRuntime:
         self._entries: List[Dict[str, Any]] = []
         self._embeddings: Dict[str, Any] = {}
         self._initialized: bool = False
-        self._npz_path = get_npz_window_path("entries_mean_embeddings")     
+        self._npz_path = os.path.join(DATA_DIR, "entries", "entries_mean_embeddings_dump.npz")
         self._lock = asyncio.Lock()
+        self._entry_index: Dict[str, Dict[str, Any]] = {}
+        self._index_for_hashed_tokens_for_deleting_entries: Dict[str, Dict[str, Any]] = {}
 
     async def initialize(self) -> None:
         """
@@ -63,7 +66,11 @@ class EntryWritingRuntime:
             if self._initialized:
                 return
 
-            self._entries = self._load_entries_from_disk()
+            self._entries = self._load_entries_json_from_disk()
+            self._rebuild_entry_index()
+            self._load_entries_embeddings_from_disk()
+
+
             self._initialized = True
         logger.info("[EntryWritingRuntime] Finished initialize()")
 
@@ -71,33 +78,12 @@ class EntryWritingRuntime:
         """
         Startup-time integrity validation for entry system.
 
-        This enforces strict consistency between:
-            1. ledger.json (authoritative event log)
-            2. entries.json (canonical entry registry)
-            3. embedding dumps:
-                - entry_clause_embeddings_dump[YYYYMMDD]_[0-3].npz
-                - entry_mean_embeddings_dump[YYYYMMDD]_[0-3].npz
-                - entry_standout_flags_dump[YYYYMMDD]_[0-3].npz
-
         HARD GOAL:
             - If an entry_id appears anywhere in ledger.json,
             it MUST exist in entries.json AND all embedding stores.
             - Deleted entries STILL retain embeddings (no exceptions).
             - Missing entries or embeddings cause immediate RuntimeError.
-
-        For integrity of Entries:
-
-        ALWAYS load from _load_entries_from_disk
-        NEVER rely on _entries, because Even though _entries is initialized in initialize(), 
-        your integrity check runs in a startup phase where:
-        _entries may still be empty
-        _entries may be stale if reload hasn’t happened
-        _entries may not reflect disk reality if crash occurred mid-write
-
-        integrity checks should be lock-free or minimally locked
-        Startup checks are meant to detect corruption, not assume safe concurrency state.
         """
-
 
         if not await self.ledger.is_loaded():
             raise RuntimeError("Ledger is not loaded")
@@ -111,10 +97,8 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         entries_path = self._entries_path
         entries_dir = os.path.dirname(entries_path)
-
-        clause_pattern = "entries_clause_embeddings_dump_*.npz"
-        mean_pattern = "entries_mean_embeddings_dump_*_*.npz"
-        standout_pattern = "entries_standout_flags_dump_*_*.npz"
+        mean_file = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
+        mean_files = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
 
         # ------------------------------------------------------------
         # LOAD LEDGER SNAPSHOT
@@ -169,93 +153,129 @@ class EntryWritingRuntime:
             )
 
         # ------------------------------------------------------------
-        # LOAD ALL EMBEDDING FILES
+        # DETERMINE SYSTEM STATE (cold start vs existing system)
         # ------------------------------------------------------------
-        clause_files = glob.glob(os.path.join(entries_dir, clause_pattern))
-        mean_files = glob.glob(os.path.join(entries_dir, mean_pattern))
-        standout_files = glob.glob(os.path.join(entries_dir, standout_pattern))
 
-        # --- strict file existence + emptiness validation ---
-        if not mean_files:
-            raise RuntimeError("[entry_runtime] No mean embedding dump files found")
+        has_ledger = len(ledger_entry_ids) > 0
+        has_entries = len(existing_entries) > 0
 
-        # ensure files are not empty / unreadable at OS level
-        for f in mean_files:
-            try:
-                if os.path.getsize(f) == 0:
-                    raise RuntimeError(f"Empty embedding file detected: {f}")
-            except OSError as e:
-                raise RuntimeError(f"Unreadable embedding file: {f} | {e}")
+        system_has_history = (
+            len(ledger_entry_ids) > 0
+            and len(existing_entries) > 0
+        )
+
+        # ------------------------------------------------------------
+        # LOAD / REQUIRE EMBEDDING FILE BASED ON STATE
+        # ------------------------------------------------------------
+
+        if not os.path.exists(mean_file):
+
+            if system_has_history:
+                # ---- STRICT MODE: data should exist ----
+                raise RuntimeError(
+                    f"[entry_runtime] Missing embedding store but system has history. "
+                    f"Cannot bootstrap safely: {mean_file}"
+                )
+
+            else:
+                # ---- COLD START MODE: safe to initialize ----
+                logger.warning(
+                    "[entry_runtime] Cold start detected. Creating empty embedding store."
+                )
+                np.savez(mean_file, _init=True)
+                mean_data = np.load(mean_file)
+
+        else:
+            # ---- NORMAL PATH ----
+            mean_data = np.load(mean_file)
+
+        try:
+            mean_data = np.load(mean_file)
+        except Exception as e:
+            raise RuntimeError(f"[entry_runtime] Failed to load canonical embedding file: {e}")
         
+
         # ------------------------------------------------------------
-        # CHECK 2: EMBEDDING VALIDATION
+        # BUILD ENTRY SETS (EMBEDDING TABLES)
         # ------------------------------------------------------------
+        embedding_keys = set()
         invalid_embeddings = []
-        missing_embeddings = []
 
-        def validate_npz(files, label):
-            for file_path in files:
-                try:
-                    data = np.load(file_path)
-                except Exception as e:
-                    logger.error("[entry_runtime] Failed to load %s: %s", file_path, e)
-                    raise RuntimeError(f"Corrupt embedding file: {file_path}")
+        for key, vec in mean_data.items():
+            if not isinstance(key, str):
+                raise RuntimeError(f"[entry_runtime] Invalid embedding key type: {type(key)}")
 
-                for key, vec in data.items():
-                    if not isinstance(key, str):
-                        raise RuntimeError(f"Invalid embedding key type in {file_path}")
-                    
-                    entry_id = key  # assuming key == entry_id
+            embedding_keys.add(key)
 
-                    # ---  strict key existence check ---
-                    if entry_id not in ledger_entry_ids:
-                        continue  
+            # ----------------------------
+            # STRICT VECTOR VALIDATION
+            # ----------------------------
+            if vec is None:
+                invalid_embeddings.append((key, "mean", "None vector"))
+                continue
+
+            if not isinstance(vec, np.ndarray):
+                invalid_embeddings.append((key, "mean", "non-ndarray"))
+                continue
+
+            if vec.shape != (EMBEDDING_DIM,):
+                invalid_embeddings.append((key, "mean", f"bad shape {vec.shape}"))
+                continue
+
+            if vec.size == 0:
+                invalid_embeddings.append((key, "mean", "empty vector"))
+                continue
+
+            if np.all(vec == 0):
+                invalid_embeddings.append((key, "mean", "zero vector"))
+                continue
 
 
-                    # --- strict vector validation ---
-                    if vec is None:
-                        invalid_embeddings.append((entry_id, label, "missing vector (None)"))
-                        continue
+        # ------------------------------------------------------------
+        # CHECK 2: LEDGER ↔ ENTRIES ↔ EMBEDDINGS (FULL COVERAGE CHECK)
+        # ------------------------------------------------------------
 
-                    if not isinstance(vec, np.ndarray):
-                        invalid_embeddings.append((entry_id, label, "not ndarray"))
-                        continue
+        missing_from_entries = []
+        missing_from_embeddings = []
 
-                    if vec.size == 0:
-                        invalid_embeddings.append((entry_id, label, "empty vector"))
+        # entries.json index already built above
+        for eid in ledger_entry_ids:
 
-                    if np.all(vec == 0):
-                        invalid_embeddings.append((entry_id, label, "zero vector"))
-                        continue
-                    
+            # must exist in entries.json
+            if eid not in existing_entries:
+                missing_from_entries.append(eid)
 
-        validate_npz(clause_files, "clause")
-        validate_npz(mean_files, "mean")
-        validate_npz(standout_files, "standout")
+            # must exist in embeddings
+            if eid not in embedding_keys:
+                missing_from_embeddings.append(eid)
+
+        if missing_from_entries:
+            for eid in missing_from_entries:
+                logger.error("[entry_runtime] Missing from entries.json: %s", eid)
+            raise RuntimeError(
+                f"[entry_runtime] Integrity failure: {len(missing_from_entries)} ledger entries missing from entries.json"
+            )
+
+        if missing_from_embeddings:
+            for eid in missing_from_embeddings:
+                logger.error("[entry_runtime] Missing embedding for entry: %s", eid)
+            raise RuntimeError(
+                f"[entry_runtime] Integrity failure: {len(missing_from_embeddings)} entries missing embeddings"
+            )
 
         # ------------------------------------------------------------
         # FINAL FAILURE CONDITIONS
         # ------------------------------------------------------------
         if invalid_embeddings:
             for eid, label, reason in invalid_embeddings:
-                logger.error(
-                    "[entry_runtime] Invalid embedding: %s | %s | %s",
-                    eid, label, reason
-                )
+                logger.error("[entry_runtime] Invalid embedding: %s | %s | %s", eid, label, reason)
+
             raise RuntimeError("Entry embedding integrity failure (invalid vectors detected)")
-
-        if missing_embeddings:
-            for eid, label in missing_embeddings:
-                logger.error(
-                    "[entry_runtime] Missing embedding: %s | %s",
-                    eid, label
-                )
-            raise RuntimeError("Entry embedding integrity failure (missing vectors detected)")
-
+            
         # ------------------------------------------------------------
         # IF SUCCESSFUL
         # ------------------------------------------------------------
-        logger.info("[entry_runtime] All entries passed integrity check.")
+        logger.info("[entry_runtime] Full integrity passed (ledger ↔ entries ↔ embeddings fully consistent)")
 
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
@@ -300,11 +320,14 @@ class EntryWritingRuntime:
             # Append to runtime memory (source of truth)
             # ----------------------------
             self._entries.append(entry)
+            entry_id = entry.get("entry_id") or entry.get("id")
+            self._entry_index[entry_id] = entry
+            self._index_for_hashed_tokens_for_deleting_entries[entry.get("hash_from_token_for_deleting_entries")] = entry
 
             # ----------------------------
             # Persist snapshot (one-way write)
             # ----------------------------
-            await self.persist()
+            await self._persist()
 
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
@@ -318,7 +341,7 @@ class EntryWritingRuntime:
 
         After this function succeeds:
         - embedding is safe for all downstream systems
-        - persist() must never validate again
+        - persist() should not try to validate again
         """
 
         async with self._lock:
@@ -369,7 +392,7 @@ class EntryWritingRuntime:
             # ------------------------------------------
             self._embeddings[entry_id] = embedding
     
-    async def persist(self) -> None:
+    async def _persist(self) -> None:
         """
         Deterministic snapshot persistence.
 
@@ -379,44 +402,65 @@ class EntryWritingRuntime:
         - no partial state is ever visible
         - no validation or coercion occurs here
         """
+        """
+        # async with self._lock: has been removed since:
+        # it was causing consistent self-deadlock via re-entrant lock acquisition.
+        # it's important to NEVER call _persist directly, even within the same file 
+        # (hence the underscore for modules that have functions solely for intra-module use)
+        # ---
+        # Q: Why not call _persist directly? 
+        # A: It can very easily cause data corruption via simultaneous writes/reads (I/O) to disk.
+        """
+        # ------------------------------------------
+        # Before trying to write, 
+        # Double check that the filepath that the rest of the software expects actually exists.
+        # ------------------------------------------
+        os.makedirs(os.path.dirname(self._entries_path), exist_ok=True)
+        
+        # ------------------------------------------
+        # JSON SNAPSHOT (source of truth)
+        # ------------------------------------------
+        snapshot = json_safe(self._entries)
 
-        async with self._lock:
+        json_tmp = self._entries_path + ".tmp"
 
-            # ------------------------------------------
-            # JSON SNAPSHOT (source of truth)
-            # ------------------------------------------
-            snapshot = json_safe(self._entries)
+        with open(json_tmp, "w", encoding="utf-8") as f:
+            json.dump(snapshot, f, ensure_ascii=False, indent=2)
+            f.flush()
+            os.fsync(f.fileno())
 
-            json_tmp = self._entries_path + ".tmp"
+        os.replace(json_tmp, self._entries_path)
 
-            with open(json_tmp, "w", encoding="utf-8") as f:
-                json.dump(snapshot, f, ensure_ascii=False, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
+        # ------------------------------------------
+        # NPZ SNAPSHOT (derived embeddings cache)
+        # ------------------------------------------
+        npz_path = self._npz_path
+        npz_tmp = npz_path + ".tmp"
 
-            os.replace(json_tmp, self._entries_path)
+        os.makedirs(os.path.dirname(npz_path), exist_ok=True)
 
-            # ------------------------------------------
-            # NPZ SNAPSHOT (derived embeddings cache)
-            # ------------------------------------------
-            npz_path = entries_mean_embed_file
-            npz_tmp = npz_path + ".tmp"
+        embedding_snapshot = self._embeddings
 
-            # IMPORTANT:
-            # assumes embeddings are already validated at set_embedding()
-            embedding_snapshot = self._embeddings
+        logging.debug("IN-MEMORY:", len(self._embeddings))
 
-            np.savez_compressed(npz_tmp, **embedding_snapshot)
-            os.sync()  # coarse-grained but safe fallback
-            os.replace(npz_tmp, npz_path)
+        existing = 0
+        for f in glob.glob("data/entries/*.npz"):
+            existing += len(np.load(f).files)
 
-            logger.info(
-                "[PersistOK] entries=%d embeddings=%d",
-                len(self._entries),
-                len(self._embeddings),
-            )
+        logging.debug("ON-DISK TOTAL:", existing)
 
-    def _load_entries_from_disk(self) -> List[Dict[str, Any]]:
+        with open(npz_tmp, "wb") as f:
+            np.savez_compressed(f, **embedding_snapshot)
+
+        os.replace(npz_tmp, npz_path)
+
+        logger.info(
+            "[PersistOK] entries=%d embeddings=%d",
+            len(self._entries),
+            len(self._embeddings),
+        )
+
+    def _load_entries_json_from_disk(self) -> List[Dict[str, Any]]:
         """
         Strict loader used ONLY at initialization / reload.
 
@@ -444,6 +488,19 @@ class EntryWritingRuntime:
             data = [item for sublist in data for item in sublist]
 
         return data
+
+    def _load_entries_embeddings_from_disk(self) -> None:
+        self._embeddings = {}
+
+        entries_dir = os.path.dirname(self._entries_path)
+        mean_files = sorted(
+            glob.glob(os.path.join(entries_dir, "entries_mean_embeddings_dump.npz"))
+        )
+
+        for file_path in mean_files:
+            data = np.load(file_path)
+            for k, v in data.items():
+                self._embeddings[k] = v
 
     async def get_embedding(self, entry_id: str):
         """
@@ -508,14 +565,51 @@ class EntryWritingRuntime:
 
             index = self._entries.index(target)
             self._entries[index] = stripped
+            entry_id = stripped.get("entry_id") or stripped.get("id")
+            self._entry_index[entry_id] = stripped
 
             # ----------------------------
             # PERSIST
             # ----------------------------
-            await self.persist()
+            await self._persist()
 
             logger.info(f"[EntryRuntime] Entry {entry_id} stripped and persisted.")
 
             return True
     def get_current_embedding_file(self) -> str:
         return self._npz_path
+    
+    def _rebuild_entry_index(self):
+        """
+        # This is a lookup cache, not a second dataset.
+
+        # It exists only to answer one question efficiently:
+
+        # “Given an entry_id, where is the entry?”
+
+        # Think of it as the table of contents at the front of the notebook;
+
+        # It does not store new information. It just points to entries already in _entries.
+        # _entries is for ordered iteration lists in detail. 
+        # _entry_index is for fast O(1) lookup via dicts
+        # If you delete _entry_index, nothing is lost except speed.
+        # If you delete _entries, everything is lost.
+        # the real architectural win is that you are reducing cognitive load later, 
+        # because you stop scanning lists just to answer simple identity queries.
+        """
+        self._entry_index = {
+            (e.get("entry_id") or e.get("id")): e
+            for e in self._entries
+        }
+
+        self._index_for_hashed_tokens_for_deleting_entries = {
+            e.get("hash_from_token_for_deleting_entries"): e
+            for e in self._entries
+            if e.get("hash_from_token_for_deleting_entries")
+        }
+
+    def get_entry_by_id(self, entry_id: str):
+        return self._entry_index.get(entry_id)
+    
+    def get_entry_by_token_hash(self, token_hash: str):
+        return self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
