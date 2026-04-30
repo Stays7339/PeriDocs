@@ -1,0 +1,51 @@
+{# PeriDocs/app/templates/admin-login.html save-state 2026-04-29T23:14:15-04:00 #}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap">
+  <div class="card">
+
+    <h1>Admin Login</h1>
+
+    <div class="card-content">
+
+      <input id="username" type="text" placeholder="username" />
+      <div style="height:10px"></div>
+
+      <input id="password" type="password" placeholder="password" />
+      <div style="height:10px"></div>
+
+      <input id="totp" type="text" placeholder="TOTP code" />
+
+      <div style="height:20px"></div>
+
+      <button class="btn primary" onclick="login()">Login</button>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+async function login() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+  const totp_code = document.getElementById("totp").value;
+
+  const res = await fetch("/admin/auth/login", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({username, password, totp_code})
+  });
+
+  const data = await res.json();
+
+  if (data.status === "ok") {
+    window.location.href = "/admin";
+  } else {
+    alert("Login failed");
+  }
+}
+</script>
+
+{% endblock %}

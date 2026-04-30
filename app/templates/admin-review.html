@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-04-24T14:04:00-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-04-29T23:14:15-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
@@ -23,5 +23,16 @@
   <button class="btn primary" onclick="submitHeuristic()">Submit</button>
 
 </div>
+
+<button class="btn ghost" onclick="logout()">Logout</button>
+
+
+<script>
+async function logout() {
+  await fetch("/admin/auth/logout", { method: "POST" });
+  window.location.href = "/admin/auth/login";
+}
+</script>
+
 <script src="/static/admin_review_ux.js" defer></script>
 {% endblock %}

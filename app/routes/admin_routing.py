@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-04-25T23:29:55-04:00
+# save-state 2026-04-29T22:45:10-04:00
 # ==========================================
 import os
 import json
@@ -12,8 +12,8 @@ import uuid
 
 from datetime import datetime, timezone
 from rdflib import Graph
-from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from pathlib import Path
@@ -26,14 +26,26 @@ from core.map.perist_reasoning_data import (
     persist_reasoning_data,
     concept_exists
 )
-
-# Initialize router with proper prefix and tags
-router = APIRouter(prefix="/admin", tags=["admin-review"])
-templates = Jinja2Templates(directory="app/templates")
+from app.routes.admin_credentialing import has_admins
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
+ADMIN_FILE = os.path.join(DATA_DIR, "logins", "admins.json.enc")
 HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
+
+def require_admin_bootstrap():
+    if not has_admins():
+        return RedirectResponse("/admin/auth/create", status_code=302)
+
+
+# Initialize router with proper prefix and tags
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin-review"]
+)
+
+templates = Jinja2Templates(directory="app/templates")
+
 
 # -----------------------------
 # Pydantic Models
@@ -99,6 +111,9 @@ async def reject_precentroid(payload: RejectPrecentroidPayload):
         threshold=BURST_PRECENTROID_STARTING_THRESHOLD
     )
     return {"status": "ok"}
+
+
+
 
 
 # -----------------------------

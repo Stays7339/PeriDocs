@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-04-05T13:58:05-04:00 (YYYYMMDDhhmm)
+# save-state 2026-04-29T23:32:00-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -10,6 +10,11 @@ import logging
 import sys
 import signal
 from pathlib import Path
+
+from fastapi import Request
+from fastapi.responses import RedirectResponse
+from app.routes.admin_routing import has_admins
+from app.routes import admin_credentialing
 
 
 from core.nlp.embeddings import _load_model, get_embedding_async
@@ -51,6 +56,7 @@ from app.routes import feedback
 # ---------------- Include router-based routes ----------------
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
+app.include_router(admin_credentialing.router) 
 
 
 
@@ -86,3 +92,31 @@ async def cleanup_old_backups():
             logger.info(f"[shutdown] Deleted old backup: {f.name}")
         except Exception as e:
             logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
+
+
+@app.middleware("http")
+async def admin_bootstrap_gate(request: Request, call_next):
+    path = request.url.path
+
+    
+    if path.startswith("/admin"):
+
+        exists = has_admins()
+
+        # NEW: check session cookie
+        cookie = request.cookies.get("admin_session")
+        is_logged_in = admin_credentialing.verify_session(cookie) if cookie else False
+
+        # allow auth routes always
+        if path.startswith("/admin/auth"):
+            return await call_next(request)
+
+        # no admins → bootstrap
+        if not exists and path != "/admin/auth/create":
+            return RedirectResponse("/admin/auth/create")
+
+        # admins exist but not logged in → force login
+        if exists and not is_logged_in:
+            return RedirectResponse("/admin/auth/login")
+
+    return await call_next(request)

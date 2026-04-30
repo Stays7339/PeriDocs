@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-29T01:57:10-04:00
+## Canonical Project Directory as of 2026-04-29T11:53:57-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -401,9 +401,8 @@ PeriDocs/                         # Root project folder
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
-│  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
-│  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
-│  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
+│  │   ├─ entrie.json
+│  │   └─ entries_mean_embeddings_dump.npz
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]

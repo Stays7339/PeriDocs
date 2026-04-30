@@ -1,0 +1,84 @@
+{# PeriDocs/app/templates/admin-bootstap.html save-state 2026-04-29T23:14:15-04:00 #}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap">
+  <div class="card">
+
+    <h1>Bootstrap Admin</h1>
+
+    <div class="card-content">
+
+      <input id="username" type="text" placeholder="admin username" />
+
+      <div style="height:10px"></div>
+
+      <input id="password" type="text" placeholder="admin password" />
+
+      <div style="height:20px"></div>
+
+      <button class="btn primary" onclick="createAdmin()">Create Admin</button>
+
+      <!-- TOTP DISPLAY -->
+      <div id="totp-section" style="display:none; margin-top:20px;">
+
+        <p><strong>Save this TOTP secret:</strong></p>
+        <div class="excerpt" id="totp-secret"></div>
+
+        <p style="margin-top:10px;"><strong>Manual setup URI:</strong></p>
+        <div class="excerpt" id="totp-uri"></div>
+
+        <!-- FIX: hide initially -->
+        <img id="qr" style="margin-top:15px; display:none;" />
+
+        <br>
+
+        <button class="btn primary" onclick="window.location.href='/admin/auth/login'">
+          Continue to Login
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<script>
+async function createAdmin() {
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
+
+  const res = await fetch("/admin/auth/create-admin", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ username, password })
+  });
+
+  const data = await res.json();
+
+  if (data.totp_secret) {
+
+    // show section
+    document.getElementById("totp-section").style.display = "block";
+
+    // render secret
+    document.getElementById("totp-secret").textContent = data.totp_secret;
+
+    // build otpauth URI
+    const uri = `otpauth://totp/PeriDocs:${username}?secret=${data.totp_secret}&issuer=PeriDocs`;
+
+    document.getElementById("totp-uri").textContent = uri;
+
+    // FIX: generate QR inside function where uri exists
+    const qr = document.getElementById("qr");
+    qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(uri);
+    qr.style.display = "block";
+
+  } else {
+    alert("Error creating admin");
+  }
+}
+</script>
+
+{% endblock %}
