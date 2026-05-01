@@ -559,7 +559,7 @@ body {
   right: 25px;
 }
 
-.progress .frame-2 {
+.progress .donation-link-narrow-1 {
   position: relative;
   width: 300px;
   height: 250px;
@@ -569,7 +569,7 @@ body {
   box-shadow: 0px 4px 4px #00000040;
 }
 
-.progress .frame-3 {
+.progress .donation-link-narrow-2 {
   position: relative;
   top: 12px;
   left: 13px;
@@ -580,7 +580,7 @@ body {
   box-shadow: 0px 4px 4px #00000040;
 }
 
-.progress .frame-4 {
+.progress .donation-link-wide-1 {
   position: relative;
   width: 350px;
   height: 250px;
@@ -590,7 +590,7 @@ body {
   box-shadow: 0px 4px 4px #00000040;
 }
 
-.progress .frame-5 {
+.progress .donation-link-wide-2 {
   position: relative;
   top: 12px;
   left: 12px;
@@ -640,8 +640,8 @@ body {
 .progress .middle-button-filled,
 .progress .right-button-filled,
 .progress .logo-lockup,
-.progress .frame-2,
-.progress .frame-4 {
+.progress .donation-link-narrow-1,
+.progress .donation-link-wide-1 {
   text-decoration: none;
 }
 
@@ -651,8 +651,8 @@ body {
 .progress .large-search-button,
 .progress .shrink-click-button,
 .progress .shrink-click-button-2,
-.progress .frame-2,
-.progress .frame-4 {
+.progress .donation-link-narrow-1,
+.progress .donation-link-wide-1 {
   border: 0;
   cursor: pointer;
   appearance: none;
@@ -688,8 +688,8 @@ body {
 }
 
 .progress .text,
-.progress .frame-2,
-.progress .frame-4 {
+.progress .donation-link-narrow-1,
+.progress .donation-link-wide-1 {
   display: block;
 }
 
@@ -700,8 +700,8 @@ body {
 .progress .large-search-button:focus-visible,
 .progress .shrink-click-button:focus-visible,
 .progress .shrink-click-button-2:focus-visible,
-.progress .frame-2:focus-visible,
-.progress .frame-4:focus-visible {
+.progress .donation-link-narrow-1:focus-visible,
+.progress .donation-link-wide-1:focus-visible {
   outline: 2px solid #4a90e2;
   outline-offset: 2px;
 }
