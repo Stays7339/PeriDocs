@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-04-28T14:5720 -04:00
+# save-state 2026-04-30T22:04:45 -04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -237,7 +237,7 @@ async def submit_success(request: Request, id: str):
 
     delete_token = delete_tokens_memory.pop(entry.get("entry_id", entry.get("id")), None)
 
-    logger.info("Submit_success function triggered for id=%s", id)
+    logger.debug("Submit_success function triggered for id=%s", id)
 
     return templates.TemplateResponse(
         "submit-success.html",
