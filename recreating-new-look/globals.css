@@ -1,54 +1,30 @@
 @import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
+
+/* Google Fonts */
+@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Montserrat:wght@100..900&family=IM+Fell+French+Canon&display=swap");
+
 * {
   -webkit-font-smoothing: antialiased;
   box-sizing: border-box;
 }
+
 html,
 body {
   margin: 0px;
   height: 100%;
 }
+
 /* a blue color as a generic focus style */
 button:focus-visible {
   outline: 2px solid #4a90e2 !important;
   outline: -webkit-focus-ring-color auto 5px !important;
 }
+
 a {
   text-decoration: none;
 }
-/* @FONTWARNING[{"type": "restricted", "family": "Lexend", "weight": "var(--styles-buttonm-bold-font-weight)", "style": "normal", "allowsCrossOrigin": false}] */
 
-@font-face {
-  font-family: "Lexend";
-  src: local("Lexend");
-}
-/* @FONTWARNING[{"type": "restricted", "family": "Montserrat Alternates-SemiBold", "weight": "400", "style": "normal", "allowsCrossOrigin": false}] */
-
-@font-face {
-  font-family: "Montserrat Alternates-SemiBold";
-  src: local("Montserrat Alternates-SemiBold");
-}
-/* @FONTWARNING[{"type": "restricted", "family": "Montserrat Alternates", "weight": "var(--styles-altcap-font-weight)", "style": "normal", "allowsCrossOrigin": false}] */
-
-@font-face {
-  font-family: "Montserrat Alternates";
-  src: local("Montserrat Alternates");
-}
-/* @FONTWARNING[{"type": "restricted", "family": "IM FELL French Canon", "weight": "var(--styles-hero2-font-weight)", "style": "normal", "allowsCrossOrigin": false}] */
-
-@font-face {
-  font-family: "IM FELL French Canon";
-  src: local("IM FELL French Canon");
-}
-/* @FONTWARNING[{"type": "restricted", "family": "Montserrat-Regular", "weight": "400", "style": "normal", "allowsCrossOrigin": false}] */
-
-@font-face {
-  font-family: "Montserrat-Regular";
-  src: local("Montserrat-Regular");
-}
-/* @FONTWARNING[{"type": "restricted", "family": "Montserrat", "weight": "var(--styles-bodym-font-weight)", "style": "normal", "allowsCrossOrigin": false}] */
-
-@font-face {
-  font-family: "Montserrat";
-  src: local("Montserrat");
+/* Base font defaults (optional but useful) */
+body {
+  font-family: "Montserrat", sans-serif;
 }

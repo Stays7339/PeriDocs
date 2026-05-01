@@ -1,3 +1,12 @@
+body {
+  margin: 0;
+  background-image: url("img/source/museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
+  background-size: cover;
+  background-position: center;
+  background-repeat: repeat-y
+}
+
+
 .progress {
   display: flex;
   flex-direction: column;
@@ -198,7 +207,7 @@
   width: 1185px;
   height: 188px;
   margin-top: 10px;
-  font-family: "Montserrat Alternates-SemiBold", Helvetica;
+  font-family: "Montserrat", sans-serif;
   font-weight: 400;
   color: transparent;
   font-size: 24px;
@@ -411,7 +420,7 @@
   position: relative;
   align-self: stretch;
   height: 85px;
-  font-family: "Montserrat-Regular", Helvetica;
+  font-family: "Montserrat", sans-serif;
   font-weight: 400;
   color: var(--brandcarbon-blackcarbon-black-004);
   font-size: 14px;
@@ -434,7 +443,7 @@
   width: 300px;
   height: 400px;
   aspect-ratio: 0.75;
-  background-image: url(./img/landing-page-card-higher-quality-1-2.png);
+  background-image: url(./img/landing-page-card-higher-quality-1.png);
   background-size: cover;
   background-position: 50% 50%;
 }
@@ -609,7 +618,7 @@
   width: 194px;
   height: 36px;
   margin-left: 25px;
-  font-family: "Montserrat Alternates-SemiBold", Helvetica;
+  font-family: "Montserrat", sans-serif;
   font-weight: 600;
   color: #ffffff;
   font-size: 36px;
