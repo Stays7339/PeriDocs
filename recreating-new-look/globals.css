@@ -1,7 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon&family=Lexend:wght@100..900&family=Montserrat+Alternates:wght@100..900&display=swap");
 @import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
-
-/* Google Fonts */
-@import url("https://fonts.googleapis.com/css2?family=Lexend:wght@100..900&family=Montserrat:wght@100..900&family=IM+Fell+French+Canon&display=swap");
 
 * {
   -webkit-font-smoothing: antialiased;
@@ -26,5 +24,5 @@ a {
 
 /* Base font defaults (optional but useful) */
 body {
-  font-family: "Montserrat", sans-serif;
+  font-family: "Montserrat Alternates", sans-serif;
 }
