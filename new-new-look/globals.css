@@ -1,0 +1,95 @@
+/* =========================
+   RESET + BASE IMPORTS
+========================= */
+
+@import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
+
+@import url("https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon&family=Lexend:wght@100..900&family=Montserrat+Alternates:wght@100..900&display=swap");
+
+/* =========================
+   ROOT LAYOUT FOUNDATION
+========================= */
+
+:root {
+  --app-background-image: none; /* set your repo image path here */
+  --app-header-height: 72px;
+}
+
+/* =========================
+   BASE ELEMENTS
+========================= */
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Montserrat Alternates", sans-serif;
+  background-image: var(--app-background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  overflow-x: hidden;
+}
+
+/* links */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+/* =========================
+   HEADER GLOBAL BEHAVIOR
+   (always visible, always pinned)
+========================= */
+
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-header-height);
+  z-index: 1000;
+
+  /* translucent overlay behavior */
+  background: rgba(255, 255, 255, 0.6); /* adjust tint later via styleguide */
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+/* ensure page content doesn't sit under header */
+main {
+  padding-top: var(--app-header-height);
+}
+
+/* =========================
+   RESPONSIVE STRUCTURAL RULE
+   ≤ 1.65 ASPECT RATIO = "COMPRESSED LAYOUT MODE"
+========================= */
+
+@media (max-aspect-ratio: 165/100) {
+  /* This is your structural collapse mode trigger */
+
+  body {
+    position: inherit; /* keeps layout stable when switching orientation */
+  }
+
+  /* You will later wire these classes in style.css */
+  .layout-horizontal-only {
+    display: none !important;
+  }
+
+  .layout-vertical-only {
+    display: block !important;
+  }
+}
