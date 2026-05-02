@@ -12,7 +12,7 @@
 
 :root {
   --app-background-image: none; /* set your repo image path here */
-  --app-header-height: 72px;
+  --app-header-height: 100px;
 }
 
 /* =========================
@@ -60,17 +60,12 @@ header {
   z-index: 1000;
 
   /* translucent overlay behavior */
-  background: rgba(255, 255, 255, 0.6); /* adjust tint later via styleguide */
+  background: var(--branddusty-olivedusty-olive-006-translucent); /* adjust tint later via styleguide */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0px 4px 4px #00000080;
 }
 
-/* ensure page content doesn't sit under header */
-main {
-  padding-top: var(--app-header-height);
-}
 
 /* =========================
    RESPONSIVE STRUCTURAL RULE
