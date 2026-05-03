@@ -39,10 +39,6 @@ save-state 2026-05-02T23:02:40-04:00
         <div class="header-center-inner">
 
       <div class="menu-group-left">
-        <a class="menu-button">Donation</a>
-        <a class="menu-button">Home</a>
-        <a class="menu-button">Home</a>
-        <a class="menu-button">Home</a>
         <a class="menu-button">Home</a>
         </div>
 
@@ -50,7 +46,9 @@ save-state 2026-05-02T23:02:40-04:00
 
       <div class="menu-group-right">
         <a class="menu-button">Info</a>
-        <a class="menu-button">TOS</a>
+        <a class="menu-button">Info</a>
+        <a class="menu-button">Info</a>
+        <a class="menu-button">Info</a>
       </div>
 
       </div>
@@ -84,6 +82,35 @@ save-state 2026-05-02T23:02:40-04:00
   <main class="page-content">
     <!-- page-specific content goes here -->
   </main>
+
+  <script>
+function updateNavPill() {
+  const left = document.querySelector(".menu-group-left");
+  const right = document.querySelector(".menu-group-right");
+  const header = document.querySelector(".header-center");
+
+  if (!left || !right || !header) return;
+
+  const headerRect = header.getBoundingClientRect();
+  const leftRect = left.getBoundingClientRect();
+  const rightRect = right.getBoundingClientRect();
+
+  // left edge of left group relative to header
+  const leftEdge = leftRect.left - headerRect.left;
+
+  // right edge of right group relative to header
+  const rightEdge = rightRect.right - headerRect.left;
+
+  const width = rightEdge - leftEdge;
+
+  // write to CSS variables
+  header.style.setProperty("--nav-pill-left", `${leftEdge}px`);
+  header.style.setProperty("--nav-pill-width", `${width}px`);
+}
+
+window.addEventListener("load", updateNavPill);
+window.addEventListener("resize", updateNavPill);
+</script>
 
 </body>
 </html>
