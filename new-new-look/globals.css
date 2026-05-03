@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/globals.css
-save-state 2026-05-02T19:10:08-04:00
+save-state 2026-05-02T21:52:58-04:00
 */
 
 /* =========================
@@ -152,6 +152,8 @@ header {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .menu-group-right {
@@ -160,6 +162,8 @@ header {
   display: flex;
   gap: 12px;
   justify-content: flex-start;
+  flex-wrap: nowrap;
+  align-items: center;
 }
 
 .header-logo img {
@@ -181,6 +185,7 @@ header {
 
   white-space: nowrap;
   padding: 8px 12px;
+  flex: 0 0 auto;
 
   font: inherit;
 }
