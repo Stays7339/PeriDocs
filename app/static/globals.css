@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/globals.css
-save-state 2026-05-03T15:54:20-04:00
+save-state 2026-05-03T16:12:40-04:00
 */
 
 /* =========================
@@ -36,6 +36,12 @@ save-state 2026-05-03T15:54:20-04:00
   --toast-error-bg: #F5A3A3;
   --toast-neutral-bg: #F5E8A3;
   --toast-text: #000000;
+  --privacy-toast-bg: var( --brandeggshelleggshell-004);
+  --privacy-toast-text: var(--toast-text);
+  --privacy-toast-link: var(--brandbright-periwinklebright-periwinkle-004);
+  --card: #F0F0EB;
+  --accent: #7F86B0;
+  --text: #111;
 
   --page-vertical-offset: 15vh;
 }
@@ -366,9 +372,9 @@ header {
   background-color: var(--toast-neutral-bg);
 }
 
-#privacy-toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%) translateY(20px);display:none;flex-direction:row;align-items:center;gap:.75rem;max-width:600px;padding:.75rem 1rem;border-radius:8px;font-size:.9rem;font-weight:500;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(0,0,0,.15);background:var(--privacy-bg);color:var(--privacy-text);transition:opacity .4s ease,transform .4s ease;}
+#privacy-toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%) translateY(20px);display:none;flex-direction:row;align-items:center;gap:.75rem;max-width:600px;padding:.75rem 1rem;border-radius:8px;font-size:.9rem;font-weight:500;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(0,0,0,.15);background:var(--privacy-toast-bg);color:var(--privacy-toast-text);transition:opacity .4s ease,transform .4s ease;}
 #privacy-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 #privacy-toast.hide{opacity:0;transform:translateX(-50%) translateY(20px);}
 #privacy-toast a{color:var(--privacy-link);text-decoration:underline;}
-#privacy-toast button{background:transparent;border:none;color:var(--privacy-text);font-size:1.2rem;cursor:pointer;margin-left:auto;opacity:.8;}
+#privacy-toast button{background:transparent;border:none;color:var(--privacy-toast-text);font-size:1.2rem;cursor:pointer;margin-left:auto;opacity:.8;}
 #privacy-toast button:hover{opacity:1;}
