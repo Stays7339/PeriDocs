@@ -1,6 +1,6 @@
 <!--
 PeriDocs/new-new-look/base.html
-save-state 2026-05-02T23:02:40-04:00
+save-state 2026-05-03T12:02:15-04:00
 -->
 
 <!doctype html>
@@ -18,6 +18,9 @@ save-state 2026-05-02T23:02:40-04:00
   <link rel="stylesheet" href="./styleguide.css" />
   <link rel="stylesheet" href="./style.css" />
 </head>
+
+<!-- ADDED: required for peridocs-ui.js toast system -->
+<div id="general-toast-container"></div>
 
 <body>
 
@@ -39,16 +42,17 @@ save-state 2026-05-02T23:02:40-04:00
         <div class="header-center-inner">
 
       <div class="menu-group-left">
-        <a class="menu-button">Home</a>
+        <a class="menu-button">About</a>
+        <a class="menu-button">Open Source</a>
+        <a class="menu-button">Institutions</a>
         </div>
 
     <div class="header-center-spine"></div>
 
       <div class="menu-group-right">
-        <a class="menu-button">Info</a>
-        <a class="menu-button">Info</a>
-        <a class="menu-button">Info</a>
-        <a class="menu-button">Info</a>
+        <a class="menu-button">User Guide</a>
+        <a class="menu-button">Contribution</a>
+        <a class="menu-button">Login / Signup</a>
       </div>
 
       </div>
@@ -111,6 +115,9 @@ function updateNavPill() {
 window.addEventListener("load", updateNavPill);
 window.addEventListener("resize", updateNavPill);
 </script>
+
+<!-- ADDED: brings in existing UI system (toasts, etc.) -->
+<script src="/static/peridocs-ui.js"></script>
 
 </body>
 </html>

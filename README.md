@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-29T11:53:57-04:00
+## Canonical Project Directory as of 2026-05-03T10:36:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -445,7 +445,13 @@ PeriDocs/                         # Root project folder
 │   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
 │
 │
-│
+├─ new-new-look/ 
+│   ├─ base.html
+│   ├─ fi-rr-search-alt.svg # Icon for authoring an entry
+│   ├─ globals.css # styles that should always be there on every page, even if they're not visible 100% of the time
+│   ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png # background image
+│   ├─ peridocs-wordmark-and-logo-v2.png
+│   └─ styleguide.css # a set of variables that are here specifically because the values within the variables are used so often throughout the repo.
 │
 │
 ├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.

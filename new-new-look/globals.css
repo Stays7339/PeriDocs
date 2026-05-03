@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/globals.css
-save-state 2026-05-02T23:02:30-04:00
+save-state 2026-05-03T12:16:55-04:00
 */
 
 /* =========================
@@ -18,6 +18,12 @@ save-state 2026-05-02T23:02:30-04:00
 :root {
   --app-background-image: url("./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
   --app-header-height: 100px;
+
+  /* =========================
+     NEW: DYNAMIC PILL CONTROL (JS WRITES THESE)
+  ========================= */
+  --nav-pill-left: 0px;
+  --nav-pill-width: 0px;
 }
 
 /* =========================
@@ -98,6 +104,11 @@ header {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--box-shadow-typical);
+
+   /* =========================
+     NEW: allow JS-driven pill positioning context
+  ========================= */
+  position: fixed;
 }
 
 
@@ -132,46 +143,16 @@ header {
   padding: 8px 16px;
 
   white-space: nowrap;
+
+    /* =========================
+     NEW: pill becomes "visual layer only"
+  ========================= */
+  background: transparent;
 }
 
-.header-center-inner {
-  position: relative;
-  display: inline-block;
-}
-
-.header-center-spine {
-  position: absolute;   
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
-}
 
 .header-hamburger-button {
   display: none;
-}
-
-/* =========================
-   MENU GROUPS (LEFT / RIGHT OF CENTER)
-========================= */
-
-.menu-group-left {
-  position: absolute;
-  right: 50%;
-  display: flex;
-  gap: 12px;
-  flex: 0 0 auto;
-  transform: translateX(-8px);
-  justify-content: flex-end;
-}
-
-.menu-group-right {
-  position: absolute;
-  left: 50%;
-  display: flex;
-  gap: 12px;
-  flex: 0 0 auto;
-  transform: translateX(8px);
-  justify-content: flex-start;
 }
 
 .header-logo img {
@@ -179,34 +160,6 @@ header {
   object-fit: contain;
   display: block;
 }
-
-/* =========================
-   BUTTON BEHAVIOR (CRITICAL PART)
-========================= */
-
-.menu-button {
-  display: inline-flex;
-  align-items: center;
-
-  /* IMPORTANT: this enables text-driven width expansion */
-  width: max-content;
-
-  white-space: nowrap;
-  padding: 8px 12px;
-  flex: 0 0 auto;
-
-  font: inherit;
-}
-
-/*
-Key behavior rule you asked for:
-- Left side does NOT affect center balance
-- Right side expands independently
-This works because:
-- center is flex:1
-- groups are max-content
-- right group is allowed to grow without constraining center anchor
-*/
 
 /* =========================
    RIGHT SVG STACKED BUTTON
@@ -231,7 +184,7 @@ This works because:
   gap: 10px;
   padding: 10px;
   position: relative;
-  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004); /* color the button itself purple */
   border-radius: 20px;
   aspect-ratio: 1;
   box-shadow: var(--box-shadow-typical);
@@ -274,140 +227,8 @@ This works because:
   }
 }
 
-/* 
-PeriDocs/new-new-look/globals.css
-save-state 2026-05-02T23:02:30-04:00
-*/
-
 /* =========================
-   RESET + BASE IMPORTS
-========================= */
-
-@import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
-
-@import url("https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon&family=Lexend:wght@100..900&family=Montserrat+Alternates:wght@100..900&display=swap");
-
-/* =========================
-   ROOT LAYOUT FOUNDATION
-========================= */
-
-:root {
-  --app-background-image: url("./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
-  --app-header-height: 100px;
-
-  /* =========================
-     NEW: DYNAMIC PILL CONTROL (JS WRITES THESE)
-  ========================= */
-  --nav-pill-left: 0px;
-  --nav-pill-width: 0px;
-}
-
-/* =========================
-   BASE ELEMENTS
-========================= */
-
-* {
-  box-sizing: border-box;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-html,
-body {
-  height: 100%;
-  margin: 0;
-}
-
-body {
-  font-family: "Montserrat Alternates", sans-serif;
-  background-color: var(--brandeggshelleggshell-003);
-  background-image: var(--app-background-image);
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  overflow-x: hidden;
-}
-
-/* links */
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-button {
-  appearance: none;
-  -webkit-appearance: none;
-
-  border: none;
-  outline: none;
-  background: none;
-
-  padding: 0;
-  margin: 0;
-
-  font: inherit;
-  color: inherit;
-
-  cursor: pointer;
-}
-
-button:focus-visible {
-  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-004);
-  outline-offset: 2px;
-}
-
-/* =========================
-   HEADER GLOBAL BEHAVIOR
-========================= */
-
-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: var(--app-header-height);
-  z-index: 100;
-
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-
-  padding: 0 3%;
-
-  background: var(--branddusty-olivedusty-olive-006-translucent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  box-shadow: var(--box-shadow-typical);
-
-  /* =========================
-     NEW: allow JS-driven pill positioning context
-  ========================= */
-  position: fixed;
-}
-
-/* =========================
-   HEADER CENTER CONTAINER
-========================= */
-
-.header-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-
-  display: block;
-  white-space: nowrap;
-
-  padding: 8px 16px;
-  border-radius: 999px;
-
-  /* =========================
-     NEW: pill becomes "visual layer only"
-  ========================= */
-  background: transparent;
-}
-
-/* =========================
-   NEW: THE ACTUAL PILL (JS CONTROLLED)
+  THE ACTUAL PILL (JS CONTROLLED)
 ========================= */
 
 .header-center::before {
@@ -449,18 +270,29 @@ header {
 .menu-group-right {
   display: flex;
   gap: 12px;
+  position: absolute;
+  gap: 12px;
+  flex: 0 0 auto;
 }
 
 .menu-group-left {
+  right: 50%;
+  transform: translateX(-8px);
   justify-content: flex-end;
 }
 
 .menu-group-right {
+  left: 50%;
+  transform: translateX(8px);
   justify-content: flex-start;
 }
 
 /* spine stays purely logical now */
 .header-center-spine {
+  position: absolute;   
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 1px;
   height: 60%;
 }
@@ -475,10 +307,15 @@ header {
   padding: 8px 12px;
   font: inherit;
   font-family: "Lexend", sans-serif;
-  color: var( --brandbright-periwinklebright-periwinkle-001);
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+  align-items: center;
+  width: max-content;
+  flex: 0 0 auto;
 }
 
 /* =========================
-   JS REQUIRED (NOT OPTIONAL)
-   This is the missing piece CSS cannot do
+  JS REQUIRED for the sliding pill look;
+  this requirement has been bidirectionally confirmed.
+  Both the Javascript within new-new-look/base.html, AND
+  the header-center::before within globalss.css are necessary.
 ========================= */

@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/styleguide.css
-save-state 2026-05-02T18:26:25-04:00
+save-state 2026-05-03T12:02:00-04:00
 */
 
 :root {
@@ -301,4 +301,7 @@ save-state 2026-05-02T18:26:25-04:00
 
 
   --box-shadow-typical: 0px 4px 4px #00000080;
+    /* General Toasts */
+  --toast-bg: #F5E8A3;
+  --toast-text: #000000;
 }
