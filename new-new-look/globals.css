@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/globals.css
-save-state 2026-05-02T21:52:58-04:00
+save-state 2026-05-02T23:02:30-04:00
 */
 
 /* =========================
@@ -86,14 +86,15 @@ header {
   right: 0;
   height: var(--app-header-height);
   z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
   padding: 0 3%;
 
-  display: grid;
-  grid-template-columns: 1fr 50vw 1fr;
-  align-items: center;
-
   /* translucent overlay behavior */
-  background: var(--branddusty-olivedusty-olive-006-translucent); /* adjust tint later via styleguide */
+  background: var(--branddusty-olivedusty-olive-006-translucent);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   box-shadow: var(--box-shadow-typical);
@@ -120,22 +121,29 @@ header {
 }
 
 .header-center {
-  position: relative;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  justify-self: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;
+
   background: var(--branddusty-olivedusty-olive-006);
   border-radius: 999px;
   padding: 8px 16px;
-  box-shadow: var(--box-shadow-typical);
+
+  white-space: nowrap;
+}
+
+.header-center-inner {
+  position: relative;
+  display: inline-block;
 }
 
 .header-center-spine {
-  grid-column: 2;
-  width: 1px;
-  height: 60%;
-  justify-self: center;
+  position: absolute;   
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .header-hamburger-button {
@@ -147,23 +155,23 @@ header {
 ========================= */
 
 .menu-group-left {
-  grid-column: 1;
-  justify-self: end;
+  position: absolute;
+  right: 50%;
   display: flex;
   gap: 12px;
+  flex: 0 0 auto;
+  transform: translateX(-8px);
   justify-content: flex-end;
-  flex-wrap: nowrap;
-  align-items: center;
 }
 
 .menu-group-right {
-  grid-column: 3;
-  justify-self: start;
+  position: absolute;
+  left: 50%;
   display: flex;
   gap: 12px;
+  flex: 0 0 auto;
+  transform: translateX(8px);
   justify-content: flex-start;
-  flex-wrap: nowrap;
-  align-items: center;
 }
 
 .header-logo img {
@@ -235,18 +243,6 @@ This works because:
   align-items: center;
   justify-content: center;
 }
-
-.header-right{
-  border: 0;
-  cursor: pointer;
-  appearance: none;
-  -webkit-appearance: none;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: inherit;
-}
-
 
 /* =========================
    RESPONSIVE STRUCTURAL RULE
