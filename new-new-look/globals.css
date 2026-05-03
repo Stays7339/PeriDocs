@@ -1,3 +1,8 @@
+/* 
+PeriDocs/new-new-look/globals.css
+save-state 2026-05-02T19:10:08-04:00
+*/
+
 /* =========================
    RESET + BASE IMPORTS
 ========================= */
@@ -11,7 +16,7 @@
 ========================= */
 
 :root {
-  --app-background-image: none; /* set your repo image path here */
+  --app-background-image: url("./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
   --app-header-height: 100px;
 }
 
@@ -33,6 +38,7 @@ body {
 
 body {
   font-family: "Montserrat Alternates", sans-serif;
+  background-color: var(--brandeggshelleggshell-003);
   background-image: var(--app-background-image);
   background-size: cover;
   background-position: center;
@@ -46,6 +52,28 @@ a {
   color: inherit;
 }
 
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: none;
+  outline: none;
+  background: none;
+
+  padding: 0;
+  margin: 0;
+
+  font: inherit;
+  color: inherit;
+
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-004);
+  outline-offset: 2px;
+}
 /* =========================
    HEADER GLOBAL BEHAVIOR
    (always visible, always pinned)
@@ -57,13 +85,161 @@ header {
   left: 0;
   right: 0;
   height: var(--app-header-height);
-  z-index: 1000;
+  z-index: 100;
+  padding: 0 3%;
+
+  display: grid;
+  grid-template-columns: 1fr 50vw 1fr;
+  align-items: center;
 
   /* translucent overlay behavior */
   background: var(--branddusty-olivedusty-olive-006-translucent); /* adjust tint later via styleguide */
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  box-shadow: 0px 4px 4px #00000080;
+  box-shadow: var(--box-shadow-typical);
+}
+
+
+/* =========================
+   HEADER SECTIONS
+========================= */
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.header-left {
+    justify-self: start;
+}
+
+.header-right {
+    justify-self: end;
+}
+
+.header-center {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  justify-self: center;
+  background: var(--branddusty-olivedusty-olive-006);
+  border-radius: 999px;
+  padding: 8px 16px;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.header-center-spine {
+  grid-column: 2;
+  width: 1px;
+  height: 60%;
+  justify-self: center;
+}
+
+.header-hamburger-button {
+  display: none;
+}
+
+/* =========================
+   MENU GROUPS (LEFT / RIGHT OF CENTER)
+========================= */
+
+.menu-group-left {
+  grid-column: 1;
+  justify-self: end;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.menu-group-right {
+  grid-column: 3;
+  justify-self: start;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.header-logo img {
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* =========================
+   BUTTON BEHAVIOR (CRITICAL PART)
+========================= */
+
+.menu-button {
+  display: inline-flex;
+  align-items: center;
+
+  /* IMPORTANT: this enables text-driven width expansion */
+  width: max-content;
+
+  white-space: nowrap;
+  padding: 8px 12px;
+
+  font: inherit;
+}
+
+/*
+Key behavior rule you asked for:
+- Left side does NOT affect center balance
+- Right side expands independently
+This works because:
+- center is flex:1
+- groups are max-content
+- right group is allowed to grow without constraining center anchor
+*/
+
+/* =========================
+   RIGHT SVG STACKED BUTTON
+========================= */
+
+.header-svg-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%) translateX(-5%);
+
+  z-index: 2;
+  pointer-events: none;
+}
+
+.header-action-button {
+  display: flex;
+  width: 60px;
+  height: 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  position: relative;
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  border-radius: 20px;
+  aspect-ratio: 1;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.header-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.header-right{
+  border: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: inherit;
 }
 
 
@@ -73,7 +249,15 @@ header {
 ========================= */
 
 @media (max-aspect-ratio: 165/100) {
-  /* This is your structural collapse mode trigger */
+  /* This is the structural collapse mode trigger */
+
+  header {
+    grid-template-columns: auto 1fr auto auto;
+  }
+
+  .header-hamburger-button {
+    display: flex;
+  }
 
   body {
     position: inherit; /* keeps layout stable when switching orientation */

@@ -1,0 +1,84 @@
+<!--
+PeriDocs/new-new-look/base.html
+save-state 2026-05-02T19:01:00-04:00
+-->
+
+<!doctype html>
+<html lang="en">
+<head>
+  <link rel="preload" as="image" href="./peridocs-wordmark-and-logo-v2.png">
+  <link rel="preload" as="image" href="./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>PeriDocs</title>
+
+  <!-- Global styles (must be loaded first) -->
+  <link rel="stylesheet" href="./globals.css" />
+  <link rel="stylesheet" href="./styleguide.css" />
+  <link rel="stylesheet" href="./style.css" />
+</head>
+
+<body>
+
+  <!-- =========================
+       HEADER (fixed, translucent, always present)
+  ========================== -->
+  <header class="app-header">
+
+    <!-- LEFT: LOGO -->
+    <div class="header-left">
+      <a class="header-logo" href="/">
+        <!-- replace with your svg or img -->
+        <img src="./peridocs-wordmark-and-logo-v2.png" alt="PeriDocs Logo" height="50"/>
+      </a>
+    </div>
+
+    <!-- CENTER: MENU BAR -->
+    <nav class="header-center" aria-label="Primary navigation">
+
+      <div class="menu-group menu-group-left">
+      </div>
+
+      <div class="menu-group menu-group-right">
+        <button class="menu-button">
+          Donation
+        </button>
+        <button class="menu-button">Home</button>
+        <button class="menu-button">Home</button>
+        <button class="menu-button">Home</button>
+        <button class="menu-button">Home</button>
+      </div>
+
+    </nav>
+
+    <!-- RIGHT: ACTION AREA -->
+    <div class="header-right">
+
+    <button class="header-hamburger-button" aria-label="Menu">
+    ☰
+    </button>
+
+      <!-- SVG icon layer (decorative or interactive depending on your intent) -->
+      <img class="header-svg-layer" src="./fi-rr-search-alt.svg" alt="" />
+
+      <!-- Button under SVG z-layer -->
+      <button class="header-action-button" aria-label="Primary Action">
+        <!-- empty or icon/text depending on your design -->
+      </button>
+
+    </div>
+
+  </header>
+
+
+  <!-- =========================
+       PAGE CONTENT SLOT
+       (sits under fixed translucent header)
+  ========================== -->
+  <main class="page-content">
+    <!-- page-specific content goes here -->
+  </main>
+
+</body>
+</html>

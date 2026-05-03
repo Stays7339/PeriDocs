@@ -1,3 +1,8 @@
+/* 
+PeriDocs/new-new-look/styleguide.css
+save-state 2026-05-02T18:26:25-04:00
+*/
+
 :root {
   --brandcarbon-blackcarbon-black-001: rgba(109, 109, 109, 1);
   --brandcarbon-blackcarbon-black-002: rgba(93, 93, 93, 1);
@@ -24,7 +29,7 @@
   --branddusty-olivedusty-olive-004: rgba(120, 136, 99, 1);
   --branddusty-olivedusty-olive-005: rgba(108, 124, 89, 1);
   --branddusty-olivedusty-olive-006: rgba(93, 106, 77, 1); /* menu bar color */
-  --branddusty-olivedusty-olive-006-translucent: rgba(93, 106, 77, 0.6); /* header background color */
+  --branddusty-olivedusty-olive-006-translucent: rgba(93, 106, 77, 0.3); /* header background color */
   --branddusty-olivedusty-olive-007: rgba(78, 89, 64, 1);
   --branddusty-olivedusty-olive-008: rgba(70, 80, 58, 1);
   --branddusty-olivedusty-olive-009: rgba(54, 62, 45, 1);
@@ -292,4 +297,8 @@
   --variable-collection-secondary-button-color: rgba(75, 75, 102, 1);
   --variable-collection-primary-button-color: rgba(109, 109, 164, 1);
   --variable-collection-carbon-black-001: rgba(255, 255, 255, 1);
+
+
+
+  --box-shadow-typical: 0px 4px 4px #00000080;
 }
