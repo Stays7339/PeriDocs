@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-03T16:21:53-04:00
+## Canonical Project Directory as of 2026-05-03T17:08:15-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -334,7 +334,8 @@ PeriDocs/                         # Root project folder
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
-│  │  ├─ style.css                       # Main stylesheet
+│  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
+│  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │

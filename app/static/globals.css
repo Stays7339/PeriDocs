@@ -240,7 +240,7 @@ header {
     position: inherit; /* keeps layout stable when switching orientation */
   }
 
-  /* You will later wire these classes in style.css */
+  /* You will later wire these classes in stylesheet.css */
   .layout-horizontal-only {
     display: none !important;
   }

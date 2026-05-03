@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/styleguide.css
-save-state 2026-05-03T12:32:05-04:00
+save-state 2026-05-03T16:43:25-04:00
 */
 
 :root {
@@ -296,7 +296,7 @@ save-state 2026-05-03T12:32:05-04:00
   );
   --variable-collection-secondary-button-color: rgba(75, 75, 102, 1);
   --variable-collection-primary-button-color: rgba(109, 109, 164, 1);
-  --variable-collection-carbon-black-001: rgba(255, 255, 255, 1);
+  --variable-collection-carbon-black-001: rgb(0, 0, 0);
 
 
 

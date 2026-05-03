@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-04-28T21:59:05-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-05-03T17:01:20-04:00 (YYYYMMDDhhmm)
 # ==========================================
 import os
 import logging
@@ -119,7 +119,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
 # Recheck that all the files are in order every once in a while
 # In seconds
-PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 150
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300
 
 
 async def periodic_integrity_check():
