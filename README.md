@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-03T10:36:40-04:00
+## Canonical Project Directory as of 2026-05-03T13:07:15-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -325,15 +325,14 @@ PeriDocs/                         # Root project folder
 │  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ favicon.png
+│  │  ├─ fi-rr-search-alt.svg
+│  │  ├─ globals.css
+│  │  ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png
 │  │  ├─ peridocs-logo-v1-white.png
 │  │  ├─ peridocs-logo-v1.png
 │  │  ├─ peridocs-logo-v2.png
-│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
-│  │  ├─ peridocs-wordmark-202602232127.svg
-│  │  ├─ peridocs-wordmark-and-logo-202602232100.png
-│  │  ├─ peridocs-wordmark-and-logo-202602232133.png
-│  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
-│  │  ├─ [a few more as the logo has been marginally iterated upon]
+│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
+│  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ style.css                       # Main stylesheet
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -342,7 +341,8 @@ PeriDocs/                         # Root project folder
 │  └─ templates/                        # Jinja2 HTML templates
 │   ├─ about.html                     # About page template
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
-│   ├─ base.html                      # Layout template
+│   ├─ base_old.html                      # The more stable one that I'm trying to replace gradually
+│   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
 │   ├─ index.html                     # Main homepage template
 │   ├─ privacy.html                   # Privacy policy page template
@@ -446,12 +446,7 @@ PeriDocs/                         # Root project folder
 │
 │
 ├─ new-new-look/ 
-│   ├─ base.html
-│   ├─ fi-rr-search-alt.svg # Icon for authoring an entry
-│   ├─ globals.css # styles that should always be there on every page, even if they're not visible 100% of the time
-│   ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png # background image
-│   ├─ peridocs-wordmark-and-logo-v2.png
-│   └─ styleguide.css # a set of variables that are here specifically because the values within the variables are used so often throughout the repo.
+│   └─ # vacated entirely.
 │
 │
 ├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.

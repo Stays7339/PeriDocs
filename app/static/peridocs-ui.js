@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-04-29T04:32:10-04:00
+// save-state 2026-05-03T15:55:05-04:00
 // ==========================================
 
 /* Notes:
@@ -218,8 +218,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const toast = document.createElement('div');
     toast.className = 'stacked-toast';
-    toast.style.backgroundColor = type === 'success' ? '#A3F5B2' :
-                              type === 'error' ? '#F5A3A3' : '#F5E8A3';
+
+    /* adds a CSS class to the toast element, choosing the class name based on the type, 
+    but if the type is "info", it swaps it to "neutral" instead. */
+    toast.classList.add(`toast-${type === 'info' ? 'neutral' : type}`);
+    
     toast.textContent = message;
 
     toastContainer.appendChild(toast);
@@ -279,6 +282,7 @@ document.addEventListener("DOMContentLoaded", () => {
           const spinnerToast = document.createElement('div');
           spinnerToast.className = 'stacked-toast';
           spinnerToast.style.display = 'inline-flex';
+          spinnerToast.classList.add('toast-neutral');
           spinnerToast.style.alignItems = 'center';
           spinnerToast.style.gap = '10px';
           spinnerToast.innerHTML = `

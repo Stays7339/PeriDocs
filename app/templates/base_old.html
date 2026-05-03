@@ -1,0 +1,53 @@
+<!-- PeriDocs-code/app/templates/base.html save-state 2026-04-24T12:06:00-04:00 -->
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="icon" href="/static/peridocs-logo-v2.png" type="image/png">
+  <title>{% block title %}PeriDocs{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/admin-typeahead.css">
+</head>
+
+<body>
+  <header class="header-bar">
+    <a href="/" class="brand-link">
+      <img src="/static/peridocs-wordmark-and-logo-202602261328.png"
+          alt="PeriDocs logo"
+          class="brand-logo">
+    </a>
+
+    <p>v0.2.0</p>
+
+    <nav class="header-menu">
+      <a class="btn primary" href="/">Home</a>
+      <a class="btn primary" href="/about">About & Contact</a>
+      <a class="btn primary" href="/terms-of-service">Terms of Service</a>
+      <a class="btn primary" href="/privacy-policy">Privacy Policy</a>
+      <a class="btn primary" href="/delete">Deletion</a>
+      <a class="btn primary" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00">Donation</a>
+    </nav>
+
+    <button id="menu-toggle-btn" class="btn primary" aria-label="Toggle menu">☰</button>
+  </header>
+
+
+  <div class="wrap {% block layout %}layout-single{% endblock %}">
+  {% block content %}{% endblock %}
+  </div>
+
+  <button id="theme-toggle-btn" aria-label="Toggle theme" class="btn primary">Dark Mode</button>
+  <button id="feedback-btn" aria-label="Give feedback" class="btn primary">Feedback</button>
+
+  {% include 'includes/modal-feedback.html' %}
+  {% include 'includes/modal-crisis.html' %}
+
+  <div id="general-toast-container"></div>
+  <div id="privacy-toast"></div>
+
+  <script src="/static/peridocs-ui.js" defer></script>
+
+  <canvas id="snow-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;display:none;"></canvas>
+</body>
+</html>

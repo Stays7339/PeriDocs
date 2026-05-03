@@ -1,53 +1,122 @@
-<!-- PeriDocs-code/app/templates/base.html save-state 2026-04-24T12:06:00-04:00 -->
+<!--
+PeriDocs/app/templates/base.html
+save-state 2026-05-03T15:33:40-04:00
+-->
+
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="icon" href="/static/peridocs-logo-v2.png" type="image/png">
-  <title>{% block title %}PeriDocs{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/admin-typeahead.css">
+  <link rel="preload" as="image" href="/static/peridocs-wordmark-and-logo-v2.png">
+  <link rel="preload" as="image" href="/static/museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>PeriDocs</title>
+
+  <!-- Global styles (must be loaded first) -->
+  <link rel="stylesheet" href="/static/globals.css" />
+  <link rel="stylesheet" href="/static/styleguide.css" />
 </head>
 
+
+
 <body>
-  <header class="header-bar">
-    <a href="/" class="brand-link">
-      <img src="/static/peridocs-wordmark-and-logo-202602261328.png"
-          alt="PeriDocs logo"
-          class="brand-logo">
-    </a>
+<!-- ADDED: required for peridocs-ui.js toast system -->
+<div id="general-toast-container"></div>
+  <!-- =========================
+       HEADER (fixed, translucent, always present)
+  ========================== -->
+  <header>
 
-    <p>v0.2.0</p>
+    <!-- LEFT: LOGO -->
+    <div class="header-left">
+      <a class="header-logo" href="/">
+        <!-- replace with your svg or img -->
+        <img src="/static/peridocs-wordmark-and-logo-v2.png" alt="PeriDocs Logo" height="50"/>
+      </a>
+    </div>
 
-    <nav class="header-menu">
-      <a class="btn primary" href="/">Home</a>
-      <a class="btn primary" href="/about">About & Contact</a>
-      <a class="btn primary" href="/terms-of-service">Terms of Service</a>
-      <a class="btn primary" href="/privacy-policy">Privacy Policy</a>
-      <a class="btn primary" href="/delete">Deletion</a>
-      <a class="btn primary" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00">Donation</a>
+    <!-- CENTER: MENU BAR -->
+    <nav class="header-center" aria-label="Primary navigation">
+        <div class="header-center-inner">
+
+      <div class="menu-group-left">
+        <a class="menu-button">About</a>
+        <a class="menu-button">Open Source</a>
+        <a class="menu-button">Institutions</a>
+        </div>
+
+    <div class="header-center-spine"></div>
+
+      <div class="menu-group-right">
+        <a class="menu-button">User Guide</a>
+        <a class="menu-button">Contribution</a>
+        <a class="menu-button">Login / Signup</a>
+      </div>
+
+      </div>
+
     </nav>
 
-    <button id="menu-toggle-btn" class="btn primary" aria-label="Toggle menu">☰</button>
+    <!-- RIGHT: ACTION AREA -->
+    <div class="header-right">
+
+    <button class="header-hamburger-button" aria-label="Menu">
+    ☰
+    </button>
+
+      <!-- SVG icon layer (decorative or interactive depending on your intent) -->
+      <img class="header-svg-layer" src="/static/fi-rr-search-alt.svg" alt="" />
+
+      <!-- Button under SVG z-layer -->
+      <button class="header-action-button" aria-label="Primary Action">
+        <!-- empty or icon/text depending on your design -->
+      </button>
+
+    </div>
+
   </header>
 
 
-  <div class="wrap {% block layout %}layout-single{% endblock %}">
-  {% block content %}{% endblock %}
-  </div>
+  <!-- =========================
+       PAGE CONTENT SLOT
+       (sits under fixed translucent header)
+  ========================== -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
 
-  <button id="theme-toggle-btn" aria-label="Toggle theme" class="btn primary">Dark Mode</button>
-  <button id="feedback-btn" aria-label="Give feedback" class="btn primary">Feedback</button>
+  <script>
+function updateNavPill() {
+  const left = document.querySelector(".menu-group-left");
+  const right = document.querySelector(".menu-group-right");
+  const header = document.querySelector(".header-center");
 
-  {% include 'includes/modal-feedback.html' %}
-  {% include 'includes/modal-crisis.html' %}
+  if (!left || !right || !header) return;
 
-  <div id="general-toast-container"></div>
-  <div id="privacy-toast"></div>
+  const headerRect = header.getBoundingClientRect();
+  const leftRect = left.getBoundingClientRect();
+  const rightRect = right.getBoundingClientRect();
 
-  <script src="/static/peridocs-ui.js" defer></script>
+  // left edge of left group relative to header
+  const leftEdge = leftRect.left - headerRect.left;
 
-  <canvas id="snow-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;display:none;"></canvas>
+  // right edge of right group relative to header
+  const rightEdge = rightRect.right - headerRect.left;
+
+  const width = rightEdge - leftEdge;
+
+  // write to CSS variables
+  header.style.setProperty("--nav-pill-left", `${leftEdge}px`);
+  header.style.setProperty("--nav-pill-width", `${width}px`);
+}
+
+window.addEventListener("load", updateNavPill);
+window.addEventListener("resize", updateNavPill);
+</script>
+
+<!-- ADDED: brings in existing UI system (toasts, etc.) -->
+<script src="/static/peridocs-ui.js"></script>
+
 </body>
 </html>

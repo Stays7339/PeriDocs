@@ -1,0 +1,374 @@
+/* 
+PeriDocs/new-new-look/globals.css
+save-state 2026-05-03T15:54:20-04:00
+*/
+
+/* =========================
+   RESET + BASE IMPORTS
+========================= */
+
+@import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
+
+@import url("https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon&family=Lexend:wght@100..900&family=Montserrat+Alternates:wght@100..900&display=swap");
+
+/* =========================
+   ROOT LAYOUT FOUNDATION
+========================= */
+
+:root {
+  --app-background-image: url("./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
+
+  /* App Header Height is here ere in globals.css since we're trying to keep one file per feature, 
+  rather than sprawling the details of a feature across several different files,
+ and it should to be available globally (in terms of available in each page of the website.) */
+  --app-header-height: 100px;
+
+  /* =========================
+     NEW: DYNAMIC PILL CONTROL (JS WRITES THESE)
+  ========================= */
+  --nav-pill-left: 0px;
+  --nav-pill-width: 0px;
+
+  /* General Toasts is here since we're trying to keep one file per feature, 
+  rather than sprawling the details of a feature across several different files,
+ and it should to be available globally (in terms of available in each page of the website.) */
+  --toast-success-bg: #A3F5B2;
+  --toast-error-bg: #F5A3A3;
+  --toast-neutral-bg: #F5E8A3;
+  --toast-text: #000000;
+
+  --page-vertical-offset: 15vh;
+}
+
+.page-content {
+  padding-top: var(--page-vertical-offset);
+}
+
+/* =========================
+   BASE ELEMENTS
+========================= */
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: "Montserrat Alternates", sans-serif;
+  background-color: var(--brandeggshelleggshell-003);
+  background-image: var(--app-background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* links */
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+
+button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: none;
+  outline: none;
+  background: none;
+
+  padding: 0;
+  margin: 0;
+
+  font: inherit;
+  color: inherit;
+
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-004);
+  outline-offset: 2px;
+}
+/* =========================
+   HEADER GLOBAL BEHAVIOR
+   (always visible, always pinned)
+========================= */
+
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-header-height);
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 3%;
+
+  /* translucent overlay behavior */
+  background: var(--branddusty-olivedusty-olive-006-translucent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--box-shadow-typical);
+
+   /* =========================
+     NEW: allow JS-driven pill positioning context
+  ========================= */
+  position: fixed;
+}
+
+
+/* =========================
+   HEADER SECTIONS
+========================= */
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.header-left {
+    justify-self: start;
+}
+
+.header-right {
+    justify-self: end;
+}
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;
+
+  background: var(--branddusty-olivedusty-olive-006);
+  border-radius: 999px;
+  padding: 8px 16px;
+
+  white-space: nowrap;
+
+    /* =========================
+     NEW: pill becomes "visual layer only"
+  ========================= */
+  background: transparent;
+}
+
+
+.header-hamburger-button {
+  display: none;
+}
+
+.header-logo img {
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+/* =========================
+   RIGHT SVG STACKED BUTTON
+========================= */
+
+.header-svg-layer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+
+  transform: translate(-50%, -50%) translateX(-5%);
+
+  z-index: 2;
+  pointer-events: none;
+}
+
+.header-action-button {
+  display: flex;
+  width: 60px;
+  height: 60px;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  position: relative;
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004); /* color the button itself purple */
+  border-radius: 20px;
+  aspect-ratio: 1;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.header-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* =========================
+   RESPONSIVE STRUCTURAL RULE
+   ≤ 1.65 ASPECT RATIO = "COMPRESSED LAYOUT MODE"
+========================= */
+
+@media (max-aspect-ratio: 165/100) {
+  /* This is the structural collapse mode trigger */
+
+  header {
+    grid-template-columns: auto 1fr auto auto;
+  }
+
+  .header-hamburger-button {
+    display: flex;
+  }
+
+  body {
+    position: inherit; /* keeps layout stable when switching orientation */
+  }
+
+  /* You will later wire these classes in style.css */
+  .layout-horizontal-only {
+    display: none !important;
+  }
+
+  .layout-vertical-only {
+    display: block !important;
+  }
+}
+
+/* =========================
+  THE ACTUAL PILL (JS CONTROLLED)
+========================= */
+
+.header-center::before {
+  content: "";
+  position: absolute;
+
+  /* JS controls these */
+  left: var(--nav-pill-left);
+  width: var(--nav-pill-width);
+
+  top: 50%;
+  transform: translateY(-50%);
+
+  height: 44px;
+
+  background: var(--branddusty-olivedusty-olive-006);
+  border-radius: 999px;
+
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* =========================
+   INNER CONTENT
+========================= */
+
+.header-center-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 1;
+}
+
+/* =========================
+   GROUPS
+========================= */
+
+.menu-group-left,
+.menu-group-right {
+  display: flex;
+  gap: 12px;
+  position: absolute;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.menu-group-left {
+  right: 50%;
+  transform: translateX(-8px);
+  justify-content: flex-end;
+}
+
+.menu-group-right {
+  left: 50%;
+  transform: translateX(8px);
+  justify-content: flex-start;
+}
+
+/* spine stays purely logical now */
+.header-center-spine {
+  position: absolute;   
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1px;
+  height: 60%;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
+.menu-button {
+  display: inline-flex;
+  white-space: nowrap;
+  padding: 8px 12px;
+  font: inherit;
+  font-family: "Lexend", sans-serif;
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+  align-items: center;
+  width: max-content;
+  flex: 0 0 auto;
+}
+
+/* =========================
+  JS REQUIRED for the sliding pill look;
+  this requirement has been bidirectionally confirmed.
+  Both the Javascript within new-new-look/base.html, AND
+  the header-center::before within globalss.css are necessary.
+========================= */
+
+
+
+/* ---------------------- Toasts Animation---------------------- */
+#general-toast-container{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:10px;pointer-events:none;z-index:1001;}
+.stacked-toast {
+  background-color:var(--toast-neutral-bg-bg);
+  color:var(--toast-text);padding:10px 15px;
+  border-radius:8px;display:inline-flex;
+  align-items:center;
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity 0.4s ease, transform 0.4s ease;
+  pointer-events:auto;
+}
+.stacked-toast.show{opacity:1;transform:translateY(0);}
+.stacked-toast.hide{opacity:0;transform:translateY(20px);}
+
+.toast-success {
+  background-color: var(--toast-success-bg);
+}
+
+.toast-error {
+  background-color: var(--toast-error-bg);
+}
+
+.toast-neutral {
+  background-color: var(--toast-neutral-bg);
+}
+
+#privacy-toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%) translateY(20px);display:none;flex-direction:row;align-items:center;gap:.75rem;max-width:600px;padding:.75rem 1rem;border-radius:8px;font-size:.9rem;font-weight:500;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(0,0,0,.15);background:var(--privacy-bg);color:var(--privacy-text);transition:opacity .4s ease,transform .4s ease;}
+#privacy-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#privacy-toast.hide{opacity:0;transform:translateX(-50%) translateY(20px);}
+#privacy-toast a{color:var(--privacy-link);text-decoration:underline;}
+#privacy-toast button{background:transparent;border:none;color:var(--privacy-text);font-size:1.2rem;cursor:pointer;margin-left:auto;opacity:.8;}
+#privacy-toast button:hover{opacity:1;}

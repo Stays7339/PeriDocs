@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-04-29T23:32:00-04:00 (ISO 8601)
+# save-state 2026-05-03T13:18:00-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -12,7 +12,7 @@ import signal
 from pathlib import Path
 
 from fastapi import Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, FileResponse
 from app.routes.admin_routing import has_admins
 from app.routes import admin_credentialing
 
@@ -120,3 +120,7 @@ async def admin_bootstrap_gate(request: Request, call_next):
             return RedirectResponse("/admin/auth/login")
 
     return await call_next(request)
+
+@app.get("/favicon.ico")
+def favicon():
+    return FileResponse("app/static/favicon.png")
