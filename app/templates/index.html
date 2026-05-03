@@ -1,56 +1,8 @@
-{# index.html - homepage, extends base.html save-state 2026-03-30T14:46:50-04:00 #}
+{# index.html - homepage, extends base.html save-state 2026-05-30T14:46:50-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-content">
-    <h1>Welcome to PeriDocs !</h1>
-    <h3>We are a safe, transparent way for you to explore what your writing reveals. <br> See our <a href="/about">elaborated philosophy</a> for more.</h3>
 
-    <form id="entry-form" action="/submit" method="post">
-
-      <div id="entry-wrapper" class="entry-wrapper" data-locked="false">
-
-        <textarea 
-          name="entry_text" 
-          rows="10"
-          placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."
-          disabled
-        ></textarea>
-
-        <div class="entry-overlay" aria-hidden="true">
-          <div class="overlay-content">
-            <button 
-              type="button"
-              id="consent-toggle"
-              role="switch"
-              aria-checked="false"
-              data-state="off"
-              class="consent-toggle"
-            >
-              <span class="toggle-knob"></span>
-              <span class="toggle-label"></span>
-            </button>
-            <p class="overlay-message">
-            You may use the platform without revealing personal or sensitive information. 
-            <br> PeriDocs is based in the US, but your data will be hosted and processed in Germany (EU). 
-            <br> <br> By continuing, you consent to 1) transfer of your data between Germany and the US, <br> 2) processing of your data in Germany to provide and improve our service, and <br> 3) the safeguards we have in place, including pseudonymization and human oversight. 
-            <br> See our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages for details. 
-            </p>
-          </div>
-        </div>
-      <div class="entry-overlay-streaks" aria-hidden="true"></div>
-
-      </div>
-
-      <div class="meta" style="margin-top:12px;">
-        <button type="submit" class="btn primary" disabled>Analyze &amp; Search</button>
-      </div>
-
-    </form>
-
-  </div>
-</div>
 {% endblock %}

@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-03T13:07:15-04:00
+## Canonical Project Directory as of 2026-05-03T16:21:53-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -344,6 +344,7 @@ PeriDocs/                         # Root project folder
 │   ├─ base_old.html                      # The more stable one that I'm trying to replace gradually
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
+│   ├─ create-entry.html # the only page where entries are typed and submitted for ingestion
 │   ├─ index.html                     # Main homepage template
 │   ├─ privacy.html                   # Privacy policy page template
 │   ├─ submit-success.html            # Submission success page template
