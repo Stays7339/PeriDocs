@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-03T16:57:30-04:00 
+save-state 2026-05-03T22:51:55-04:00 
 ---------------------- */
 
 
@@ -8,27 +8,41 @@ save-state 2026-05-03T16:57:30-04:00
   position: relative;
   align-self: stretch;
   width: 100%;
-  height: 300px;
+  height: 400px;
   background-color: var(--variable-collection-brand-overlays-mauve-shadow-overlay-001);
   box-shadow: var(--box-shadow-typical); 
 }
 
-.card-paragraph-small {
+.card-paragraph-small-white {
   position: relative;
   align-self: stretch;
 
-  font-family: var(--styles-font-family-3); 
-  font-weight: var(--styles-bodyxl-font-weight);
+  
+  font: var(--styles-bodyxl);
+  font-family: var(--styles-font-family-3);
 
-  color: var(--variable-collection-carbon-black-001); 
-
-  font-size: var(--styles-bodyxl-font-size);
-  letter-spacing: var(--styles-bodyxl-letter-spacing);
-  line-height: var(--styles-bodyxl-line-height);
-  font-style: var(--styles-bodyxl-font-style);
+  color: var(--brandbright-periwinklebright-periwinkle-001);
 }
 
-.flexcontainer {
+.colored-text-white {
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+}
+
+.donation-box-flex-container-1 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  position: absolute;
+  width: 300px;
+  height: 175px;
+  top: 99px;
+  left: 33px;
+}
+
+/* These flex containers are effectively the equivalent of doing a click and drag text box when editing a screenshot*/
+
+.donation-box-flex-container-2 {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -41,26 +55,26 @@ save-state 2026-05-03T16:57:30-04:00
 }
 
 
-.donate-link-boxes {
+.container-for-pair-of-donation-boxes {
   display: inline-flex;
   align-items: flex-start;
   gap: 25px;
   position: absolute;
-  top: 25px;
+  top: 80px;
   right: 25px;
 }
 
-.donation-link-narrow-1 {
+.donation-link-narrow-outer {
   position: relative;
   width: 300px;
   height: 250px;
   background-color: var(--branddusty-olivedusty-olive-003);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: var(--box-shadow-typical); /* changed */
+  box-shadow: var(--box-shadow-typical);
 }
 
-.donation-link-narrow-2 {
+.donation-link-narrow-inner {
   position: relative;
   top: 12px;
   left: 13px;
@@ -68,20 +82,20 @@ save-state 2026-05-03T16:57:30-04:00
   height: 225px;
   background-color: var(--branddusty-olivedusty-olive-002);
   border-radius: 5px;
-  box-shadow: var(--box-shadow-typical); /* changed */
+  box-shadow: var(--box-shadow-typical); 
 }
 
-.donation-link-wide-1 {
+.donation-link-wide-outer {
   position: relative;
   width: 350px;
   height: 250px;
   background-color: var(--branddusty-olivedusty-olive-003);
   border-radius: 10px;
   overflow: hidden;
-  box-shadow: var(--box-shadow-typical); /* changed */
+  box-shadow: var(--box-shadow-typical); 
 }
 
-.donation-link-wide-2 {
+.donation-link-wide-inner {
   position: relative;
   top: 12px;
   left: 12px;
@@ -89,7 +103,7 @@ save-state 2026-05-03T16:57:30-04:00
   height: 225px;
   background-color: var(--branddusty-olivedusty-olive-002);
   border-radius: 5px;
-  box-shadow: var(--box-shadow-typical); /* changed */
+  box-shadow: var(--box-shadow-typical); 
 }
 
 .donation-ribbon {
@@ -101,22 +115,104 @@ save-state 2026-05-03T16:57:30-04:00
   display: flex;
   background-color: var(--brandmauve-shadowmauve-shadow-006);
   border-radius: 0px 10px 10px 0px;
-  box-shadow: var(--box-shadow-typical); /* changed */
+  box-shadow: var(--box-shadow-typical); 
 }
 
-.donations {
+.donations-card-header {
   margin-top: 15px;
   width: 194px;
   height: 36px;
   margin-left: 25px;
 
-  font-family: var(--styles-font-family-1); /* changed: was hardcoded string */
+  font-family: var(--styles-font-family-3); 
   font-weight: 600;
 
-  color: var(--variable-collection-carbon-black-001); /* changed */
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
 
   font-size: 36px;
   text-align: center;
   line-height: 36px;
   white-space: nowrap;
+}
+
+.donation-link-narrow-inner,
+.donation-link-wide-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;  
+  gap: 12px;
+}
+
+.donation-input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+
+  background-color: var(--brandeggshelleggshell-002);
+  border: none;
+  border-radius: 6px;
+
+  padding: 6px 10px;
+  padding-left: 22px; /* makes room for the $ sign */
+
+  font-family: var(--styles-font-family-3);
+  font-size: 16px;
+
+  color: var(--brandcarbon-blackcarbon-black-006);
+  box-shadow: var(--box-shadow-typical);
+}
+
+.donation-input-wrapper {
+  position: relative;
+  width: 90%;
+}
+
+
+.donation-currency {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  font-family: var(--styles-font-family-3);
+  color: var(--brandcarbon-blackcarbon-black-006);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+.donation-input:focus {
+  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-005);
+}
+
+.donation-button {
+  margin-top: 15px;
+  width: 90%;
+  height: 40px;
+
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-005);
+  border: none;
+  border-radius: 6px;
+
+  font-family: var(--styles-font-family-3);
+  font-weight: 600;
+  font-size: 14px;
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+
+  cursor: pointer;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.donation-button:hover {
+  filter: brightness(1.05);
+}
+
+
+.donation-label {
+  font-family: var(--styles-font-family-3);
+  font-weight: 700;
+  font-size: 16px;
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
 }

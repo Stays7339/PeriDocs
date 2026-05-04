@@ -1,6 +1,6 @@
 /* 
 PeriDocs/new-new-look/styleguide.css
-save-state 2026-05-03T16:43:25-04:00
+save-state 2026-05-03T18:12:00-04:00
 */
 
 :root {
@@ -113,11 +113,13 @@ save-state 2026-05-03T16:43:25-04:00
   --styles-h6-letter-spacing: 0.48px;
   --styles-h6-line-height: 139.9999976158142%;
   --styles-h6-font-style: normal;
-  --styles-bodyxl-font-weight: 400;
-  --styles-bodyxl-font-size: 18px;
+
+  /* For some reason, the variables listed xl have the lowest weight integer. ??
+  The font size is fine, it's just the font weight that goes backward.
+  Not ideal at all, but we'll keep it as is until we're at a calm enough point to refactor */
+  --styles-bodyxl: 400 18px/160% normal;
   --styles-bodyxl-letter-spacing: 0.54px;
-  --styles-bodyxl-line-height: 160.0000023841858%;
-  --styles-bodyxl-font-style: normal;
+
   --styles-bodyl-font-weight: 400;
   --styles-bodyl-font-size: 16px;
   --styles-bodyl-letter-spacing: 0.48px;

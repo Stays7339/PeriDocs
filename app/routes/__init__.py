@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-03T13:18:00-04:00 (ISO 8601)
+# save-state 2026-05-03T20:44:20-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -57,6 +57,9 @@ from app.routes import feedback
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
 app.include_router(admin_credentialing.router) 
+
+from app.routes import donation
+app.include_router(donation.router)
 
 
 
