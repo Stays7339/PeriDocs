@@ -1,15 +1,14 @@
 /* 
-PeriDocs/new-new-look/globals.css
-save-state 2026-05-03T16:12:40-04:00
+PeriDocs/app/static/globals.css
+save-state 2026-05-04T15:45:15-04:00
 */
 
 /* =========================
-   RESET + BASE IMPORTS
+   RESET ASSUMPTIONS PER WEB BROWSER
 ========================= */
 
-@import url("https://cdnjs.cloudflare.com/ajax/libs/meyer-reset/2.0/reset.min.css");
+@import url("/static/myers-reset-2.0.css");
 
-@import url("https://fonts.googleapis.com/css2?family=IM+Fell+French+Canon&family=Lexend:wght@100..900&family=Montserrat+Alternates:wght@100..900&display=swap");
 
 /* =========================
    ROOT LAYOUT FOUNDATION
@@ -22,6 +21,7 @@ save-state 2026-05-03T16:12:40-04:00
   rather than sprawling the details of a feature across several different files,
  and it should to be available globally (in terms of available in each page of the website.) */
   --app-header-height: 100px;
+  --page-vertical-offset: 20vh;
 
   /* =========================
      NEW: DYNAMIC PILL CONTROL (JS WRITES THESE)
@@ -43,7 +43,7 @@ save-state 2026-05-03T16:12:40-04:00
   --accent: #7F86B0;
   --text: #111;
 
-  --page-vertical-offset: 15vh;
+  
 }
 
 .page-content {
@@ -225,7 +225,7 @@ header {
    ≤ 1.65 ASPECT RATIO = "COMPRESSED LAYOUT MODE"
 ========================= */
 
-@media (max-aspect-ratio: 165/100) {
+@media (max-aspect-ratio: 175/100) {
   /* This is the structural collapse mode trigger */
 
   header {
@@ -328,8 +328,8 @@ header {
   display: inline-flex;
   white-space: nowrap;
   padding: 8px 12px;
-  font: inherit;
   font-family: "Lexend", sans-serif;
+  font-weight: 600;
   color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
   align-items: center;
   width: max-content;
@@ -378,3 +378,148 @@ header {
 #privacy-toast a{color:var(--privacy-link);text-decoration:underline;}
 #privacy-toast button{background:transparent;border:none;color:var(--privacy-toast-text);font-size:1.2rem;cursor:pointer;margin-left:auto;opacity:.8;}
 #privacy-toast button:hover{opacity:1;}
+
+/* =========================
+   FONTS
+========================= */
+
+@font-face {
+  font-family: "Lexend";
+  src: url("/static/fonts/Lexend/Lexend-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+/* since google fonts didn't give a bold file, the browser will try to fake it when requesting other weights*/
+@font-face {
+  font-family: "Metal";
+  src: url("/static/fonts/Metal - front by Danh Hong/Metal-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Thin.ttf") format("truetype");
+  font-weight: 100;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ThinItalic.ttf") format("truetype");
+  font-weight: 100;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraLight.ttf") format("truetype");
+  font-weight: 200;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraLightItalic.ttf") format("truetype");
+  font-weight: 200;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-SemiBoldItalic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraBoldItalic.ttf") format("truetype");
+  font-weight: 800;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-BlackItalic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+}

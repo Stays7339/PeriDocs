@@ -1,9 +1,59 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-03T22:51:55-04:00 
+save-state 2026-05-04T13:52:25-04:00 
 ---------------------- */
+/* ======= Viasuals for Front Page Landing Hero =========*/
 
+.front-page-hero {
+  position: relative;
+  align-self: stretch;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  height: inherit;
+  padding-left: 10vw;
+  padding-right: 10vw;
+}
 
+.hero-paragraph {
+  font-family: "Montserrat Alternates", Helvetica, sans-serif;
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 110%;
+}
+
+.hero-paragraph.purple {
+  color: var( --brandmuted-periwinklemuted-periwinkle-004);
+}
+
+.hero-paragraph.black {
+  color: var(--brandcarbon-blackcarbon-black-005);
+}
+
+.hero-paragraph.italics {
+  font-style: italic;
+}
+
+.hero-paragraph.small {
+  font-size: 20px;
+}
+
+.hero-paragraph.XL {
+  font-size: 55px;
+}
+
+.hero-paragraph.accented-shape {
+  font-family: "Metal";
+  font-weight: 400;
+}
+
+.arrow-landing-page-hero-positioning
+{
+  position: relative;
+  bottom: 4.7vh;
+}
+
+/* ======= Visuals for Donation Section =========*/
 .donation-banner {
   position: relative;
   align-self: stretch;
