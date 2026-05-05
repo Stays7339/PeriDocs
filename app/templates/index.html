@@ -1,4 +1,4 @@
-{# index.html - homepage, extends base.html save-state 2026-05-05T14:06:40-04:00 #}
+{# index.html - homepage, extends base.html save-state 2026-05-05T15:02:10-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
@@ -18,30 +18,30 @@
     <div></div>
   <a href="/create-entry" class="button general-button button-for-hero-positioning">Start an Entry</a>
   <div></div>
-  <img src="/static/arrow.svg" class="arrow-for-hero-positioning" alt=""> <!-- fixed img syntax -->
+  <img src="/static/arrow.svg" class="arrow-for-hero-positioning" alt="">
 
 </section>
 
-<section class="donation-banner">
+<section class="banner-1-banner">
 
-    <!-- ADDED: layout root wrapper for responsive reflow -->
-    <div class="donation-layout">
+    <!-- layout root wrapper for responsive reflow -->
+    <div class="banner-1-layout">
 
-        <!-- unchanged: ribbon -->
-        <div class="donation-ribbon">
-            <h2 class="donations-card-header">
+        
+        <div class="banner-1-ribbon">
+            <h2 class="banner-1s-card-header">
                 <span>Donations</span>
             </h2>
         </div>
         
 
-        <!-- ADDED: content flow wrapper (replaces absolute positioning dependency) -->
-        <div class="donation-content">
+       
+        <div class="banner-1-content">
 
-            <!-- MODIFIED: removed “positioning meaning”, now purely content block -->
-            <div class="donation-text-columns">
+            
+            <div class="banner-1-text-columns">
 
-                <div class="donation-box-flex-container-1">
+                <div class="banner-1-box-flex-container-1">
                     <p class="card-paragraph-small-white">
                         PeriDocs.org is run by a diligent two-person team based in Atlanta, GA. 
                         We plan to keep PeriDocs free of ads and limited in terms of data collection. If you'd like to help,
@@ -49,7 +49,7 @@
                     </p>
                 </div>
 
-                <div class="donation-box-flex-container-2">
+                <div class="banner-1-box-flex-container-2">
                     <p><span class="card-paragraph-small-white">
                         Some ways that your funding helps the platform:
                     </span></p>
@@ -60,20 +60,19 @@
 
             </div>
 
-            <!-- unchanged visual components, now just inside flex flow -->
-            <div class="container-for-pair-of-donation-boxes" aria-label="Donation links">
+            <div class="container-for-pair-of-banner-1-boxes" aria-label="Donation links">
 
-                <div class="donation-link-narrow-outer">
-                    <div class="donation-link-narrow-inner">
-                        <div class="donation-label">One-Time Donation</div>
+                <div class="banner-1-link-narrow-outer">
+                    <div class="banner-1-link-narrow-inner">
+                        <div class="banner-1-label">One-Time Donation</div>
 
-                        <div class="donation-input-wrapper">
-                            <span class="donation-currency">$</span>
-                            <input class="donation-input" type="number" min="1" step="1"
+                        <div class="banner-1-input-wrapper">
+                            <span class="banner-1-currency">$</span>
+                            <input class="banner-1-input" type="number" min="1" step="1"
                                    placeholder="One-time charge" id="onetime-amount"/>
                         </div>
 
-                        <button class="donation-button"
+                        <button class="banner-1-button"
                                 type="button"
                                 onclick="PeriDocsDonations.valuecheckOneTimeDonation()">
                             Checkout via Stripe
@@ -81,17 +80,17 @@
                     </div>
                 </div>
 
-                <div class="donation-link-wide-outer">
-                    <div class="donation-link-wide-inner">
-                        <div class="donation-label">Monthly Donation</div>
+                <div class="banner-1-link-wide-outer">
+                    <div class="banner-1-link-wide-inner">
+                        <div class="banner-1-label">Monthly Donation</div>
 
-                        <div class="donation-input-wrapper">
-                            <span class="donation-currency">$</span>
-                            <input class="donation-input" type="number" min="1" step="1"
+                        <div class="banner-1-input-wrapper">
+                            <span class="banner-1-currency">$</span>
+                            <input class="banner-1-input" type="number" min="1" step="1"
                                    placeholder="Recurring monthly charge" id="monthly-amount"/>
                         </div>
 
-                        <button class="donation-button"
+                        <button class="banner-1-button"
                                 type="button"
                                 onclick="PeriDocsDonations.valuecheckMonthlyDonation()">
                             Checkout via Stripe
@@ -101,9 +100,9 @@
 
             </div>
 
-        </div> <!-- END donation-content -->
+        </div> 
 
-    </div> <!-- END donation-layout -->
+    </div>
 
 </section>
 

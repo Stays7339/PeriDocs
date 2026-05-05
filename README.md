@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-03T23:07:18-04:00
+## Canonical Project Directory as of 2026-05-05T15:00:00-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -324,18 +324,18 @@ PeriDocs/                         # Root project folder
 │  ├─ static/                            # Frontend static files
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
+│  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ donation-ui.js                  #Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
-│  │  ├─ favicon.png
 │  │  ├─ fi-rr-search-alt.svg
 │  │  ├─ globals.css
 │  │  ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png
-│  │  ├─ peridocs-logo-v1-white.png
-│  │  ├─ peridocs-logo-v1.png
-│  │  ├─ peridocs-logo-v2.png
+│  │  ├─ myers-reset-2.0.css           # public domain boilerplate code that helps to keep css styling consistent across different web browsers
+│  │  ├─ peridocs-logo-icon-2026-05-05.svg
+│  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
+│  │  ├─ peridocs-logo-workmark-2026-05-05.svg
 │  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
-│  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
@@ -344,7 +344,6 @@ PeriDocs/                         # Root project folder
 │  └─ templates/                        # Jinja2 HTML templates
 │   ├─ about.html                     # About page template
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
-│   ├─ base_old.html                      # The more stable one that I'm trying to replace gradually
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
 │   ├─ create-entry.html # the only page where entries are typed and submitted for ingestion

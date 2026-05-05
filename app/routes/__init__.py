@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-03T20:44:20-04:00 (ISO 8601)
+# save-state 2026-05-05T14:54:20-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -126,4 +126,4 @@ async def admin_bootstrap_gate(request: Request, call_next):
 
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse("app/static/favicon.png")
+    return FileResponse("/static/peridocs-logo-icon-2026-05-05.svg")
