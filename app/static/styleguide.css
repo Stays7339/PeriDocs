@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/styleguide.css
-save-state 2026-05-04T14:54:25-04:00
+save-state 2026-05-05T12:58:15-04:00
 */
 
 :root {
@@ -46,8 +46,8 @@ save-state 2026-05-04T14:54:25-04:00
   --brandmuted-periwinklemuted-periwinkle-005: rgba(92, 92, 153, 1); /* Action Button */
   --brandmuted-periwinklemuted-periwinkle-006: rgba(75, 75, 102, 1);
 
-  /* For some reason, the formatting shorthand seems to be less strict here  */
-  --styles-bodyxl: 400 18px/160% normal;
+  /* {font weight} {font size}/{line height} {italics (oblique) / normal} */
+  --styles-bodyxl: 500 18px/160% normal;
   --styles-bodyxl-letter-spacing: 0.54px;
 
   --variable-collection-height: 20px;

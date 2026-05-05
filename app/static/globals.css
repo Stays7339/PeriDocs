@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-04T15:45:15-04:00
+save-state 2026-05-05T12:58:22-04:00
 */
 
 /* =========================
@@ -154,25 +154,6 @@ header {
     justify-self: end;
 }
 
-.header-center {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-
-  display: block;
-
-  background: var(--branddusty-olivedusty-olive-006);
-  border-radius: 999px;
-  padding: 8px 16px;
-
-  white-space: nowrap;
-
-    /* =========================
-     NEW: pill becomes "visual layer only"
-  ========================= */
-  background: transparent;
-}
-
 
 .header-hamburger-button {
   display: none;
@@ -250,8 +231,31 @@ header {
   }
 }
 
+/* This first mention of header center is necessar for positioning it in the proper horizontal anchor coordinate
+The next mention is to control the width as button are added and removed from the bar */
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;
+
+  background: var(--branddusty-olivedusty-olive-006);
+  padding: 8px 16px;
+
+  white-space: nowrap;
+
+  /* pill becomes visual layer only, 
+  unrelated to the coordinates of the menu links, 
+  since the menu links determine the width */
+  background: transparent;
+}
+
+
+
 /* =========================
-  THE ACTUAL PILL (JS CONTROLLED)
+   JS CONTROLLED RESPONSIVE PILL WIDTH
 ========================= */
 
 .header-center::before {
@@ -268,10 +272,11 @@ header {
   height: 44px;
 
   background: var(--branddusty-olivedusty-olive-006);
-  border-radius: 999px;
 
   z-index: 0;
   pointer-events: none;
+  border-radius: 10px;
+  box-shadow: var(--box-shadow-typical);
 }
 
 /* =========================
