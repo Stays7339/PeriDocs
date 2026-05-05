@@ -23,77 +23,88 @@
 </section>
 
 <section class="donation-banner">
-    <div class="donation-ribbon">
-            <h2 class="donations-card-header"><span>Donations</span>
+
+    <!-- ADDED: layout root wrapper for responsive reflow -->
+    <div class="donation-layout">
+
+        <!-- unchanged: ribbon -->
+        <div class="donation-ribbon">
+            <h2 class="donations-card-header">
+                <span>Donations</span>
             </h2>
         </div>
+        
+
+        <!-- ADDED: content flow wrapper (replaces absolute positioning dependency) -->
+        <div class="donation-content">
+
+            <!-- MODIFIED: removed “positioning meaning”, now purely content block -->
+            <div class="donation-text-columns">
+
                 <div class="donation-box-flex-container-1">
-                <p class="card-paragraph-small-white"> PeriDocs.org is run by a diligent two-person team based in Atlanta, GA. 
-                    We plan to keep PeriDocs free of ads and limited in terms of data collection. If you'd like to help,
-                    spreading the word or donating to PeriDocs LLC are the best options.
-                </p>
+                    <p class="card-paragraph-small-white">
+                        PeriDocs.org is run by a diligent two-person team based in Atlanta, GA. 
+                        We plan to keep PeriDocs free of ads and limited in terms of data collection. If you'd like to help,
+                        spreading the word or donating to PeriDocs LLC are the best options.
+                    </p>
                 </div>
+
                 <div class="donation-box-flex-container-2">
-                    <p><span class="card-paragraph-small-white">Some ways that your funding helps the platform:</span></p>
+                    <p><span class="card-paragraph-small-white">
+                        Some ways that your funding helps the platform:
+                    </span></p>
                     <p><span class="card-paragraph-small-white">• Running servers to keep PeriDocs online;</span></p>
                     <p><span class="card-paragraph-small-white">• Curating open-source and public domain media;</span></p>
                     <p><span class="card-paragraph-small-white">• Eventually, adding on employees to the PeriDocs team!</span></p>
                 </div>
-                <div class="container-for-pair-of-donation-boxes" aria-label="Donation links">
-                    <div class="donation-link-narrow-outer">
-                        <div class="donation-link-narrow-inner">
 
-                            <div class="donation-label">One-Time Donation</div>
+            </div>
 
-                            <div class="donation-input-wrapper">
-                                <span class="donation-currency">$</span>
+            <!-- unchanged visual components, now just inside flex flow -->
+            <div class="container-for-pair-of-donation-boxes" aria-label="Donation links">
 
-                                <input
-                                    class="donation-input"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    placeholder="One-time charge"
-                                    id="onetime-amount"
-                                />
-                                </div>
+                <div class="donation-link-narrow-outer">
+                    <div class="donation-link-narrow-inner">
+                        <div class="donation-label">One-Time Donation</div>
 
-                            <button
-                                class="donation-button"
-                                type="button"
-                                onclick="PeriDocsDonations.valuecheckOneTimeDonation()"
-                            >
-                                Checkout via Stripe
-                            </button>
-
+                        <div class="donation-input-wrapper">
+                            <span class="donation-currency">$</span>
+                            <input class="donation-input" type="number" min="1" step="1"
+                                   placeholder="One-time charge" id="onetime-amount"/>
                         </div>
-                    </div>
-                    <div class="donation-link-wide-outer">
-                        <div class="donation-link-wide-inner">
-                            <div class="donation-label">Monthly Donation</div>
-                            <div class="donation-input-wrapper">
-                                <span class="donation-currency">$</span>
 
-                                <input
-                                    class="donation-input"
-                                    type="number"
-                                    min="1"
-                                    step="1"
-                                    placeholder="Reccuring monthly charge"
-                                    id="monthly-amount"
-                                />
-                                </div>
-                            <button
-                                class="donation-button"
+                        <button class="donation-button"
                                 type="button"
-                                onclick="PeriDocsDonations.valuecheckMonthlyDonation()"
-                            >
-                                Checkout via Stripe
-                            </button>
-
-                        </div>
+                                onclick="PeriDocsDonations.valuecheckOneTimeDonation()">
+                            Checkout via Stripe
+                        </button>
                     </div>
                 </div>
-            </section>
+
+                <div class="donation-link-wide-outer">
+                    <div class="donation-link-wide-inner">
+                        <div class="donation-label">Monthly Donation</div>
+
+                        <div class="donation-input-wrapper">
+                            <span class="donation-currency">$</span>
+                            <input class="donation-input" type="number" min="1" step="1"
+                                   placeholder="Reccuring monthly charge" id="monthly-amount"/>
+                        </div>
+
+                        <button class="donation-button"
+                                type="button"
+                                onclick="PeriDocsDonations.valuecheckMonthlyDonation()">
+                            Checkout via Stripe
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div> <!-- END donation-content -->
+
+    </div> <!-- END donation-layout -->
+
+</section>
 
 {% endblock %}

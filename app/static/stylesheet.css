@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-04T13:52:25-04:00 
+save-state 2026-05-05T12:27:35-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -58,9 +58,10 @@ save-state 2026-05-04T13:52:25-04:00
   position: relative;
   align-self: stretch;
   width: 100%;
-  height: 400px;
+  min-height: 400px;
   background-color: var(--variable-collection-brand-overlays-mauve-shadow-overlay-001);
   box-shadow: var(--box-shadow-typical); 
+  padding-top: 0.25%;
 }
 
 .card-paragraph-small-white {
@@ -78,45 +79,30 @@ save-state 2026-05-04T13:52:25-04:00
   color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
 }
 
-.donation-box-flex-container-1 {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  position: absolute;
-  width: 300px;
-  height: 175px;
-  top: 99px;
-  left: 33px;
-}
-
-/* These flex containers are effectively the equivalent of doing a click and drag text box when editing a screenshot*/
-
+.donation-box-flex-container-1,
 .donation-box-flex-container-2 {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-  position: absolute;
-  width: 300px;
-  height: 175px;
-  top: 99px;
-  left: 350px;
+  position: relative; 
+  width: 100%;
+  height: auto;
 }
 
 
 .container-for-pair-of-donation-boxes {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 25px;
-  position: absolute;
-  top: 80px;
-  right: 25px;
+  display: flex; /* enables CSS setting called 'gap' and 'justify content', which helps prevent awkward vertical stacking.*/          
+  gap: 25px; /* spaces the elements so they're not awkardly bunched up*/
+  flex-wrap: wrap; /* Required for going between single line and multi-line for different window sizes.
+
+  position: relative;  /* not really useful unless we do an element with an absolute position*/
+  flex-direction: row; /* technically a default value, but to be safe, it stays*/  
+  top: auto;    /* technically a default value, but to be safe, it stays*/   
+  right: auto; /* technically a default value, but to be safe, it stays*/   
 }
 
 .donation-link-narrow-outer {
   position: relative;
   width: 300px;
+  flex: 0 1 300px;           /* can grow (first '0') or shrink (second '1'), but not below comfort (min-width) */
+  min-width: 280px;          /* prevents collapsing in on itself */
   height: 250px;
   background-color: var(--branddusty-olivedusty-olive-003);
   border-radius: 10px;
@@ -138,6 +124,8 @@ save-state 2026-05-04T13:52:25-04:00
 .donation-link-wide-outer {
   position: relative;
   width: 350px;
+  flex: 0 1 350px; /* can grow (first '0') or shrink (second '1'), but not below comfort (min-width) */
+  min-width: 320px; /* prevents collapsing in on itself */
   height: 250px;
   background-color: var(--branddusty-olivedusty-olive-003);
   border-radius: 10px;
@@ -157,10 +145,8 @@ save-state 2026-05-04T13:52:25-04:00
 }
 
 .donation-ribbon {
-  position: absolute;
-  top: 10px;
-  left: 0;
-  width: 715px;
+  position: relative;
+  width: min(900px, 92vw);
   height: 66px;
   display: flex;
   background-color: var(--brandmauve-shadowmauve-shadow-006);
@@ -265,4 +251,82 @@ save-state 2026-05-04T13:52:25-04:00
   font-size: 16px;
 
   color: var(--brandbright-periwinklebright-periwinkle-001);
+}
+
+/* =========================
+   DONATION LAYOUT SYSTEM
+   (replaces absolute positioning logic)
+========================= */
+
+/* root section layout container */
+.donation-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* governs desktop vs mobile layout switching */
+.donation-content {
+  display: flex;
+  flex-direction: column; /* default = mobile-first (safe baseline) */
+  gap: 24px;
+  padding: 2% 3%;
+}
+
+/* text grouping becomes flow-based instead of absolute */
+.donation-text-columns {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  max-width: 1400px;
+  flex: 1 1 250px;
+}
+
+
+
+/* =========================
+   DESKTOP OVERRIDE
+========================= */
+
+@media (min-aspect-ratio: 175/100) {
+
+  /* ADDED: desktop row layout */
+  .donation-content {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  /* ADDED: restore horizontal columns on wide screens */
+  .donation-text-columns {
+    flex-direction: row;
+    max-width: 700px;
+  }
+
+  .container-for-pair-of-donation-boxes {
+    flex-direction: row;
+  }
+}
+
+/* =========================
+   MOBILE OVERRIDE
+========================= */
+
+@media (max-aspect-ratio: 175/100) {
+
+  /* ADDED: mobile collapse behavior */
+  .donation-text-columns {
+    flex-direction: column;
+  }
+
+  /* center content once the screen is small enough */
+  section > * {
+    margin-left: auto;     
+    margin-right: auto;    
+    text-align: center; 
+  }
+
+  .container-for-pair-of-donation-boxes {
+    justify-content: center;
+  }
+
 }
