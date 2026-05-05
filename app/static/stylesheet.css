@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-05T12:58:35-04:00 
+save-state 2026-05-05T13:32:45-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -47,10 +47,20 @@ save-state 2026-05-05T12:58:35-04:00
   font-weight: 400;
 }
 
-.arrow-landing-page-hero-positioning
+.arrow-for-hero-positioning
 {
   position: relative;
-  bottom: 4.7vh;
+  translate: 110px -90px;
+
+  /* compress height of arrow to ~90% of original height */
+  transform: scaleY(0.9);
+  transform-origin: top;
+}
+
+.button-for-hero-positioning
+{
+  position: relative;
+  translate: 0px 20px;
 }
 
 /* ======= Visuals for Donation Section =========*/
@@ -61,7 +71,7 @@ save-state 2026-05-05T12:58:35-04:00
   min-height: 400px;
   background-color: var(--variable-collection-brand-overlays-mauve-shadow-overlay-001);
   box-shadow: var(--box-shadow-typical); 
-  padding-top: 0.25%;
+  padding-top: 1%;
 }
 
 .card-paragraph-small-white {
@@ -70,7 +80,7 @@ save-state 2026-05-05T12:58:35-04:00
 
   
   font: var(--styles-bodyxl);
-  font-family: var(--styles-font-family-3);
+  font-family: "Montserrat Alternates";
 
   color: var(--brandbright-periwinklebright-periwinkle-001);
 }
@@ -160,7 +170,7 @@ save-state 2026-05-05T12:58:35-04:00
   height: 36px;
   margin-left: 25px;
 
-  font-family: var(--styles-font-family-3); 
+  font-family: "Lexend"; 
   font-weight: 600;
 
   color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
@@ -192,8 +202,8 @@ save-state 2026-05-05T12:58:35-04:00
   padding: 6px 10px;
   padding-left: 22px; /* makes room for the $ sign */
 
-  font-family: var(--styles-font-family-3);
   font-size: 16px;
+  font-family: "Lexend";
 
   color: var(--brandcarbon-blackcarbon-black-006);
   box-shadow: var(--box-shadow-typical);
@@ -211,10 +221,10 @@ save-state 2026-05-05T12:58:35-04:00
   top: 50%;
   transform: translateY(-50%);
 
-  font-family: var(--styles-font-family-3);
   color: var(--brandcarbon-blackcarbon-black-006);
   opacity: 0.8;
   pointer-events: none;
+  font-family: "Lexend";
 }
 
 .donation-input:focus {
@@ -230,7 +240,7 @@ save-state 2026-05-05T12:58:35-04:00
   border: none;
   border-radius: 6px;
 
-  font-family: var(--styles-font-family-3);
+  font-family: "Lexend";
   font-weight: 600;
   font-size: 14px;
 
@@ -246,7 +256,7 @@ save-state 2026-05-05T12:58:35-04:00
 
 
 .donation-label {
-  font-family: var(--styles-font-family-3);
+  font-family: "Lexend";
   font-weight: 700;
   font-size: 16px;
 
