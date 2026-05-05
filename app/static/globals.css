@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-05T13:53:20-04:00
+save-state 2026-05-05T15:09:55-04:00
 */
 
 /* =========================
@@ -67,7 +67,7 @@ body {
 }
 
 body {
-  font-family: "Montserrat Alternates", sans-serif;
+  font-family: "Lexend", sans-serif;
   background-color: var(--brandeggshelleggshell-003);
   background-image: var(--app-background-image);
   background-size: cover;
