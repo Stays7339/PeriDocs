@@ -126,4 +126,4 @@ async def admin_bootstrap_gate(request: Request, call_next):
 
 @app.get("/favicon.ico")
 def favicon():
-    return FileResponse("/static/peridocs-logo-icon-2026-05-05.svg")
+    return FileResponse("app/static/peridocs-logo-icon-2026-05-05.svg")
