@@ -1,11 +1,11 @@
-{# index.html - homepage, extends base.html save-state 2026-05-05T15:02:10-04:00 #}
+{# index.html - homepage, extends base.html save-state 2026-05-09T12:47:45-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
 
 {% block content %}
 
-<section class="front-page-hero">
+<article class="front-page-hero">
     <!-- span allows in-line flowing, where as div and p both split the text into individual lines -->
   <span class="hero-paragraph italics black small">Hello! Welcome to</span> 
   <span class="hero-paragraph italics purple small">PeriDocs</span>
@@ -20,32 +20,158 @@
   <div></div>
   <img src="/static/arrow.svg" class="arrow-for-hero-positioning" alt="">
 
-</section>
+</article>
 
-<section>
-    <div style="width: 300px; height: 400px; position: relative">
-    <img style="width: 300px; height: 400px; left: 0px; top: 0px; position: absolute" src="/static/info-card-border.png" />
-    <div style="width: 220px; left: 40px; top: 25px; position: absolute; flex-direction: column; justify-content: flex-start; align-items: center; gap: 12px; display: inline-flex">
-      <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 15px; display: flex">
-        <img style="align-self: stretch; height: 125px; padding: 10px" src="" />
-        <div style="align-self: stretch; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 5px; display: flex">
-          <div style="text-align: center; color: black; font-size: 24px; font-family: Montserrat Alternates; font-weight: 600; line-height: 33.60px; letter-spacing: 0.24px; word-wrap: break-word">Info Card Header</div>
-          <div style="align-self: stretch; height: 85px; text-align: center; color: #2C2C2C; font-size: 14px; font-family: Montserrat; font-weight: 400; line-height: 22.40px; letter-spacing: 0.42px; word-wrap: break-word">This is where we will briefly explain where the buttons lead, ending with something that urges the reader to click. </div>
-        </div>
-      </div>
-      <div data-property-1="Default" style="flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 10px; display: flex">
-        <div style="height: 78px; padding: 10px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 10px; display: flex">
-          <div style="flex: 1 1 0; padding: 10px; background: var(--Primary-Button-Color, #6D6DA4); border-radius: 10px; flex-direction: column; justify-content: flex-start; align-items: flex-start; gap: 10px; display: flex">
-            <div style="flex: 1 1 0; padding: 10px; background: #6D6DA4; justify-content: center; align-items: center; gap: 10px; display: inline-flex">
-              <div style="color: #F5F3ED; font-size: 16px; font-family: Lexend; font-weight: 700; line-height: 17.60px; letter-spacing: 0.80px; word-wrap: break-word">Button Text</div>
+<article class="info-card-article">
+
+    <div class="info-card-layout">
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+                    <div class="info-card-image-feather-frame">
+                    <img
+                    class="info-card-image"
+                    src="/static/pdia-cccbc7da-373b-462b-aea3-0d236bcf21e3 Richard Deakin 1855 Image Sourced from Public Domain Image Archive : Biodiversity Heritage Library : Internet Archive : University of Toronto Libraries.jpg"
+                    alt="Image of flowers, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                    title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: cccbc7da-373b-462b-aea3-0d236bcf21e3 ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                    style="object-position: 0% 22%;"
+                    />
+                    </div>
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            Using the Site (user guide)
+                        </h2>
+
+                        <p class="info-card-description">
+                            PeriDocs aims to be welcoming to its users, and considerate of the privacy of everyone.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href=""
+                       class="general-button">
+                        See The Process
+                    </a>
+
+                </div>
+
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-</section>
 
-<section class="banner-1-banner">
+        </section>
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+
+                    <img
+                        class="info-card-image"
+                        src="/static/pdia-f8dc3382-2e3d-425d-9009-b929a6c10c7a Richard Deakin 1855 Image sourced from the Public Domain Image Archive - Biodiversity Heritage Library - Internet Archive - University of Toronto Libraries.jpg"
+                        alt="Image of a dilapidated colloseum, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: f8dc3382-2e3d-425d-9009-b929a6c10c7a ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        style="object-position: 50% 0%;"
+                    />
+
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            How it works (Open Source)
+                        </h2>
+
+                        <p class="info-card-description">
+                            The software of PeriDocs is released under the Affero General Public License v3.0.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href=""
+                       class="general-button">
+                        View The Source Code
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+
+                    <img
+                        class="info-card-image"
+                        src="/static/pdia-ee457c8d-5a8b-4f79-808b-3ca42e96a70cRichard Deakin 1855 Image Sourced from Public Domain Image Archive : Biodiversity Heritage Library : Internet Archive : University of Toronto Libraries.jpg"
+                        alt="Image of flowers, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: ee457c8d-5a8b-4f79-808b-3ca42e96a70 ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        style="object-position: 50% 0%;"
+                    />
+
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            Ways to help (Contribute)
+                        </h2>
+
+                        <p class="info-card-description">
+                            There are several different ways that you, specifically, can help support PeriDocs.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href=""
+                       class="general-button">
+                        Help us help others
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</article>
+
+<article class="banner-1-banner">
     <!-- layout root wrapper for responsive reflow -->
     <div class="banner-1-layout">
 
@@ -126,6 +252,6 @@
 
     </div>
 
-</section>
+</article>
 
 {% endblock %}

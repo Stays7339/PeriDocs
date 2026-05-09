@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-05T13:32:45-04:00 
+save-state 2026-05-09T11:32:22-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -10,7 +10,6 @@ save-state 2026-05-05T13:32:45-04:00
   justify-content: center;
   text-align: center;
   width: 100%;
-  height: inherit;
   padding-left: 10vw;
   padding-right: 10vw;
 }
@@ -61,7 +60,183 @@ save-state 2026-05-05T13:32:45-04:00
 {
   position: relative;
   translate: 0px 20px;
+  z-index: 3;
 }
+
+/* ======= Visuals for the info card area ========*/
+.info-card-article {
+  width: 100%;
+  padding: 40px 3%;
+}
+
+/* governs desktop row vs mobile stack behavior */
+.info-card-layout {
+  display: grid;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(280px, 300px));
+
+  justify-content: center;
+
+  gap: 30px;
+}
+
+/* outer visual card shell */
+.info-card {
+  position: relative;
+  width: 300px;
+  height: 400px;
+}
+
+/* decorative frame image */
+.info-card-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* internal card content positioning */
+.info-card-inner {
+  position: absolute;
+  top: 25px;
+  left: 40px;
+
+  width: 220px;
+  height: 350px;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* upper content grouping */
+.info-card-content-group {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+/* image viewport / crop frame */
+.info-card-image-feather-frame {
+  position: relative;
+
+  width: 100%;
+  height: 125px;
+
+  overflow: hidden;
+}
+
+/* soft edge overlay */
+.info-card-image-frame::after {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  box-shadow:
+    inset 0 0 18px rgba(245,243,237,0.65);
+}
+
+/* image area */
+.info-card-image {
+
+  --feather-start: 05%;
+  --feather-end: 95%;
+
+  width: 100%;
+  height: 125px;
+
+  padding: 0;              /* important: padding fights cropping control */
+  object-fit: cover;       /* key: crops instead of squishing */
+
+  object-position: center; /* default framing */
+
+  display: block;
+
+  -webkit-mask-image:
+    linear-gradient(to right,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%),
+
+    linear-gradient(to bottom,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%);
+
+  -webkit-mask-composite: source-in;
+
+  mask-image:
+    linear-gradient(to right,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%),
+
+    linear-gradient(to bottom,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%);
+
+  mask-composite: intersect;
+}
+
+
+
+/* text grouping */
+.info-card-text-group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* headline */
+.info-card-title {
+  text-align: center;
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+
+  font-size: 24px;
+  font-family: "Montserrat Alternates";
+  font-weight: 600;
+  line-height: 33.6px;
+  letter-spacing: 0.24px;
+}
+
+/* supporting paragraph */
+.info-card-description {
+  text-align: center;
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+
+  font-size: 14px;
+  font-family: "Lexend";
+  font-weight: 400;
+  letter-spacing: 0.42px;
+  margin: 0;
+}
+
+/* button region */
+.info-card-actions {
+  width: 100%;
+
+  display: flex;
+  justify-content: center;
+}
+
+/* actual button should use general button from globals.css*/
+
+
 
 /* ======= Visuals for banner-1 Section =========*/
 .banner-1-banner {
@@ -339,17 +514,21 @@ save-state 2026-05-05T13:32:45-04:00
 ========================= */
 
 @media (max-aspect-ratio: 175/100) {
-
-  /* ADDED: mobile collapse behavior */
-  .banner-1-text-columns {
-    flex-direction: column;
-  }
-
-  /* center content once the screen is small enough */
+   /* center content once the screen is small enough */
   section > * {
     margin-left: auto;     
     margin-right: auto;    
     text-align: center; 
+  }
+
+  .info-card-layout {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  /* ADDED: mobile collapse behavior */
+  .banner-1-text-columns {
+    flex-direction: column;
   }
 
   .container-for-pair-of-banner-1-boxes {

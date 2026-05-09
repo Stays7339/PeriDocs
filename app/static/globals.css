@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-05T16:54:50-04:00
+save-state 2026-05-08T12:39:00-04:00
 */
 
 /* =========================
@@ -99,7 +99,7 @@ a {
   color: inherit;
 }
 
-
+/*Really, all buttons should be using general button, but just in case they don't, there's this*/
 button {
   appearance: none;
   -webkit-appearance: none;
@@ -113,8 +113,6 @@ button {
 
   font: inherit;
   color: inherit;
-
-  cursor: pointer;
 }
 
 button:focus-visible {
@@ -123,6 +121,18 @@ button:focus-visible {
 }
 
 .general-button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: none;
+  outline: none;
+  background: none;
+
+  padding: 0;
+  margin: 0;
+
+  font: inherit;
+  color: inherit;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -138,10 +148,14 @@ button:focus-visible {
   font-size: 14px;
 
   color: var(--brandbright-periwinklebright-periwinkle-001); /* colors the text of the button an off-white*/
-
-  cursor: pointer;
   box-shadow: var(--box-shadow-typical);
 }
+
+.general-button:hover {
+  filter: brightness(1.05);
+}
+
+
 /* =========================
    HEADER GLOBAL BEHAVIOR
    (always visible, always pinned)
