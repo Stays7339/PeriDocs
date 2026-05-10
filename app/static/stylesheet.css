@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-09T11:32:22-04:00 
+save-state 2026-05-09T17:59:00-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -56,6 +56,7 @@ save-state 2026-05-09T11:32:22-04:00
   transform-origin: top;
 }
 
+
 .button-for-hero-positioning
 {
   position: relative;
@@ -71,20 +72,21 @@ save-state 2026-05-09T11:32:22-04:00
 
 /* governs desktop row vs mobile stack behavior */
 .info-card-layout {
-  display: grid;
-
-  grid-template-columns:
-    repeat(auto-fit, minmax(280px, 300px));
+  display: flex;
+  flex-wrap: wrap;
 
   justify-content: center;
 
-  gap: 30px;
+  gap: clamp(14px, 2vw, 30px);
 }
 
 /* outer visual card shell */
 .info-card {
   position: relative;
+
   width: 300px;
+  flex: 0 1 300px;
+
   height: 400px;
 }
 
@@ -109,8 +111,15 @@ save-state 2026-05-09T11:32:22-04:00
 
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+
+  /* space-between does not work (it breaks anchored layout logic) */
+  justify-content: flex-start;
+
+  /* keeps everything centered horizontally */
   align-items: center;
+
+  /*  defines vertical rhythm between sections */
+  gap: 10px; /* tweak 8–16px depending on visual density */
 }
 
 /* upper content grouping */
@@ -120,6 +129,7 @@ save-state 2026-05-09T11:32:22-04:00
   display: flex;
   flex-direction: column;
   gap: 15px;
+  
 }
 
 /* image viewport / crop frame */
@@ -198,6 +208,7 @@ save-state 2026-05-09T11:32:22-04:00
 .info-card-text-group {
   display: flex;
   flex-direction: column;
+  margin-top: 10px;
 }
 
 /* headline */
@@ -211,6 +222,8 @@ save-state 2026-05-09T11:32:22-04:00
   font-weight: 600;
   line-height: 33.6px;
   letter-spacing: 0.24px;
+
+
 }
 
 /* supporting paragraph */
@@ -224,6 +237,7 @@ save-state 2026-05-09T11:32:22-04:00
   font-weight: 400;
   letter-spacing: 0.42px;
   margin: 0;
+  margin-top: 6px;
 }
 
 /* button region */
@@ -232,6 +246,9 @@ save-state 2026-05-09T11:32:22-04:00
 
   display: flex;
   justify-content: center;
+
+  margin-top: auto;
+  padding-bottom: 10px;
 }
 
 /* actual button should use general button from globals.css*/
@@ -519,11 +536,6 @@ save-state 2026-05-09T11:32:22-04:00
     margin-left: auto;     
     margin-right: auto;    
     text-align: center; 
-  }
-
-  .info-card-layout {
-    grid-template-columns: 1fr;
-    justify-items: center;
   }
 
   /* ADDED: mobile collapse behavior */

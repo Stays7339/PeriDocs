@@ -1,6 +1,6 @@
 <!--
 PeriDocs/app/templates/base.html
-save-state 2026-05-08T12:14:43-04:00
+save-state 2026-05-09T17:11:20-04:00
 -->
 
 <!doctype html>
@@ -18,6 +18,13 @@ save-state 2026-05-08T12:14:43-04:00
   <link rel="stylesheet" href="/static/styleguide.css" />
   <link rel="stylesheet" href="/static/stylesheet.css" />
 </head>
+
+<!-- ADDED: mobile menu overlay -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay">
+  <nav class="mobile-menu-panel" aria-label="Mobile navigation">
+    <!-- we reuse the SAME menu HTML via JS clone -->
+  </nav>
+</div>
 
 
 
@@ -45,15 +52,15 @@ save-state 2026-05-08T12:14:43-04:00
       <div class="menu-group-left">
         <a class="menu-button" href="/about">About</a>
         <a class="menu-button" href="https://github.com/Stays7339/PeriDocs" target="_blank" rel="noopener noreferrer">Open Source</a>
-        <a class="menu-button" title="For universities, labs, and partner organizations">Institutions</a>
+        <a class="menu-button" href="/terms-of-service">Terms of Service</a>
         </div>
 
     <div class="header-center-spine"></div>
 
       <div class="menu-group-right">
+        <a class="menu-button" href="/privacy-policy">Privacy Policy</a>
         <a class="menu-button" title="Planned Feature For Future Release">User Guide</a>
-        <a class="menu-button" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00" target="_blank" rel="noopener noreferrer">Contribution</a>
-        <a class="menu-button" title="Planned Feature For Future Release">Login / Signup</a>
+        <a class="menu-button" href="/#donate">Donate to PeriDocs</a>
       </div>
 
       </div>
@@ -64,7 +71,7 @@ save-state 2026-05-08T12:14:43-04:00
     <div class="header-right">
 
     <button class="header-hamburger-button" aria-label="Menu">
-    ☰
+      <span class="header-hamburger-icon">☰</span>
     </button>
 
       <!-- SVG icon layer (decorative or interactive depending on your intent) -->
@@ -114,9 +121,96 @@ function updateNavPill() {
 
 window.addEventListener("load", updateNavPill);
 window.addEventListener("resize", updateNavPill);
+
+
+// clone existing menu (no duplication of HTML in templates)
+
+const hamburger = document.querySelector(".header-hamburger-button");
+const overlay = document.getElementById("mobileMenuOverlay");
+const navSource = document.querySelector(".header-center");
+
+function openMobileMenu() {
+  if (!overlay || !navSource) return;
+  // prevent duplicate rebuilds
+  if (overlay.classList.contains("is-open")) return;
+
+  const panel = overlay.querySelector(".mobile-menu-panel");
+
+  
+  panel.innerHTML = navSource.innerHTML;
+
+  overlay.classList.add("is-open");
+}
+
+function closeMobileMenu() {
+  overlay.classList.remove("is-open");
+}
+
+
+function toggleMobileMenu() {
+  if (overlay?.classList.contains("is-open")) {
+    closeMobileMenu();
+  } else {
+    openMobileMenu();
+  }
+}
+
+hamburger?.addEventListener("click", toggleMobileMenu);
+
+overlay?.addEventListener("click", (e) => {
+  if (e.target === overlay) closeMobileMenu();
+});
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") {
+    closeMobileMenu();
+  }
+});
+
+function forceDesktopCleanup() {
+  // close mobile menu
+  overlay?.classList.remove("is-open");
+
+  // clear cloned DOM
+  const panel = overlay?.querySelector(".mobile-menu-panel");
+  if (panel) panel.innerHTML = "";
+
+  // repair nav pill layout
+  updateNavPill();
+}
+
+const mq = window.matchMedia("(max-aspect-ratio: 175/100)");
+
+let isMobileMode = mq.matches;
+
+
+
+mq.addEventListener("change", (e) => {
+  const nowMobile = e.matches;
+
+  // ENTERING DESKTOP MODE (THIS is your case)
+  if (!nowMobile && isMobileMode) {
+    forceDesktopCleanup();
+  }
+
+  // ENTERING MOBILE MODE
+  if (nowMobile && !isMobileMode) {
+    // optional: ensure header state is clean
+    updateNavPill();
+  }
+
+  isMobileMode = nowMobile;
+});
+
+window.addEventListener("resize", () => {
+  updateNavPill();
+
+  // optional safety: if we're in desktop mode, ensure no mobile state leaks
+  if (!mq.matches) forceDesktopCleanup();
+});
 </script>
 
-<!-- ADDED: brings in existing UI system (toasts, etc.) -->
+<!-- brings in existing UI system (toasts, etc.) -->
 <script src="/static/peridocs-ui.js"></script>
 <script src="/static/donation-ui.js"></script>
 

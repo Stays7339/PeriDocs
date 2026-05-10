@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-08T12:39:00-04:00
+save-state 2026-05-09T17:25:55-04:00
 */
 
 /* =========================
@@ -207,15 +207,40 @@ header {
     justify-self: end;
 }
 
-
-.header-hamburger-button {
-  display: none;
-}
-
 .header-logo img {
   width: auto;
   object-fit: contain;
   display: block;
+}
+
+/* =========================
+   HAMBURGER BUTTON
+========================= */
+
+.header-hamburger-button {
+  display: none;
+
+  width: 60px;
+  height: 60px;
+
+  transform: translateX(20px);
+
+  align-items: center;
+  justify-content: center;
+
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  border-radius: 20px;
+
+  box-shadow: var(--box-shadow-typical);
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+
+  font-size: 28px;
+  line-height: 1;
+}
+
+.header-hamburger-icon {
+  transform: translateY(-1px);
 }
 
 /* =========================
@@ -264,10 +289,11 @@ header {
     grid-template-columns: auto 1fr auto auto;
   }
 
-  .header-center,
-  .menu-group-left,
-  .menu-group-right {
-    display: none !important;   /* fully removes menu bar content */
+  /* keep DOM available, only hide visual presentation in header */
+  .header-center {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
   }
 
   .header-hamburger-button {
@@ -278,7 +304,6 @@ header {
     position: inherit; /* keeps layout stable when switching orientation */
   }
 
-  /* You will later wire these classes in stylesheet.css */
   .layout-horizontal-only {
     display: none !important;
   }
@@ -405,6 +430,78 @@ The next mention is to control the width as button are added and removed from th
   the header-center::before within globalss.css are necessary.
 ========================= */
 
+/* =========================
+   MOBILE MENU OVERLAY
+========================= */
+
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+  display: none;
+  z-index: 15;
+}
+
+.mobile-menu-overlay.is-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-panel {
+  width: min(90vw, 420px);
+  background: var(--brandeggshelleggshell-005);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--box-shadow-typical);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-menu-panel .header-center-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* remove desktop positioning logic */
+.mobile-menu-panel .menu-group-left,
+.mobile-menu-panel .menu-group-right {
+  position: static;
+
+  transform: none;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  justify-content: flex-start;
+
+   width: 100%;
+}
+
+/* hide decorative center spine in popup */
+.mobile-menu-panel .header-center-spine {
+  display: none;
+}
+
+/*  make all buttons full-width stacked rows */
+.mobile-menu-panel .menu-button {
+  width: 100%;
+
+  padding: 14px 16px;
+
+  border-radius: 10px;
+
+  background: rgba(255,255,255,0.04);
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+}
+
 
 
 /* ---------------------- Toasts Animation---------------------- */
@@ -473,16 +570,6 @@ The next mention is to control the width as button are added and removed from th
   content: "";
   position: absolute;
   inset: 0;
-
-  background:
-    radial-gradient(circle at 20% 10%, rgba(255,255,255,0.08), transparent 40%),
-    radial-gradient(circle at 80% 90%, rgba(127,134,176,0.12), transparent 45%),
-    linear-gradient(
-      145deg,
-      rgba(255,255,255,0.03),
-      transparent 40%,
-      rgba(0,0,0,0.05)
-    );
 
   pointer-events: none;
 }
