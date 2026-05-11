@@ -1,4 +1,4 @@
-#========= requirements.txt save-state 2026-05-03T21:38:55-04:00 ========
+#========= requirements.txt save-state 2026-05-103T21:24:30-04:00 ========
 # Core ML / NLP
 torch==2.10.0 --index-url https://download.pytorch.org/whl/cpu
 transformers==4.46.2
@@ -12,7 +12,6 @@ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0
 # Sentence-Transformers dependencies
 scikit-learn>=1.7.2,<2.0
 scipy>=1.16.3,<2.0
-pillow>=12.0.0
 joblib>=1.5.2
 threadpoolctl>=3.6.0
 
@@ -48,6 +47,8 @@ rdflib>=7.6.0
 # Human Moderator Credentialing
 argon2-cffi-bindings>=25.1.0
 pyotp>=2.9.0
+pillow>=12.0.0
+qrcode>=8.2
 
 # Custom Donations via Stripe
 stripe==15.1.0

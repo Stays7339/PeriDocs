@@ -1,5 +1,5 @@
 // peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-03T23:09:30-04:00
+// save-state 2026-05-10T15:56:45-04:00
 // ==========================================
 
 /* Notes:
@@ -78,18 +78,21 @@ document.addEventListener("DOMContentLoaded", () => {
   /* --- Initialize --- */
   applyConsentState(consentGranted);
 
-  /* --- Listening For Click on the Consent Toggle (un-comment to re-enable consent toggle) --- */
-  if (consentToggle) {
-    consentToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      // Disable toggle for 3 seconds to prevent accidental double-click
-      consentToggle.disabled = true;
-      setTimeout(() => {
-        consentToggle.disabled = false;
-      }, 3000);
-      applyConsentState(!consentGranted);
-    });
-  }
+  /* --- Listening For Click on the Consent Toggle (production-only) --- */
+if (ProductionMode === false && consentToggle) {
+  consentToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+
+    // Disable toggle for 3 seconds to prevent accidental double-click
+    consentToggle.disabled = true;
+
+    setTimeout(() => {
+      consentToggle.disabled = false;
+    }, 3000);
+
+    applyConsentState(!consentGranted);
+  });
+}
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
@@ -393,14 +396,14 @@ function copySafeTextToClipboard(safeText) {
 
 // ---------------------- Copy Entry Button Binding ---------------------- //
 const copyEntryBtn = document.getElementById("copy-entry-btn");
-if (copyEntryBtn) {  // FIXED: check the correct variable
+if (copyEntryBtn) {  
   const safeText = copyEntryBtn.dataset.safeText; // read from data attribute
   copyEntryBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
 }
 
 // ---------------------- Copy Delete Token Button Binding ---------------------- //
 const copyDeleteTokenBtn = document.getElementById("copy-delete-token-btn");
-if (copyDeleteTokenBtn) {  // FIXED: check the correct variable
+if (copyDeleteTokenBtn) {  
   const safeText = copyDeleteTokenBtn.dataset.safeText; // read from data attribute
   copyDeleteTokenBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
 }
@@ -458,70 +461,6 @@ window.copySafeTextToClipboard = copySafeTextToClipboard;
       }
   }); // end deleteForm submit listener
     }
-
-// =========================
-// Header & Mobile Menu
-// =========================
-
-function initHeaderMenu() {
-  try {
-    const headerMenu = document.querySelector('.header-menu');
-    const menuToggle = document.getElementById('menu-toggle-btn');
-    const themeBtn = document.getElementById('theme-toggle-btn');
-    const feedbackBtn = document.getElementById('feedback-btn');
-
-    // Mobile menu toggle
-    menuToggle?.addEventListener('click', () => {
-      headerMenu?.classList.toggle('show');
-    });
-
-    // Move theme/feedback buttons into sidebar on mobile
-    function updateSidebarButtons() {
-      if (!headerMenu || !themeBtn || !feedbackBtn) return;
-      if (window.innerWidth <= 835) {
-        if (!headerMenu.contains(themeBtn)) headerMenu.appendChild(themeBtn);
-        if (!headerMenu.contains(feedbackBtn)) headerMenu.appendChild(feedbackBtn);
-      } else {
-        if (themeBtn.parentNode === headerMenu) document.body.appendChild(themeBtn);
-        if (feedbackBtn.parentNode === headerMenu) document.body.appendChild(feedbackBtn);
-      }
-    }
-    updateSidebarButtons();
-    window.addEventListener('resize', updateSidebarButtons);
-
-    // Header link/button hover and active
-    function styleHeaderButtons() {
-      headerMenu?.querySelectorAll('a, button').forEach(el => {
-        el.style.width = '100%';
-        el.style.marginBottom = '1.5rem';
-        el.style.display = 'inline-flex';
-        el.style.alignItems = 'center';
-        el.style.justifyContent = 'center';
-        el.style.fontFamily = "'CabinetGrotesk-Variable', system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial";
-        el.style.fontWeight = '600';
-        el.style.height = '48px';
-        el.style.textDecoration = 'none';
-        el.style.color = '#FFFFFF';
-        el.style.borderRadius = '10px';
-        el.style.transition = 'background 0.2s ease, transform 0.1s ease';
-        el.addEventListener('mouseenter', () => { el.style.transform='translateY(-1px)'; });
-        el.addEventListener('mouseleave', () => { el.style.transform='translateY(0)'; });
-        el.addEventListener('mousedown', () => el.style.transform='translateY(0)');
-      });
-    }
-    styleHeaderButtons();
-
-  } catch (err) {
-    console.error('Header/menu init failed:', err);
-  }
-}
-
-// Run immediately or on DOMContentLoaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initHeaderMenu);
-} else {
-  initHeaderMenu();
-}
 
 }); // end DOMContentLoaded
 

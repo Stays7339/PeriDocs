@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-05T15:00:00-04:00
+## Canonical Project Directory as of 2026-05-10T21:39:05-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -302,6 +302,13 @@ PeriDocs/                         # Root project folder
 │
 ├─ app/                                # Backend + frontend application code
 │  │
+│  ├─ credentialing/
+│  │  ├─ account_routing.py
+│  │  ├─ account_runtime.py       
+│  │  ├─ account_storage.py   
+│  │  ├─ authentication_middleware.py   
+│  │  ├─ create_first_account.py   
+│  │  └─ security_fundamentals.py 
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
@@ -323,9 +330,9 @@ PeriDocs/                         # Root project folder
 │  │
 │  ├─ static/                            # Frontend static files
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
-│  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
+│  │  ├─ custom-styled-text-field.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ donation-ui.js                  #Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
 │  │  ├─ fi-rr-search-alt.svg
 │  │  ├─ globals.css

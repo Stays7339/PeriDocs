@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_credentialing.py
-# save-state 2026-04-29T23:32:10-04:00
+# save-state 2026-05-10T14:00:00-04:00
 # ==========================================
 
 import os
@@ -8,6 +8,13 @@ import json
 import pyotp
 import hmac
 import hashlib
+import time
+import hmac
+import base64
+import secrets
+
+from collections import defaultdict
+from fastapi import Request
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,13 +47,34 @@ ph = PasswordHasher()
 
 router = APIRouter(prefix="/admin/auth", tags=["admin-auth"])
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
 
 
 # ---------------------------------------------------
 # SINGLE SOURCE OF TRUTH
 # ---------------------------------------------------
+
+BOOTSTRAP_SECRET = AES_KEY  # reuse master Fernet key
+
+BOOTSTRAP_TTL_SECONDS = 600  # 10 minutes validity window
+
+RATE_LIMIT_STORE = defaultdict(list)
+
+RATE_LIMIT_WINDOW_SECONDS = 60
+RATE_LIMIT_MAX_REQUESTS = 10
+
+SESSION_TTL = 3600  # 1 hour
+
+BOOTSTRAP_STORE = {}
+
+BOOTSTRAP_IN_PROGRESS = False
+
+
 _admin_cache = {}
 _loaded = False
+
+# Stateless bootstrap system (no server memory state)
+# token = signed payload (username, password, secret, expiry)
 
 
 def load_admins():
@@ -93,32 +121,47 @@ def has_admins() -> bool:
     return len(load_admins()) > 0
 
 def sign_session(username: str) -> str:
-    """
-    Create HMAC signature for a username
-    """
+    payload = {
+        "username": username,
+        "exp": time.time() + SESSION_TTL,
+        "number-used-once": secrets.token_urlsafe(16)
+    }
+
+    raw = json.dumps(payload, sort_keys=True)
+
     sig = hmac.new(
         AES_KEY.encode(),
-        username.encode(),
+        raw.encode(),
         hashlib.sha256
     ).hexdigest()
 
-    return f"{username}|{sig}"
+    return base64.urlsafe_b64encode(
+        (raw + "." + sig).encode()
+    ).decode()
 
 
 def verify_session(cookie_value: str) -> bool:
-    """
-    Verify cookie has not been tampered with
-    """
     try:
-        username, sig = cookie_value.split("|")
+        decoded = base64.urlsafe_b64decode(cookie_value.encode()).decode()
 
-        expected_sig = hmac.new(
+        raw, sig = decoded.rsplit(".", 1)
+
+        expected = hmac.new(
             AES_KEY.encode(),
-            username.encode(),
+            raw.encode(),
             hashlib.sha256
         ).hexdigest()
 
-        return hmac.compare_digest(sig, expected_sig)
+        if not hmac.compare_digest(sig, expected):
+            return False
+
+        payload = json.loads(raw)
+
+        if time.time() > payload["exp"]:
+            return False
+
+        return True
+
     except Exception:
         return False
 
@@ -128,12 +171,14 @@ def verify_session(cookie_value: str) -> bool:
 # ---------------------------------------------------
 class CreateAdminPayload(BaseModel):
     username: str
-    password: str
 
+class CompleteBootstrapPayload(BaseModel):
+    username: str
+    temp_secret: str
+    totp_code: str
 
 class AdminLoginPayload(BaseModel):
     username: str
-    password: str
     totp_code: str
 
 
@@ -143,8 +188,16 @@ class AdminLoginPayload(BaseModel):
 @router.get("/create", response_class=HTMLResponse)
 async def create_page(request: Request):
     """
-    CHANGE: prevents access if admins already exist
+    prevents access if admins already exist
     """
+
+    global BOOTSTRAP_IN_PROGRESS
+
+    if BOOTSTRAP_IN_PROGRESS:
+        raise HTTPException(status_code=409, detail="Bootstrap already in progress")
+
+    BOOTSTRAP_IN_PROGRESS = True
+
     if has_admins():
         return RedirectResponse("/admin/auth/login")
 
@@ -154,7 +207,7 @@ async def create_page(request: Request):
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
     """
-    CHANGE: forces bootstrap if no admins exist yet
+   forces bootstrap if no admins exist yet
     """
     if not has_admins():
         return RedirectResponse("/admin/auth/create")
@@ -163,37 +216,103 @@ async def login_page(request: Request):
 
 
 # ---------------------------------------------------
-# CREATE ADMIN
+# BEGIN BOOTSTRAP
 # ---------------------------------------------------
-@router.post("/create-admin")
-async def create_admin(payload: CreateAdminPayload):
-    admins = load_admins()
+@router.post("/create-account")
+async def create_identity(payload: CreateAdminPayload):
 
-    if payload.username in admins:
-        raise HTTPException(status_code=400, detail="Admin already exists")
+    if not rate_limit(f"bootstrap:create:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
 
-    # TOTP secret generated once
+    if not rate_limit(f"login:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    if has_admins():
+        raise HTTPException(status_code=403, detail="Identity already initialized")
+
     totp_secret = pyotp.random_base32()
 
-    admins[payload.username] = {
-        "password_hash": ph.hash(payload.password),
-        "totp_secret_enc": fernet.encrypt(totp_secret.encode()).decode(),
+    bootstrap_token = create_bootstrap_token({
+        "username": payload.username,
+        "temp_secret": totp_secret,
+        "role": "user",
+        "created_at": time.time(),
+        "expires_at": time.time() + BOOTSTRAP_TTL_SECONDS
+    })
+    return {
+        "status": "pending",
+        "bootstrap_token": bootstrap_token,
+        "totp_secret": totp_secret
+    }
+
+# ---------------------------------------------------
+# COMPLETE BOOTSTRAP
+# ---------------------------------------------------
+@router.post("/complete-bootstrap")
+async def complete_identity_setup(payload: dict):
+    if not rate_limit(f"bootstrap:create:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    if not rate_limit(f"login:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    token_data = _verify_bootstrap_token(payload["bootstrap_token"])
+
+    totp = pyotp.TOTP(token_data["temp_secret"])
+
+    if not totp.verify(payload["totp_code"], valid_window=1):
+        raise HTTPException(status_code=401, detail="Invalid TOTP")
+
+    token_hash = hashlib.sha256(payload["bootstrap_token"].encode()).hexdigest()
+
+    BOOTSTRAP_STORE[token_hash]["used"] = True
+
+    "password_hash": ph.hash(payload.password),
+    token_data = verify_bootstrap_token(payload.bootstrap_token)
+
+    identities = load_admins()
+
+    # identity system (admin is just a role flag)
+    identities[token_data["username"]] = {
+        "password_hash": ph.hash(token_data["password"]),
+        "totp_secret_enc": fernet.encrypt(
+            token_data["temp_secret"].encode()
+        ).decode(),
+        "role": token_data["role"],  # ADMIN, USER, etc.
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
     save_admins()
 
-    return {
-        "status": "ok",
-        "totp_secret": totp_secret
-    }
+    BOOTSTRAP_IN_PROGRESS = False
 
+    return {"status": "ok"}
+
+
+@router.post("/reset-bootstrap")
+async def reset_bootstrap():
+
+    global _bootstrap_session
+
+    _bootstrap_session = None
+
+    BOOTSTRAP_IN_PROGRESS = False
+    BOOTSTRAP_STORE.clear()
+
+    return {"status": "reset"}
 
 # ---------------------------------------------------
 # LOGIN
 # ---------------------------------------------------
 @router.post("/login")
 async def login(payload: AdminLoginPayload):
+
+    if not rate_limit(f"bootstrap:create:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    if not rate_limit(f"login:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
     admins = load_admins()
 
     admin = admins.get(payload.username)
@@ -217,20 +336,109 @@ async def login(payload: AdminLoginPayload):
     session_value = sign_session(payload.username)
 
     response.set_cookie(
-        key="admin_session",
+        key="session",
         value=session_value,
         httponly=True,
-        secure=False,   # set True in production (HTTPS)
-        samesite="lax"
+        secure=ProductionMode,
+        samesite="strict"
     )
 
     return response
 
 @router.post("/logout")
 async def logout():
+
+    if not rate_limit(f"bootstrap:create:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
+    if not rate_limit(f"login:{payload.username}"):
+        raise HTTPException(status_code=429, detail="Too many requests")
+
     response = JSONResponse({"status": "logged_out"})
 
     # NEW: delete cookie
-    response.delete_cookie("admin_session")
+    response.delete_cookie("session")
 
     return response
+
+def _sign_bootstrap_payload(payload: dict) -> str:
+    """
+    Creates tamper-proof bootstrap token (stateless session)
+    """
+
+    raw = json.dumps(payload, sort_keys=True).encode()
+
+    sig = hmac.new(
+        BOOTSTRAP_SECRET.encode(),
+        raw,
+        hashlib.sha256
+    ).hexdigest()
+
+    return base64.urlsafe_b64encode(raw + b"." + sig.encode()).decode()
+
+
+def verify_bootstrap_token(token: str) -> dict:
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
+    entry = BOOTSTRAP_STORE.get(token_hash)
+
+    if not entry:
+        raise HTTPException(status_code=401, detail="Invalid bootstrap token")
+
+    if entry["used"]:
+        raise HTTPException(status_code=401, detail="Bootstrap token already used")
+
+    payload = entry["payload"]
+
+    if time.time() > payload["expires_at"]:
+        raise HTTPException(status_code=401, detail="Bootstrap token expired")
+
+    return payload
+
+
+def rate_limit(key: str):
+    """
+    Simple sliding window rate limiter (in-memory).
+    """
+    now = time.time()
+
+    window = RATE_LIMIT_STORE[key]
+
+    # remove expired timestamps
+    RATE_LIMIT_STORE[key] = [
+        t for t in window if now - t < RATE_LIMIT_WINDOW_SECONDS
+    ]
+
+    if len(RATE_LIMIT_STORE[key]) >= RATE_LIMIT_MAX_REQUESTS:
+        return False
+
+    RATE_LIMIT_STORE[key].append(now)
+    return True
+
+def create_bootstrap_token(payload: dict) -> str:
+    """
+    Stateless-safe token:
+    - JSON encoded
+    - hashed key lookup
+    """
+    raw = json.dumps(payload, sort_keys=True).encode()
+
+    token_id = secrets.token_urlsafe(32)
+
+    token_hash = hashlib.sha256(token_id.encode()).hexdigest()
+
+    BOOTSTRAP_STORE[token_hash] = {
+        "payload": payload,
+        "used": False
+    }
+
+    return token_id
+
+@router.post("/restart-bootstrap")
+async def restart_bootstrap():
+    global BOOTSTRAP_IN_PROGRESS
+
+    BOOTSTRAP_IN_PROGRESS = False
+    BOOTSTRAP_STORE.clear()
+
+    return {"status": "reset"}

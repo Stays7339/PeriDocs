@@ -1,6 +1,6 @@
 <!--
 PeriDocs/app/templates/base.html
-save-state 2026-05-09T17:11:20-04:00
+save-state 2026-05-10T15:54:00-04:00
 -->
 
 <!doctype html>
@@ -17,6 +17,7 @@ save-state 2026-05-09T17:11:20-04:00
   <link rel="stylesheet" href="/static/globals.css" />
   <link rel="stylesheet" href="/static/styleguide.css" />
   <link rel="stylesheet" href="/static/stylesheet.css" />
+  <link rel="stylesheet" href="/static/custom-styled-text-field.css" />
 </head>
 
 <!-- ADDED: mobile menu overlay -->
@@ -94,7 +95,13 @@ save-state 2026-05-09T17:11:20-04:00
     {% block content %}{% endblock %}
   </main>
 
+  {% include 'includes/modal-feedback.html' %}
+  {% include 'includes/modal-crisis.html' %}
+
   <script>
+
+window.ProductionMode = JSON.parse('{{ ProductionMode | default(false) | tojson }}');
+
 function updateNavPill() {
   const left = document.querySelector(".menu-group-left");
   const right = document.querySelector(".menu-group-right");
@@ -188,7 +195,7 @@ let isMobileMode = mq.matches;
 mq.addEventListener("change", (e) => {
   const nowMobile = e.matches;
 
-  // ENTERING DESKTOP MODE (THIS is your case)
+  // ENTERING DESKTOP MODE
   if (!nowMobile && isMobileMode) {
     forceDesktopCleanup();
   }
@@ -213,6 +220,7 @@ window.addEventListener("resize", () => {
 <!-- brings in existing UI system (toasts, etc.) -->
 <script src="/static/peridocs-ui.js"></script>
 <script src="/static/donation-ui.js"></script>
+<script src="/static/account_authentication.js"></script>
 
 </body>
 </html>

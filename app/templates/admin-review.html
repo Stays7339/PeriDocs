@@ -1,8 +1,11 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-04-29T23:14:15-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-05-10T12:32:30-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
 {% block content %}
+<button class="general-button" onclick="logout()">Logout</button>
+
+<div class="card-grid">
 <div class="card">
   <h1>Review Queue</h1>
   <div id="review-list" class="card-content"></div>
@@ -12,27 +15,20 @@
   <h2>Create Heuristic</h2>
 
   <div id="givens-container"></div>
-  <button class="btn" onclick="addGiven()">+ Add Given</button>
+  <button class="general-button" onclick="addGiven()">+ Add Given</button>
 
   <hr>
 
   <div id="outputs-container"></div>
-  <button class="btn" onclick="addOutput()">+ Add Output</button>
+  <button class="general-button" onclick="addOutput()">+ Add Output</button>
 
   <br><br>
-  <button class="btn primary" onclick="submitHeuristic()">Submit</button>
+  <button class="general-button" onclick="submitHeuristic()">Submit</button>
 
 </div>
+</div>
 
-<button class="btn ghost" onclick="logout()">Logout</button>
 
-
-<script>
-async function logout() {
-  await fetch("/admin/auth/logout", { method: "POST" });
-  window.location.href = "/admin/auth/login";
-}
-</script>
 
 <script src="/static/admin_review_ux.js" defer></script>
 {% endblock %}

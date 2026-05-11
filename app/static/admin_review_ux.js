@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-04-26T16:31:05-04:00
+// save-state 2026-05-10T12:53:10-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -9,7 +9,7 @@ let reviewQueue = [];
 // REVIEW QUEUE
 // -----------------------------
 async function fetchQueue() {
-  const res = await fetch("/admin/review-queue");
+  const res = await authFetch("/admin/review-queue");
   reviewQueue = await res.json();
   renderQueue();
 
@@ -54,9 +54,9 @@ function renderQueue() {
 
       if (!description_from_human_moderator || !title_from_human_moderator) return;
 
-      await fetch("/admin/approve-precentroid", {
+      await authFetch("/admin/approve-precentroid", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: authHeaders(),
         body: JSON.stringify({
           id: item.id,
           description_from_human_moderator,
@@ -69,9 +69,9 @@ function renderQueue() {
     });
 
     rejectBtn.addEventListener("click", async () => {
-      await fetch("/admin/reject-precentroid", {
+      await authFetch("/admin/reject-precentroid", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: authHeaders(),
         body: JSON.stringify({ id: item.id })
       });
 
@@ -101,18 +101,23 @@ async function toggleEntries(precentroidId) {
   const entryIds =
     reviewQueue.find(p => p.id === precentroidId)?.meta.entry_ids || [];
 
-  const res = await fetch("/admin/entries-safe-text", {
+  const res = await authFetch("/admin/entries-safe-text", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: authHeaders(),
     body: JSON.stringify({ entry_ids: entryIds })
   });
 
   const data = await res.json();
 
-  entriesContainer.innerHTML = data.entries
-    .map(e => `<p class="matched-snippet">${e.safe_text}</p>`)
-    .join("");
+  entriesContainer.innerHTML = "";
 
+  for (const e of data.entries) {
+    const p = document.createElement("p");
+    p.className = "matched-snippet";
+    p.textContent = e.safe_text;
+    entriesContainer.appendChild(p);
+  }
+  
   entriesContainer.style.display = "block";
   el.scrollIntoView({ behavior: "smooth" });
 
@@ -144,7 +149,7 @@ window.addEventListener("popstate", event => {
 fetchQueue();
 
 // =====================================================
-// HEURISTICS + TYPEAHEAD SYSTEM (RESTORED FULL UX)
+// HEURISTICS + TYPEAHEAD SYSTEM
 // =====================================================
 
 const givensContainer = document.getElementById("givens-container");
@@ -195,9 +200,9 @@ async function submitHeuristic() {
     })
     .filter(o => o.concept);
 
-  const res = await fetch("/admin/create-heuristic", {
+  const res = await authFetch("/admin/create-heuristic", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
+    headers: authHeaders(),
     body: JSON.stringify({ givens, outputs })
   });
 
@@ -212,7 +217,7 @@ async function submitHeuristic() {
 // LOAD CONCEPTS (backend source of truth)
 // -----------------------------
 async function loadConceptList() {
-  const res = await fetch("/admin/concepts");
+  const res = await authFetch("/admin/concepts");
   const data = await res.json();
   CONCEPTS = data.concepts;
 }
@@ -220,7 +225,7 @@ async function loadConceptList() {
 loadConceptList();
 
 // =====================================================
-// TYPEAHEAD SYSTEM (FULL RESTORED UX)
+// TYPEAHEAD SYSTEM
 // =====================================================
 
 function conceptMatches(input, concept) {
@@ -292,7 +297,7 @@ function attachTypeahead(inputEl) {
   });
 }
 
-// FIXED: correct index scoping
+// correct index scoping
 function updateActive(items, index) {
   items.forEach(el => el.classList.remove("active"));
 

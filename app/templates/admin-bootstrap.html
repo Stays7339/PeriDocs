@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-bootstap.html save-state 2026-04-29T23:14:15-04:00 #}
+{# PeriDocs/app/templates/admin-bootstrap.html save-state 2026-05-10T21:32:55-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
@@ -13,7 +13,7 @@
 
       <div style="height:10px"></div>
 
-      <input id="password" type="text" placeholder="admin password" />
+      <input id="password" type="password" placeholder="admin password" />
 
       <div style="height:20px"></div>
 
@@ -33,8 +33,16 @@
 
         <br>
 
-        <button class="btn primary" onclick="window.location.href='/admin/auth/login'">
-          Continue to Login
+        <input
+          id="bootstrap-totp-code"
+          type="text"
+          placeholder="Enter current TOTP code"
+        />
+
+        <div style="height:10px"></div>
+
+        <button class="btn primary" onclick="completeBootstrap()">
+          Verify & Create Admin
         </button>
 
       </div>
@@ -43,42 +51,128 @@
 
   </div>
 </div>
+{% endblock %}
 
 <script>
-async function createAdmin() {
-  const username = document.getElementById("username").value;
-  const password = document.getElementById("password").value;
 
-  const res = await fetch("/admin/auth/create-admin", {
+let pendingBootstrap = null; /* temporary bootstrap state */ 
+
+async function createAdmin() {
+
+  if (pendingBootstrap !== null) {
+    showToast(
+      "Bootstrap already started.",
+      "error"
+    );
+    return;
+  }
+
+  const username =
+    document.getElementById("username").value.trim();
+
+  const password =
+    document.getElementById("password").value;
+
+  const res = await authFetch("/auth/bootstrap/start", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ username, password })
+    credentials: "same-origin",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      username,
+      password
+    })
   });
 
   const data = await res.json();
 
-  if (data.totp_secret) {
-
-    // show section
-    document.getElementById("totp-section").style.display = "block";
-
-    // render secret
-    document.getElementById("totp-secret").textContent = data.totp_secret;
-
-    // build otpauth URI
-    const uri = `otpauth://totp/PeriDocs:${username}?secret=${data.totp_secret}&issuer=PeriDocs`;
-
-    document.getElementById("totp-uri").textContent = uri;
-
-    // FIX: generate QR inside function where uri exists
-    const qr = document.getElementById("qr");
-    qr.src = "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=" + encodeURIComponent(uri);
-    qr.style.display = "block";
-
-  } else {
-    alert("Error creating admin");
+  if (!res.ok) {
+    showToast(data.detail || "Bootstrap failed", "error");
+    return;
   }
+
+  pendingBootstrap = Object.freeze({
+    ticket_id: data.ticket_id,
+    username
+  });
+
+  document.getElementById("totp-section").style.display = "block";
+
+  document.getElementById("totp-secret").textContent =
+    data.time_code_secret;
+
+  const uri =
+    `otpauth://totp/PeriDocs:${username}?secret=${data.time_code_secret}&issuer=PeriDocs`;
+
+  document.getElementById("totp-uri").textContent = uri;
+
+  const qr = document.getElementById("qr");
+
+  qr.src =
+  "/auth/bootstrap/qr?uri="
+  + encodeURIComponent(uri);
+
+  qr.style.display = "block";
+}
+
+
+async function completeBootstrap() {
+
+  if (!pendingBootstrap) {
+    showToast("Missing bootstrap session", "error");
+    return;
+  }
+
+  const password =
+    document.getElementById("password").value;
+
+  const time_code =
+    document.getElementById("bootstrap-totp-code").value;
+
+  const res = await authFetch("/auth/bootstrap/complete", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      ticket_id: pendingBootstrap.ticket_id,
+      password,
+      time_code
+    })
+  });
+
+  const data = await res.json();
+
+  if (!res.ok) {
+    showToast(
+      data.detail || "Verification failed",
+      "error"
+    );
+    return;
+  }
+
+  showToast(
+    "Administrator account created",
+    "success"
+  );
+
+  setTimeout(() => {
+    window.location.href = "/admin/auth/login";
+  }, 1000);
+}
+
+function resetBootstrap() {
+
+  // CLEAR ALL STATE
+  pendingBootstrap = null;
+
+  // CLEAR UI
+  document.getElementById("totp-section").style.display = "none";
+  document.getElementById("totp-secret").textContent = "";
+  document.getElementById("totp-uri").textContent = "";
+  document.getElementById("qr").style.display = "none";
+
+  // optional: clear inputs
+  document.getElementById("username").value = "";
+  document.getElementById("password").value = "";
+  document.getElementById("bootstrap-totp-code").value = "";
 }
 </script>
-
-{% endblock %}

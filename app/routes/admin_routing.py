@@ -45,6 +45,7 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
 
 
 # -----------------------------

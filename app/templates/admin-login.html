@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-login.html save-state 2026-04-29T23:14:15-04:00 #}
+{# PeriDocs/app/templates/admin-login.html save-state 2026-05-10T12:12:20-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
@@ -10,17 +10,17 @@
 
     <div class="card-content">
 
-      <input id="username" type="text" placeholder="username" />
+      <input class="typeahead-dropdown typeahead-item" id="username" type="text" placeholder="username" />
       <div style="height:10px"></div>
 
-      <input id="password" type="password" placeholder="password" />
+      <input class="typeahead-dropdown typeahead-item" id="password" type="password" placeholder="password" />
       <div style="height:10px"></div>
 
-      <input id="totp" type="text" placeholder="TOTP code" />
+      <input class="typeahead-dropdown typeahead-item" id="totp" type="text" placeholder="TOTP code" />
 
       <div style="height:20px"></div>
 
-      <button class="btn primary" onclick="login()">Login</button>
+      <button class="general-button" onclick="login()">Login</button>
 
     </div>
 
@@ -32,12 +32,17 @@
 async function login() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-  const totp_code = document.getElementById("totp").value;
+  const time_code = document.getElementById("totp").value;
 
-  const res = await fetch("/admin/auth/login", {
+  const res = await authFetch("/auth/login", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({username, password, totp_code})
+    credentials: "same-origin",
+    headers: authHeaders(),
+    body: JSON.stringify({
+      username,
+      password,
+      time_code
+    })
   });
 
   const data = await res.json();
@@ -45,7 +50,7 @@ async function login() {
   if (data.status === "ok") {
     window.location.href = "/admin";
   } else {
-    alert("Login failed");
+    showToast("Login failed", "error");
   }
 }
 </script>

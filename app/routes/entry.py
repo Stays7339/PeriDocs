@@ -25,6 +25,8 @@ from core.map.mapping_runtime import ledger, centroid_system , entry_runtime
 
 
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
+
 logger = logging.getLogger(__name__)
 
 

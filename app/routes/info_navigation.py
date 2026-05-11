@@ -11,6 +11,7 @@ from app.routes import app  # FastAPI instance from __init__.py
 
 # Jinja2 templates directory
 templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
 
 
 @app.get("/", response_class=HTMLResponse)

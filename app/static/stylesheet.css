@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-09T17:59:00-04:00 
+save-state 2026-05-10T12:31:10-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -483,6 +483,8 @@ save-state 2026-05-09T17:59:00-04:00
   max-width: 1400px;
   flex: 1 1 250px;
 }
+
+/* Give a recessed-look to the interior of the banner*/
 
 .banner-1-banner::before {
   content: "";

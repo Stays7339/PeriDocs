@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-10T10:34:10-04:00
+save-state 2026-05-10T13:12:12-04:00
 */
 
 /* =========================
@@ -105,6 +105,26 @@ body {
   background-repeat: repeat-y;
   position: relative;
   z-index: 0;
+}
+
+/* ---------------------- About page paragraph alignment from earlier ---------------------- */
+.about-content p {
+  margin: 0 0 1rem 0; /* space between paragraphs */
+}
+
+p.left { text-align: left; }
+p.center { text-align: center; }
+p.right { text-align: right; }
+/* this part is intentionally redundant, since we set it so that all h1 headers are centered*/
+h1.center {
+  text-align: center;
+}
+
+/* ------------------ prevent auto zoom on mobile when tapping a text box------------------------ */
+input,
+textarea,
+select {
+  font-size: 16px; /* prevents iOS auto-zoom on focus */
 }
 
 /* links */
@@ -734,6 +754,11 @@ The next mention is to control the width as button are added and removed from th
   max-width: var(--modal-content-max-width); box-shadow: var(--modal-content-shadow);
 }
 .modal-actions { display:flex; justify-content:flex-end; gap: var(--modal-actions-gap); }
+
+/* ---------------------- Feedback Modal ---------------------- */
+.feedback-modal{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:1002;}
+.feedback-modal-content{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
+.feedback-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
 
 
 /* =========================
