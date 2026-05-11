@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-04-30T22:04:45 -04:00
+# save-state 2026-05-11T14:12:10 -04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -25,7 +25,6 @@ from core.map.mapping_runtime import ledger, centroid_system , entry_runtime
 
 
 templates = Jinja2Templates(directory="app/templates")
-templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
 
 logger = logging.getLogger(__name__)
 

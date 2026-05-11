@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-10T22:00:45-04:00 (ISO 8601)
+# save-state 2026-05-11T14:19:30-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -15,25 +15,30 @@ from pathlib import Path
 
 from fastapi import Request
 from fastapi.responses import RedirectResponse, FileResponse, JSONResponse
-from app.routes.admin_routing import has_admins
-from app.routes import admin_credentialing
-from app.credentialing.authentication_middleware import auth_middleware
+from app.credentialing.authentication_middleware import (
+    auth_middleware,
+    security_headers_middleware,
+)
+from app.credentialing import account_routing
+from app.credentialing.account_runtime import (
+    account_runtime,
+    initialize_account_runtime,
+    shutdown_account_runtime,
+)
 
 from core.nlp.embeddings import _load_model, get_embedding_async
 from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
-from app.credentialing.account_runtime import (
-   initialize_account_runtime,
-   shutdown_account_runtime,
-)
+
 
 # ==========================================
 # CONFIG Toggle FOR Development VS Production
 # ==========================================
 
-
-ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
 load_dotenv()
+ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
+app.state.production_mode = ProductionMode
+
 
 # ------------------- logging setup -------------------
 logger = logging.getLogger(__name__)
@@ -69,12 +74,13 @@ from app.routes import feedback
 # ---------------- Include router-based routes ----------------
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
-app.include_router(admin_credentialing.router) 
+app.include_router(account_routing.router)
 
 from app.routes import donation
 app.include_router(donation.router)
 
 app.middleware("http")(auth_middleware)
+app.middleware("http")(security_headers_middleware)
 
 
 
@@ -95,7 +101,10 @@ async def startup_sequence():
     logger.info("Startup sequence complete.")
 
 @app.on_event("shutdown")
-async def cleanup_old_backups():
+async def shutdown_sequence():
+    logger.info("Starting shutdown sequence...")
+
+    await shutdown_account_runtime()
     """
     Keep only the most recent backup, delete all others.
     Triggered on SIGINT (Ctrl+C) or SIGTERM (systemctl stop).
@@ -113,55 +122,6 @@ async def cleanup_old_backups():
             logger.info(f"[shutdown] Deleted old backup: {f.name}")
         except Exception as e:
             logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
-
-
-@app.middleware("http")
-async def admin_bootstrap_funnel(request: Request, call_next):
-
-    path = request.url.path
-
-    if path.startswith("/admin"):
-
-        exists = has_admins()
-
-        # ---------------------------------
-        # NO ADMINS YET
-        # ---------------------------------
-
-        if not exists:
-
-            if path != "/admin/auth/create":
-
-                return RedirectResponse(
-                    "/admin/auth/create",
-                    status_code=302
-                )
-
-            return await call_next(request)
-
-        # ---------------------------------
-        # REQUIRE LOGIN
-        # ---------------------------------
-
-        if not request.state.is_authenticated:
-
-            return RedirectResponse(
-                "/admin/auth/login",
-                status_code=302
-            )
-
-        # ---------------------------------
-        # REQUIRE ADMIN ROLE
-        # ---------------------------------
-
-        if request.state.role != "administrator":
-
-            return JSONResponse(
-                {"detail": "Forbidden"},
-                status_code=403
-            )
-
-    return await call_next(request)
 
 @app.get("/favicon.ico")
 def favicon():

@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-05-10T15:18:40-04:00
+# save-state 2026-05-11T14:18:44-04:00
 # ==========================================
 
 import os
@@ -13,12 +13,19 @@ import secrets
 import pyotp
 from argon2 import PasswordHasher
 
+from cryptography.fernet import Fernet
+fernet = Fernet(AES_KEY)
+
+
+
 _password_hasher = PasswordHasher()
 
 SESSION_TTL_SECONDS = 3600
-BOOTSTRAP_TTL_SECONDS = 600
 
-SECRET_KEY = os.environ["PERIDOCS_AES_KEY"].encode()
+
+SECRET_KEY = os.environ.get("PERIDOCS_AES_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("PERIDOCS_AES_KEY env variable not found")
 
 
 # ----------------------------

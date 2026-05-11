@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-04-29T22:45:10-04:00
+# save-state 2026-05-11T14:18:33-04:00
 # ==========================================
 import os
 import json
@@ -18,6 +18,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from pathlib import Path
 
+
 from core.map.mapping_runtime import centroid_system
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from core.map.perist_reasoning_data import (
@@ -26,17 +27,11 @@ from core.map.perist_reasoning_data import (
     persist_reasoning_data,
     concept_exists
 )
-from app.routes.admin_credentialing import has_admins
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-ADMIN_FILE = os.path.join(DATA_DIR, "logins", "admins.json.enc")
+ADMIN_FILE = # ?
 HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
-
-def require_admin_bootstrap():
-    if not has_admins():
-        return RedirectResponse("/admin/auth/create", status_code=302)
-
 
 # Initialize router with proper prefix and tags
 router = APIRouter(
@@ -45,7 +40,12 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="app/templates")
-templates.env.globals["ProductionMode"] = ProductionMode # for making changes easier between Dev mode and Produciton mode
+
+templates.env.globals.setdefault(
+    "ProductionMode",
+    request.app.state.production_mode
+)
+ # for making changes easier between Dev mode and Produciton mode
 
 
 # -----------------------------

@@ -1,149 +1,27 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-10T21:56:12-04:00
+# save-state 2026-05-11T14:19:12-04:00
 # ==========================================
-
-"""
-PeriDocs Account Runtime
-========================
-
-Purpose
--------
-This file provides the SINGLE authoritative runtime for:
-
-- account creation
-- account lookup
-- account mutation
-- encrypted persistence
-- startup integrity verification
-- serialized account writes
-- role enforcement
-
-Design Philosophy
------------------
-Memory is authoritative.
-Disk is durability.
-
-Meaning:
-- The in-memory account state is treated as the live truth.
-- The encrypted file on disk is treated as persistent storage.
-- All mutations flow through ONE controlled runtime.
-
-This avoids:
-- race conditions
-- partial writes
-- inconsistent account state
-- scattered credential logic
-
-Important Security Rules
-------------------------
-- passwords are ALWAYS hashed
-- TOTP secrets are ALWAYS encrypted at rest
-- usernames may remain plaintext
-- account persistence is ALWAYS encrypted
-- all disk writes are atomic
-- all mutations are serialized through a queue + lock
-
-This runtime intentionally avoids:
-- direct route-layer mutations
-- direct storage manipulation
-- exposing mutable internal references
-
-# =========================================================
-# IMPORTANT DESIGN NOTES
-# =========================================================
-#
-# WHY A QUEUE EXISTS EVEN THOUGH USER COUNT IS LOW
-# ---------------------------------------------------------
-# The queue is not about throughput.
-#
-# It exists to guarantee:
-#
-# - deterministic write order
-# - no overlapping writes
-# - no partially-written encrypted files
-# - future scalability without redesign
-#
-#
-# WHY MEMORY IS AUTHORITATIVE
-# ---------------------------------------------------------
-# Disk is treated as durability storage.
-#
-# Runtime memory is treated as the current truth.
-#
-# This matches the other runtimes within the PeriDocs project:
-#
-# - ledger runtime
-# - centroid runtime
-# - entry runtime
-#
-# architecture philosophy.
-#
-#
-# WHY TMP FILES + os.replace()
-# ---------------------------------------------------------
-# This prevents:
-#
-# - corrupted partial writes
-# - interrupted writes
-# - malformed encrypted snapshots
-#
-# because os.replace() is atomic on modern operating systems.
-#
-#
-# WHY USERNAMES REMAIN PLAINTEXT
-# ---------------------------------------------------------
-# Usernames are identifiers, not secrets.
-#
-# Password hashes and TOTP secrets remain protected.
-#
-#
-# WHY TOTP SECRETS ARE ENCRYPTED INSTEAD OF HASHED
-# ---------------------------------------------------------
-# TOTP verification requires the original secret.
-#
-# Hashing would destroy the ability to generate valid codes.
-#
-# Therefore:
-#
-# - encrypted at rest
-# - decrypted only during verification
-#
-# is the correct model.
-#
-#
-# WHY THIS FILE DOES NOT HANDLE LOGIN
-# ---------------------------------------------------------
-# Runtime responsibility:
-#
-# - memory authority
-# - serialization
-# - persistence
-# - integrity guarantees
-#
-# Authentication responsibility:
-#
-# - password verification
-# - session creation
-# - CSRF
-# - TOTP verification
-#
-# Separation keeps the architecture understandable.
-
-"""
 
 import os
 import json
 import copy
+import time
+import secrets
 import asyncio
 import logging
+
 from typing import Dict, Optional, Any
+from pathlib import Path
 
 from app.credentialing.security_fundamentals import (
     encrypt_value,
     decrypt_value,
     hash_password,
     verify_password,
+    verify_password,
+    generate_time_code_secret,
+    verify_time_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -153,7 +31,14 @@ logger = logging.getLogger(__name__)
 # CONFIGURATION
 # =========================================================
 
-DATA_DIRECTORY = os.getenv("PERIDOCS_DATA_DIR", "data")
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+DATA_DIRECTORY = Path(
+    os.getenv(
+        "PERIDOCS_DATA_DIR",
+        PROJECT_ROOT / "data"
+    )
+)
 
 ACCOUNT_DIRECTORY = os.path.join(
     DATA_DIRECTORY,
@@ -211,12 +96,6 @@ class AccountRuntime:
         self._accounts_by_username: Dict[str, Dict[str, Any]] = {}
 
         # -----------------------------------------
-        # fast lookup cache
-        # -----------------------------------------
-
-        self._username_lookup_index: Dict[str, Dict[str, Any]] = {}
-
-        # -----------------------------------------
         # startup state
         # -----------------------------------------
 
@@ -244,6 +123,13 @@ class AccountRuntime:
         # -----------------------------------------
 
         self._background_queue_worker = None
+
+        self._pending_account_setups = {}
+
+        self._pending_setup_expiration_seconds = 600
+
+        self._dibs_on_first_admin_account = False
+    
 
     # =====================================================
     # INITIALIZATION
@@ -276,8 +162,6 @@ class AccountRuntime:
             )
 
             await self._load_accounts_from_disk()
-
-            self._rebuild_username_lookup_index()
 
             await self._verify_integrity_of_loaded_accounts()
 
@@ -354,25 +238,39 @@ class AccountRuntime:
     # ACCOUNT CREATION
     # =====================================================
 
-    async def create_account(
+    
+    async def call_dibs_on_first_admin_account(self) -> bool:
+        async with self._account_write_lock:
+            if self._dibs_on_first_admin_account:
+                return False
+            self._dibs_on_first_admin_account = True
+            return True
+
+    
+    async def begin_account_setup(
         self,
         *,
         username: str,
         plaintext_password: str,
-        plaintext_time_based_one_time_password_secret: str,
     ):
         """
-        Create and persist a new account.
+        Begins staged account setup.
 
-        Security Guarantees
-        -------------------
-        - password is hashed before storage
-        - TOTP secret is encrypted before storage
-        - first account automatically becomes administrator
-        - all later accounts become ordinary users
+        Account is NOT persisted yet.
+
+        Flow:
+        - generate TOTP secret
+        - hold staged state in memory
+        - require valid TOTP before persistence
         """
 
+        if await self.system_has_accounts():
+            # optional: later replace with invite system
+            pass
+
         async with self._account_write_lock:
+
+            self._cleanup_expired_pending_setups()
 
             if username in self._accounts_by_username:
 
@@ -380,15 +278,124 @@ class AccountRuntime:
                     "Username already exists."
                 )
 
-            role = (
-                "administrator"
-                if not self._accounts_by_username
-                else "ordinary"
+            for pending in self._pending_account_setups.values():
+
+                if pending["username"] == username:
+
+                    raise RuntimeError(
+                        "Username already pending setup."
+                    )
+
+            setup_token = secrets.token_urlsafe(32)
+
+            generated_totp_secret = (
+                generate_time_code_secret()
             )
 
-            self._accounts_by_username[username] = {
+            self._pending_account_setups[
+                setup_token
+            ] = {
 
-                # usernames intentionally plaintext
+                "username":
+                    username,
+
+                "plaintext_password":
+                    plaintext_password,
+
+                "generated_totp_secret":
+                    generated_totp_secret,
+
+                "created_at":
+                    time.time(),
+
+                "expires_at":
+                    (
+                        time.time()
+                        + self._pending_setup_expiration_seconds
+                    ),
+            }
+
+            return {
+                "setup_token":
+                    setup_token,
+
+                "totp_secret":
+                    generated_totp_secret,
+            }
+    
+    async def determine_initial_role(self) -> str:
+        async with self._account_write_lock:
+            return "administrator" if not self._accounts_by_username else "ordinary"
+
+    async def complete_account_setup(
+        self,
+        *,
+        setup_token: str,
+        submitted_totp_code: str,
+    ):
+        """
+        Finalizes account setup ONLY after valid TOTP.
+        """
+
+        async with self._account_write_lock:
+
+            is_first = len(self._accounts_by_username) == 0
+            role = "administrator" if is_first else "ordinary"
+
+
+            self._cleanup_expired_pending_setups()
+
+            pending = self._pending_account_setups.get(
+                setup_token
+            )
+
+            if not pending:
+
+                raise RuntimeError(
+                    "Invalid setup token."
+                )
+
+            if time.time() > pending["expires_at"]:
+
+                self._pending_account_setups.pop(
+                    setup_token,
+                    None
+                )
+
+                raise RuntimeError(
+                    "Setup token expired."
+                )
+
+            generated_totp_secret = (
+                pending["generated_totp_secret"]
+            )
+
+            if not verify_time_code(
+                generated_totp_secret,
+                submitted_totp_code
+            ):
+
+                raise RuntimeError(
+                    "Invalid TOTP code."
+                )
+
+            username = pending["username"]
+
+            plaintext_password = (
+                pending["plaintext_password"]
+            )
+
+            role = await self.determine_initial_role()
+
+            self._accounts_by_username[
+                username
+            ] = {
+
+                "user_id":
+                    secrets.token_hex(32),
+
+                "username":
+                    username,
 
                 "password_hash":
                     hash_password(
@@ -397,22 +404,27 @@ class AccountRuntime:
 
                 "time_secret_encrypted":
                     encrypt_value(
-                        plaintext_time_based_one_time_password_secret
+                        generated_totp_secret
                     ),
 
                 "role":
                     role,
+
+                "created_at":
+                    time.time(),
             }
 
-            self._rebuild_username_lookup_index()
+            self._pending_account_setups.pop(
+                setup_token,
+                None
+            )
 
             await self._persist_accounts_to_disk()
 
             logger.info(
-                "[AccountRuntime] Created account: %s",
+                "[AccountRuntime] Account setup completed: %s",
                 username
             )
-
     # =====================================================
     # AUTHENTICATION
     # =====================================================
@@ -490,6 +502,12 @@ class AccountRuntime:
                     return True
 
             return False
+
+    async def system_has_accounts(self) -> bool:
+
+        async with self._account_write_lock:
+
+            return bool(self._accounts_by_username)
 
     async def get_user_role(
         self,
@@ -574,6 +592,19 @@ class AccountRuntime:
             encoding="utf-8"
         ) as temporary_file:
 
+            try:
+
+                os.chmod(
+                    ENCRYPTED_ACCOUNT_FILE,
+                    0o600
+                )
+
+            except PermissionError:
+
+                logger.warning(
+                    "[AccountRuntime] Failed to harden file permissions for encrypted account."
+                )
+
             temporary_file.write(
                 encrypted_payload
             )
@@ -588,6 +619,19 @@ class AccountRuntime:
             TEMPORARY_WRITE_FILE,
             ENCRYPTED_ACCOUNT_FILE
         )
+
+        try:
+
+            os.chmod(
+                ENCRYPTED_ACCOUNT_FILE,
+                0o600
+            )
+
+        except PermissionError:
+
+            logger.warning(
+                "[AccountRuntime] Failed to harden file permissions for encrypted account."
+            )
 
         logger.info(
             "[AccountRuntime] Persisted encrypted account snapshot."
@@ -701,27 +745,27 @@ class AccountRuntime:
             "[AccountRuntime] Account integrity verification passed."
         )
 
-    # =====================================================
-    # INDEXES
-    # =====================================================
+    def _cleanup_expired_pending_setups(self):
 
-    def _rebuild_username_lookup_index(
-        self
-    ):
-        """
-        Fast username lookup index.
+        current_time = time.time()
 
-        This is a cache, not a second source of truth.
-        """
+        expired_tokens = []
 
-        self._username_lookup_index = {
+        for token, pending in (
+            self._pending_account_setups.items()
+        ):
 
-            username: user
+            if current_time > pending["expires_at"]:
 
-            for username, user in (
-                self._accounts_by_username.items()
+                expired_tokens.append(token)
+
+        for token in expired_tokens:
+
+            self._pending_account_setups.pop(
+                token,
+                None
             )
-        }
+
 
     # =====================================================
     # CLEAN SHUTDOWN
@@ -779,80 +823,3 @@ async def shutdown_account_runtime():
     Flushes pending writes before process exit.
     """
     await account_runtime.shutdown()
-
-
-async def get_accounts_snapshot():
-    """
-    Safe read-only deep copy of all accounts.
-
-    Returns:
-        dict
-    """
-    return await account_runtime.get_all_accounts()
-
-
-async def get_account(username: str):
-    """
-    Safe lookup helper.
-
-    Returns:
-        dict | None
-    """
-    return await account_runtime.get_account(username)
-
-
-async def does_any_administrator_exist() -> bool:
-    """
-    Returns True if at least one administrator exists.
-    """
-    return await account_runtime.has_administrators()
-
-
-async def create_account(
-    *,
-    username: str,
-    password_hash: str,
-    encrypted_time_based_one_time_password_secret: str,
-    role: str,
-):
-    """
-    Thin wrapper around runtime queue insertion.
-
-    The queue serializes writes automatically.
-    """
-
-    account_payload = {
-        "password_hash": password_hash,
-        "time_secret_encrypted": encrypted_time_based_one_time_password_secret,
-        "role": role,
-    }
-
-    await account_runtime.enqueue_account_creation(
-        username=username,
-        account_payload=account_payload
-    )
-
-
-async def update_account_role(
-    *,
-    username: str,
-    role: str,
-):
-    """
-    Queue-safe role update helper.
-    """
-
-    await account_runtime.enqueue_account_role_change(
-        username=username,
-        role=role
-    )
-
-
-async def remove_account(username: str):
-    """
-    Queue-safe account deletion helper.
-    """
-
-    await account_runtime.enqueue_account_deletion(
-        username=username
-    )

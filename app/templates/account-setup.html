@@ -1,23 +1,23 @@
-{# PeriDocs/app/templates/admin-bootstrap.html save-state 2026-05-10T21:32:55-04:00 #}
+{# PeriDocs/app/templates/account-setup.html save-state 2026-05-11T13:52:50-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
 <div class="wrap">
   <div class="card">
 
-    <h1>Bootstrap Admin</h1>
+    <h1>Create An Account</h1>
 
     <div class="card-content">
 
-      <input id="username" type="text" placeholder="admin username" />
+      <input id="username" type="text" placeholder="username" />
 
       <div style="height:10px"></div>
 
-      <input id="password" type="password" placeholder="admin password" />
+      <input id="password" type="password" placeholder="password" />
 
       <div style="height:20px"></div>
 
-      <button class="btn primary" onclick="createAdmin()">Create Admin</button>
+      <button class="btn primary" onclick="createAccount()">Create Account Now</button>
 
       <!-- TOTP DISPLAY -->
       <div id="totp-section" style="display:none; margin-top:20px;">
@@ -42,7 +42,7 @@
         <div style="height:10px"></div>
 
         <button class="btn primary" onclick="completeBootstrap()">
-          Verify & Create Admin
+          Verify & Create Account
         </button>
 
       </div>
@@ -57,7 +57,7 @@
 
 let pendingBootstrap = null; /* temporary bootstrap state */ 
 
-async function createAdmin() {
+async function createAccount() {
 
   if (pendingBootstrap !== null) {
     showToast(
@@ -73,7 +73,7 @@ async function createAdmin() {
   const password =
     document.getElementById("password").value;
 
-  const res = await authFetch("/auth/bootstrap/start", {
+  const res = await authFetch("/auth/account/setup/start", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
@@ -91,24 +91,24 @@ async function createAdmin() {
   }
 
   pendingBootstrap = Object.freeze({
-    ticket_id: data.ticket_id,
+    setup_token: data.setup_token,
     username
   });
 
   document.getElementById("totp-section").style.display = "block";
 
   document.getElementById("totp-secret").textContent =
-    data.time_code_secret;
+    data.totp_secret;
 
   const uri =
-    `otpauth://totp/PeriDocs:${username}?secret=${data.time_code_secret}&issuer=PeriDocs`;
+    `otpauth://totp/PeriDocs:${username}?secret=${data.totp_secret}&issuer=PeriDocs`;
 
   document.getElementById("totp-uri").textContent = uri;
 
   const qr = document.getElementById("qr");
 
   qr.src =
-  "/auth/bootstrap/qr?uri="
+  "/auth/account/setup/qr?uri="
   + encodeURIComponent(uri);
 
   qr.style.display = "block";
@@ -128,12 +128,12 @@ async function completeBootstrap() {
   const time_code =
     document.getElementById("bootstrap-totp-code").value;
 
-  const res = await authFetch("/auth/bootstrap/complete", {
+  const res = await authFetch("/auth/account/setup/complete", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
     body: JSON.stringify({
-      ticket_id: pendingBootstrap.ticket_id,
+      setup_token: pendingBootstrap.setup_token,
       password,
       time_code
     })
@@ -150,12 +150,12 @@ async function completeBootstrap() {
   }
 
   showToast(
-    "Administrator account created",
+    "Account created",
     "success"
   );
 
   setTimeout(() => {
-    window.location.href = "/admin/auth/login";
+    window.location.href = "/auth/login";
   }, 1000);
 }
 

@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-10T21:32:35-04:00
+# save-state 2026-05-11T14:18:55-04:00
 # ==========================================
 
 
@@ -11,12 +11,7 @@ from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
 
 
-from app.credentialing.account_storage import load_accounts, save_accounts
-from app.credentialing.create_first_account import (
-    create_bootstrap_ticket,
-    verify_bootstrap_ticket,
-    consume_bootstrap_ticket
-)
+
 from app.credentialing.security_fundamentals import (
     verify_time_code,
     create_session,
@@ -27,19 +22,23 @@ from app.credentialing.security_fundamentals import (
     generate_cross_site_request_forgery_token,
 )
 
-templates.env.globals["ProductionMode"] = ProductionMode
+from app.credentialing.account_runtime import account_runtime
+
+templates.env.globals.setdefault(
+    "ProductionMode",
+    request.app.state.production_mode
+)
 
 router = APIRouter(prefix="/auth")
 
 
-class BootstrapRequest(BaseModel):
+class AccountSetupStartRequest(BaseModel):
     username: str
     password: str
 
 
-class BootstrapCompleteRequest(BaseModel):
-    ticket_id: str
-    password: str
+class AccountSetupCompleteRequest(BaseModel):
+    setup_token: str
     time_code: str
 
 
@@ -52,119 +51,123 @@ class LoginRequest(BaseModel):
 # ----------------------------
 # BOOTSTRAP START
 # ----------------------------
-@router.post("/bootstrap/start")
-def bootstrap_start(data: BootstrapRequest):
+@router.post("/account/setup/start")
+async def account_setup_start(
+    data: AccountSetupStartRequest
+):
 
-    accounts = load_accounts()
+    result = await (
+        account_runtime.begin_account_setup(
+            username=data.username,
+            plaintext_password=data.password,
+        )
+    )
 
-    if accounts:
-        raise HTTPException(403, "System already initialized")
-
-    ticket_id, temp_secret = create_bootstrap_ticket(data.username)
-
-    return {
-        "ticket_id": ticket_id,
-        "time_code_secret": temp_secret
-    }
+    return result
 
 
 # ----------------------------
 # BOOTSTRAP COMPLETE
 # ----------------------------
-@router.post("/bootstrap/complete")
-def bootstrap_complete(data: BootstrapCompleteRequest):
+@router.post("/account/setup/complete")
+async def account_setup_complete(
+    data: AccountSetupCompleteRequest
+):
 
-    ticket = verify_bootstrap_ticket(data.ticket_id)
+    await (
+        account_runtime.complete_account_setup(
+            setup_token=data.setup_token,
+            submitted_totp_code=data.time_code,
+        )
+    )
 
-    if not verify_time_code(ticket["temp_secret"], data.time_code):
-        raise HTTPException(401, "Invalid time-based code")
-
-    accounts = load_accounts()
-
-    if accounts:
-        raise HTTPException(403, "System already initialized")
-
-    role = "administrator" if len(accounts) == 0 else "ordinary"
-
-    accounts[ticket["username"]] = {
-        "password_hash": hash_password(data.password),  # NOTE: should be hashed in final pass
-        "time_secret_encrypted": encrypt_value(ticket["temp_secret"]),
-        "role": role
+    return {
+        "status": "ok"
     }
-
-    save_accounts(accounts)
-
-    consume_bootstrap_ticket(data.ticket_id)
-
-    return {"status": "ok"}
 
 
 # ----------------------------
 # LOGIN
 # ----------------------------
 @router.post("/login")
-def login(data: LoginRequest):
+async def login(data: LoginRequest):
 
-    accounts = load_accounts()
-    user = accounts.get(data.username)
+    user = await (
+        account_runtime.get_user_snapshot(
+            data.username
+        )
+    )
 
     if not user:
-        raise HTTPException(401, "Invalid login")
 
-    if not verify_password(user["password_hash"], data.password):
-        raise HTTPException(401, "Invalid login")
+        raise HTTPException(
+            401,
+            "Invalid login"
+        )
+
+    if not verify_password(
+        user["password_hash"],
+        data.password
+    ):
+
+        raise HTTPException(
+            401,
+            "Invalid login"
+        )
 
     time_secret = decrypt_value(
         user["time_secret_encrypted"]
     )
 
-    if not verify_time_code(time_secret, data.time_code):
-        raise HTTPException(401, "Invalid login")
-    
-    session_token = create_session(data.username)
-    csrf_token = generate_cross_site_request_forgery_token()
+    if not verify_time_code(
+        time_secret,
+        data.time_code
+    ):
+
+        raise HTTPException(
+            401,
+            "Invalid login"
+        )
+
+    session_token = create_session({
+        "user_id":
+            user["user_id"],
+
+        "username":
+            user["username"],
+    })
+
+    csrf_token = (
+        generate_cross_site_request_forgery_token()
+    )
 
     response = JSONResponse({
         "status": "ok"
     })
 
+    templates.env.globals.setdefault(
+        "ProductionMode",
+        request.app.state.production_mode
+    )
+
     response.set_cookie(
         key="session",
         value=session_token,
-
-        # JavaScript cannot read cookie. 
-        # HttpOnly=True actually means: “This cookie may only be accessed by the browser’s network layer, 
-        # not by JavaScript.”
-        # It's not actually making the login info explicitly unencrypted, 
-        # though it doesn't automatically add in encryption either (which would be HTTPS / secure=true)
         httponly=True,
-
-        # only send over HTTPS in production
-        secure=ProductionMode,
-
-        # blocks most cross-site abuse
-        samesite="strict",
-
-        # cookie available site-wide
+        secure=production_mode,
+        samesite="Lax",
         path="/",
-
-        # one hour
-        max_age=3600
+        max_age=604800,
     )
 
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
-
         httponly=False,
-
-        secure=ProductionMode,
-
-        samesite="strict",
-
+        secure=production_mode,
+        samesite="Lax",
         path="/",
-
-        max_age=3600
+        max_age=604800,
     )
 
     return response
@@ -178,14 +181,18 @@ def logout():
 
     response.delete_cookie(
         key="session",
-        key="csrf_token",
         path="/"
     )
 
+    response.delete_cookie(
+        key="csrf_token",
+        path="/"
+    )   
+
     return response
 
-@router.get("/bootstrap/qr")
-def bootstrap_qr(uri: str):
+@router.get("/account/setup/qr")
+def account_setup_qr(uri: str):
 
     img = qrcode.make(uri)
 

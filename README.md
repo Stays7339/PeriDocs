@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-10T21:39:05-04:00
+## Canonical Project Directory as of 2026-05-11T13:54:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -305,9 +305,7 @@ PeriDocs/                         # Root project folder
 │  ├─ credentialing/
 │  │  ├─ account_routing.py
 │  │  ├─ account_runtime.py       
-│  │  ├─ account_storage.py   
-│  │  ├─ authentication_middleware.py   
-│  │  ├─ create_first_account.py   
+│  │  ├─ authentication_middleware.py    
 │  │  └─ security_fundamentals.py 
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
@@ -329,6 +327,7 @@ PeriDocs/                         # Root project folder
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # Frontend static files
+│  │  ├─ account_authentication.js       # We're currently considering moving this into PeriDocs/app/credentialing  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
@@ -350,11 +349,14 @@ PeriDocs/                         # Root project folder
 │  │
 │  └─ templates/                        # Jinja2 HTML templates
 │   ├─ about.html                     # About page template
+│   ├─ account-login.html                # includes in-line javascript
+│   ├─ account-setup.html             # includes in-line javascript
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
+│   ├─ create-entry.html 
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
 │   ├─ create-entry.html # the only page where entries are typed and submitted for ingestion
-│   ├─ index.html                     # Main homepage template
+│   ├─ index.html                     # Landing page template
 │   ├─ privacy.html                   # Privacy policy page template
 │   ├─ submit-success.html            # Submission success page template
 │   ├─ terms-of-service.html          # Terms of Service page template
@@ -455,11 +457,7 @@ PeriDocs/                         # Root project folder
 │   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
 │
 │
-├─ new-new-look/ 
-│   └─ # vacated entirely.
-│
-│
-├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
+├─ venv/                               # Recreated upon system initialization / bootstrap for the whole project, after installing requirements.txt using 'pip install' and after setup_roberta.py.
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git

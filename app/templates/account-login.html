@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-login.html save-state 2026-05-10T12:12:20-04:00 #}
+{# PeriDocs/app/templates/account-login.html save-state 2026-05-11T13:52:35-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
@@ -6,7 +6,7 @@
   <div class="card-grid">
   <div class="card">
 
-    <h1>Admin Login</h1>
+    <h1>Account Login</h1>
 
     <div class="card-content">
 
@@ -48,7 +48,7 @@ async function login() {
   const data = await res.json();
 
   if (data.status === "ok") {
-    window.location.href = "/admin";
+    window.location.href = "/";
   } else {
     showToast("Login failed", "error");
   }
