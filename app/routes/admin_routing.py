@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-05-11T14:18:33-04:00
+# save-state 2026-05-11T14:33:08-04:00
 # ==========================================
 import os
 import json
@@ -29,7 +29,6 @@ from core.map.perist_reasoning_data import (
 )
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
-ADMIN_FILE = # ?
 HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
 
@@ -40,12 +39,6 @@ router = APIRouter(
 )
 
 templates = Jinja2Templates(directory="app/templates")
-
-templates.env.globals.setdefault(
-    "ProductionMode",
-    request.app.state.production_mode
-)
- # for making changes easier between Dev mode and Produciton mode
 
 
 # -----------------------------

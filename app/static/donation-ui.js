@@ -1,12 +1,12 @@
 // ==========================================
 // donation-ui.js
 // PeriDocs Stripe Donation Frontend Module
-// Works alongside peridocs-ui.js
+// Works alongside peridocs-misc-ux.js
 // save-state 2026-05-03T23:10:40-04:00
 // ==========================================
 
 /*
-  DEPENDENCIES (must exist globally via peridocs-ui.js):
+  DEPENDENCIES (must exist globally via peridocs-misc-ux.js):
   - showToast(message, type)
   - general-toast-container DOM element
 */

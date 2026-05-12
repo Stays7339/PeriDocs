@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-05-11T14:18:44-04:00
+# save-state 2026-05-11T14:23:00-04:00
 # ==========================================
 
 import os
@@ -11,22 +11,24 @@ import hmac
 import hashlib
 import secrets
 import pyotp
+
+from pathlib import Path
 from argon2 import PasswordHasher
-
 from cryptography.fernet import Fernet
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+load_dotenv(PROJECT_ROOT / ".env")
+
+AES_KEY = os.environ.get("PERIDOCS_AES_KEY")
+if not AES_KEY:
+    raise RuntimeError("PERIDOCS_AES_KEY env variable not found")
+
 fernet = Fernet(AES_KEY)
-
-
 
 _password_hasher = PasswordHasher()
 
 SESSION_TTL_SECONDS = 3600
-
-
-SECRET_KEY = os.environ.get("PERIDOCS_AES_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("PERIDOCS_AES_KEY env variable not found")
-
 
 # ----------------------------
 # SESSION SYSTEM
@@ -42,7 +44,7 @@ def create_session(username: str) -> str:
     raw = json.dumps(session_payload, sort_keys=True)
 
     signature = hmac.new(
-        SECRET_KEY,
+        AES_KEY,
         raw.encode(),
         hashlib.sha256
     ).hexdigest()
@@ -58,7 +60,7 @@ def verify_session(token: str) -> bool:
         raw, signature = decoded.rsplit(".", 1)
 
         expected = hmac.new(
-            SECRET_KEY,
+            AES_KEY,
             raw.encode(),
             hashlib.sha256
         ).hexdigest()

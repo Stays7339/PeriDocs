@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-11T14:19:30-04:00 (ISO 8601)
+# save-state 2026-05-11T14:33:00-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -19,25 +19,20 @@ from app.credentialing.authentication_middleware import (
     auth_middleware,
     security_headers_middleware,
 )
+from fastapi.templating import Jinja2Templates
+
+
 from app.credentialing import account_routing
 from app.credentialing.account_runtime import (
     account_runtime,
     initialize_account_runtime,
     shutdown_account_runtime,
 )
-
 from core.nlp.embeddings import _load_model, get_embedding_async
 from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
 
 
-# ==========================================
-# CONFIG Toggle FOR Development VS Production
-# ==========================================
-
-load_dotenv()
-ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
-app.state.production_mode = ProductionMode
 
 
 # ------------------- logging setup -------------------
@@ -61,6 +56,16 @@ logging.getLogger("uvicorn.access").addFilter(FilterStatic())
 # ********* app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None) is important for not leaving the backend publicly exposed *********
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
+
+# ==========================================
+# CONFIG Toggle FOR Development VS Production
+# ==========================================
+
+load_dotenv()
+ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
+app.state.production_mode = ProductionMode
+templates = Jinja2Templates(directory="app/templates")
+templates.env.globals["ProductionMode"] = ProductionMode
 
 
 # ---------------- Static Files ----------------

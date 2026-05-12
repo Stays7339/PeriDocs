@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-11T13:54:40-04:00
+## Canonical Project Directory as of 2026-05-11T15:25:15-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -326,7 +326,7 @@ PeriDocs/                         # Root project folder
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
 │  │  └─ __pycache__/                
 │  │
-│  ├─ static/                            # Frontend static files
+│  ├─ static/                            # raw files served directly to browser unchanged
 │  │  ├─ account_authentication.js       # We're currently considering moving this into PeriDocs/app/credentialing  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
@@ -340,14 +340,14 @@ PeriDocs/                         # Root project folder
 │  │  ├─ peridocs-logo-icon-2026-05-05.svg
 │  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
 │  │  ├─ peridocs-logo-workmark-2026-05-05.svg
-│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
+│  │  ├─ peridocs-misc-ux.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
-│  └─ templates/                        # Jinja2 HTML templates
+│  └─ templates/                        # server-rendered files processed by Jinja
 │   ├─ about.html                     # About page template
 │   ├─ account-login.html                # includes in-line javascript
 │   ├─ account-setup.html             # includes in-line javascript

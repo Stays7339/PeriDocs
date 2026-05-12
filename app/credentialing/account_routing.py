@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-11T14:18:55-04:00
+# save-state 2026-05-11T14:44:15-04:00
 # ==========================================
 
 
@@ -9,6 +9,8 @@ import qrcode
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
 
 
 
@@ -24,12 +26,11 @@ from app.credentialing.security_fundamentals import (
 
 from app.credentialing.account_runtime import account_runtime
 
-templates.env.globals.setdefault(
-    "ProductionMode",
-    request.app.state.production_mode
-)
+templates = Jinja2Templates(directory="app/templates")
 
 router = APIRouter(prefix="/auth")
+
+
 
 
 class AccountSetupStartRequest(BaseModel):
@@ -89,8 +90,24 @@ async def account_setup_complete(
 # ----------------------------
 # LOGIN
 # ----------------------------
+@router.get("/create-account")
+async def create_account_page(request: Request):
+    return templates.TemplateResponse(
+        "account-setup.html",
+        {"request": request}
+    )
+
+@router.get("/login")
+async def login_page(request: Request):
+    return templates.TemplateResponse(
+        "account-login.html",
+        {"request": request}
+    )
+
+# router.get is fundamentally different from router.post
+
 @router.post("/login")
-async def login(data: LoginRequest):
+async def login(request: Request, data: LoginRequest):
 
     user = await (
         account_runtime.get_user_snapshot(
@@ -145,16 +162,11 @@ async def login(data: LoginRequest):
         "status": "ok"
     })
 
-    templates.env.globals.setdefault(
-        "ProductionMode",
-        request.app.state.production_mode
-    )
-
     response.set_cookie(
         key="session",
         value=session_token,
         httponly=True,
-        secure=production_mode,
+        secure=request.app.state.production_mode,
         samesite="Lax",
         path="/",
         max_age=604800,
@@ -164,7 +176,7 @@ async def login(data: LoginRequest):
         key="csrf_token",
         value=csrf_token,
         httponly=False,
-        secure=production_mode,
+        secure=request.app.state.production_mode,
         samesite="Lax",
         path="/",
         max_age=604800,

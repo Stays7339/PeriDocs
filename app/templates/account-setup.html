@@ -1,23 +1,25 @@
-{# PeriDocs/app/templates/account-setup.html save-state 2026-05-11T13:52:50-04:00 #}
+{# PeriDocs/app/templates/account-setup.html save-state 2026-05-11T15:36:27-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
-<div class="wrap">
+<div class="card-grid">
   <div class="card">
 
     <h1>Create An Account</h1>
 
     <div class="card-content">
 
-      <input id="username" type="text" placeholder="username" />
+      <input class="typeahead-dropdown typeahead-item" id="username" type="text" placeholder="username" />
 
       <div style="height:10px"></div>
 
-      <input id="password" type="password" placeholder="password" />
+      <input class="typeahead-dropdown typeahead-item" id="password" type="password" placeholder="password" />
 
       <div style="height:20px"></div>
 
-      <button class="btn primary" onclick="createAccount()">Create Account Now</button>
+      <button class="general-button" id="create-account-btn">
+        Create Account
+      </button>
 
       <!-- TOTP DISPLAY -->
       <div id="totp-section" style="display:none; margin-top:20px;">
@@ -41,7 +43,7 @@
 
         <div style="height:10px"></div>
 
-        <button class="btn primary" onclick="completeBootstrap()">
+        <button class="general-button" id="complete-bootstrap-btn">
           Verify & Create Account
         </button>
 
@@ -53,126 +55,6 @@
 </div>
 {% endblock %}
 
-<script>
-
-let pendingBootstrap = null; /* temporary bootstrap state */ 
-
-async function createAccount() {
-
-  if (pendingBootstrap !== null) {
-    showToast(
-      "Bootstrap already started.",
-      "error"
-    );
-    return;
-  }
-
-  const username =
-    document.getElementById("username").value.trim();
-
-  const password =
-    document.getElementById("password").value;
-
-  const res = await authFetch("/auth/account/setup/start", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      username,
-      password
-    })
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    showToast(data.detail || "Bootstrap failed", "error");
-    return;
-  }
-
-  pendingBootstrap = Object.freeze({
-    setup_token: data.setup_token,
-    username
-  });
-
-  document.getElementById("totp-section").style.display = "block";
-
-  document.getElementById("totp-secret").textContent =
-    data.totp_secret;
-
-  const uri =
-    `otpauth://totp/PeriDocs:${username}?secret=${data.totp_secret}&issuer=PeriDocs`;
-
-  document.getElementById("totp-uri").textContent = uri;
-
-  const qr = document.getElementById("qr");
-
-  qr.src =
-  "/auth/account/setup/qr?uri="
-  + encodeURIComponent(uri);
-
-  qr.style.display = "block";
-}
-
-
-async function completeBootstrap() {
-
-  if (!pendingBootstrap) {
-    showToast("Missing bootstrap session", "error");
-    return;
-  }
-
-  const password =
-    document.getElementById("password").value;
-
-  const time_code =
-    document.getElementById("bootstrap-totp-code").value;
-
-  const res = await authFetch("/auth/account/setup/complete", {
-    method: "POST",
-    credentials: "same-origin",
-    headers: authHeaders(),
-    body: JSON.stringify({
-      setup_token: pendingBootstrap.setup_token,
-      password,
-      time_code
-    })
-  });
-
-  const data = await res.json();
-
-  if (!res.ok) {
-    showToast(
-      data.detail || "Verification failed",
-      "error"
-    );
-    return;
-  }
-
-  showToast(
-    "Account created",
-    "success"
-  );
-
-  setTimeout(() => {
-    window.location.href = "/auth/login";
-  }, 1000);
-}
-
-function resetBootstrap() {
-
-  // CLEAR ALL STATE
-  pendingBootstrap = null;
-
-  // CLEAR UI
-  document.getElementById("totp-section").style.display = "none";
-  document.getElementById("totp-secret").textContent = "";
-  document.getElementById("totp-uri").textContent = "";
-  document.getElementById("qr").style.display = "none";
-
-  // optional: clear inputs
-  document.getElementById("username").value = "";
-  document.getElementById("password").value = "";
-  document.getElementById("bootstrap-totp-code").value = "";
-}
-</script>
+{% block page_scripts %}
+<script src="/static/account-setup-responsiveness.js"></script>
+{% endblock %}

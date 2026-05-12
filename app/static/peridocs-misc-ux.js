@@ -1,5 +1,5 @@
-// peridocs-ui.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-10T15:56:45-04:00
+// peridocs-misc-ux.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
+// save-state 2026-05-11T16:43:50-04:00
 // ==========================================
 
 /* Notes:
@@ -33,6 +33,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Streaks element
   const streaks = entryWrapper?.querySelector(".entry-overlay-streaks");
+
+
+  const productionMode = document.body.dataset.productionMode === "true";
 
   // ---------------------- Apply Consent State ---------------------- //
   function applyConsentState(granted) {
@@ -78,21 +81,19 @@ document.addEventListener("DOMContentLoaded", () => {
   /* --- Initialize --- */
   applyConsentState(consentGranted);
 
-  /* --- Listening For Click on the Consent Toggle (production-only) --- */
-if (ProductionMode === false && consentToggle) {
-  consentToggle.addEventListener("click", (e) => {
-    e.stopPropagation();
+  /* --- Listening For Click on the Consent Toggle (production mode sensitive) --- */
+  if (!productionMode && consentToggle) {
+    consentToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Disable toggle for 3 seconds to prevent accidental double-click
+      consentToggle.disabled = true;
+      setTimeout(() => {
+        consentToggle.disabled = false;
+      }, 3000);
+      applyConsentState(!consentGranted);
+    });
+  }
 
-    // Disable toggle for 3 seconds to prevent accidental double-click
-    consentToggle.disabled = true;
-
-    setTimeout(() => {
-      consentToggle.disabled = false;
-    }, 3000);
-
-    applyConsentState(!consentGranted);
-  });
-}
   const toastContainer = document.querySelector("#general-toast-container");
   const privacyToast = document.querySelector("#privacy-toast");
   const themeBtn = document.getElementById('theme-toggle-btn');
