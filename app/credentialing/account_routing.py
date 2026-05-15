@@ -15,7 +15,7 @@ from fastapi import Request
 
 
 from app.credentialing.security_fundamentals import (
-    verify_time_code,
+    verify_totp_code,
     create_session,
     hash_password,
     verify_password,
@@ -40,17 +40,17 @@ class AccountSetupStartRequest(BaseModel):
 
 class AccountSetupCompleteRequest(BaseModel):
     setup_token: str
-    time_code: str
+    totp_code: str
 
 
 class LoginRequest(BaseModel):
     username: str
     password: str
-    time_code: str
+    totp_code: str
 
 
 # ----------------------------
-# BOOTSTRAP START
+# Account Setup START
 # ----------------------------
 @router.post("/account/setup/start")
 async def account_setup_start(
@@ -68,7 +68,7 @@ async def account_setup_start(
 
 
 # ----------------------------
-# BOOTSTRAP COMPLETE
+# Account Setup COMPLETE
 # ----------------------------
 @router.post("/account/setup/complete")
 async def account_setup_complete(
@@ -78,7 +78,7 @@ async def account_setup_complete(
     await (
         account_runtime.complete_account_setup(
             setup_token=data.setup_token,
-            submitted_totp_code=data.time_code,
+            totp_code=data.totp_code,
         )
     )
 
@@ -136,9 +136,9 @@ async def login(request: Request, data: LoginRequest):
         user["time_secret_encrypted"]
     )
 
-    if not verify_time_code(
+    if not verify_totp_code(
         time_secret,
-        data.time_code
+        data.totp_code
     ):
 
         raise HTTPException(
@@ -165,9 +165,9 @@ async def login(request: Request, data: LoginRequest):
     response.set_cookie(
         key="session",
         value=session_token,
-        httponly=True,
+        httponly=True, # httponly=True JavaScript cannot read the cookie at all.
         secure=request.app.state.production_mode,
-        samesite="Lax",
+        samesite="Strict", # Prevents cookie interception on unencrypted networks. The cookie is ONLY sent over HTTPS, never HTTP.
         path="/",
         max_age=604800,
     )
@@ -175,9 +175,9 @@ async def login(request: Request, data: LoginRequest):
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
-        httponly=False,
+        httponly=True, #
         secure=request.app.state.production_mode,
-        samesite="Lax",
+        samesite="Strict",
         path="/",
         max_age=604800,
     )

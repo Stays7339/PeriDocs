@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-11T14:19:12-04:00
+# save-state 2026-05-12T14:48:05-04:00
 # ==========================================
 
 import os
@@ -20,8 +20,8 @@ from app.credentialing.security_fundamentals import (
     hash_password,
     verify_password,
     verify_password,
-    generate_time_code_secret,
-    verify_time_code,
+    generate_totp_code_secret,
+    verify_totp_code,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,26 +34,13 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 DATA_DIRECTORY = Path(
-    os.getenv(
-        "PERIDOCS_DATA_DIR",
-        PROJECT_ROOT / "data"
-    )
+    os.getenv("PERIDOCS_DATA_DIR", PROJECT_ROOT / "data")
 )
 
-ACCOUNT_DIRECTORY = os.path.join(
-    DATA_DIRECTORY,
-    "accounts"
-)
+ACCOUNT_DIRECTORY = DATA_DIRECTORY / "accounts"
 
-ENCRYPTED_ACCOUNT_FILE = os.path.join(
-    ACCOUNT_DIRECTORY,
-    "accounts.encrypted.json"
-)
-
-TEMPORARY_WRITE_FILE = (
-    ENCRYPTED_ACCOUNT_FILE + ".tmp"
-)
-
+ENCRYPTED_ACCOUNT_FILE = ACCOUNT_DIRECTORY / "accounts.encrypted.json"
+TEMPORARY_WRITE_FILE = ENCRYPTED_ACCOUNT_FILE.with_suffix(".tmp")
 
 # =========================================================
 # ACCOUNT RUNTIME
@@ -129,6 +116,26 @@ class AccountRuntime:
         self._pending_setup_expiration_seconds = 600
 
         self._dibs_on_first_admin_account = False
+
+        # =====================================================
+        # FLUSH CONTROL (ADAPTIVE, TRAFFIC-AWARE)
+        # =====================================================
+
+        self._recent_queue_processing_timestamps: list[float] = []
+
+        self._last_account_disk_flush_time: float = 0.0
+
+        self._pending_mutations_since_last_flush: int = 0
+
+        self._minimum_flush_interval_seconds: float = 2.0
+        self._maximum_flush_interval_seconds: float = 30.0
+
+        self._flush_pressure_smoothing_window_seconds: float = 10.0
+    
+    async def shutdown(self):
+    ...
+    await self._account_operation_queue.join()
+    await self._persist_accounts_to_disk()
     
 
     # =====================================================
@@ -156,10 +163,7 @@ class AccountRuntime:
                 "[AccountRuntime] Starting initialization."
             )
 
-            os.makedirs(
-                ACCOUNT_DIRECTORY,
-                exist_ok=True
-            )
+            ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
             await self._load_accounts_from_disk()
 
@@ -183,39 +187,102 @@ class AccountRuntime:
 
     async def _account_operation_worker(self):
         """
-        Background worker that serializes queued account
-        operations into deterministic execution order.
-
-        This ensures:
-        - no overlapping account writes
-        - deterministic mutation ordering
-        - centralized persistence boundaries
+        Processes queued mutations and performs adaptive flushes
+        based on observed system load.
         """
 
-        logger.info(
-            "[AccountRuntime] Queue worker started."
-        )
+        logger.info("[AccountRuntime] Queue worker started.")
 
         while True:
 
-            queued_operation = await (
-                self._account_operation_queue.get()
-            )
+            operation = await self._account_operation_queue.get()
 
             try:
+                await operation()
 
-                await queued_operation()
+                self._pending_mutations_since_last_flush += 1
+                self._record_queue_processing_timestamp()
+
+                if self._should_flush_account_state_to_disk():
+                    await self._flush_account_state_if_needed()
 
             except Exception as error:
-
                 logger.exception(
                     "[AccountRuntime] Queue operation failed: %s",
                     error
                 )
 
             finally:
-
                 self._account_operation_queue.task_done()
+
+    def _record_queue_processing_timestamp(self):
+        now = time.time()
+
+        self._recent_queue_processing_timestamps.append(now)
+
+        cutoff = now - self._flush_pressure_smoothing_window_seconds
+
+        self._recent_queue_processing_timestamps = [
+            t for t in self._recent_queue_processing_timestamps
+            if t >= cutoff
+        ]
+
+    def _estimate_current_write_pressure(self) -> float:
+        now = time.time()
+
+        window = self._flush_pressure_smoothing_window_seconds
+
+        ops = len(self._recent_queue_processing_timestamps)
+
+        ops_per_second = ops / max(window, 1e-6)
+
+        queue_depth = self._account_operation_queue.qsize()
+
+        queue_pressure = min(queue_depth / 50.0, 1.0)
+        rate_pressure = min(ops_per_second / 5.0, 1.0)
+
+        return max(queue_pressure, rate_pressure)
+
+    def _should_flush_account_state_to_disk(self) -> bool:
+        """
+        Determines whether disk flush should occur based on:
+        - recent load
+        - time since last flush
+        - accumulated mutation count
+        """
+
+        now = time.time()
+
+        pressure = self._estimate_current_write_pressure()
+
+        # dynamically stretch flush interval under load
+        adaptive_interval = self._minimum_flush_interval_seconds + (
+            (1.0 - pressure) * (self._maximum_flush_interval_seconds - self._minimum_flush_interval_seconds)
+        )
+
+        time_since_flush = now - self._last_account_disk_flush_time
+
+        if self._pending_mutations_since_last_flush == 0:
+            return False
+
+        if time_since_flush < adaptive_min_interval:
+            return False
+
+        # high pressure → delay flush more aggressively
+        if pressure > 0.7 and time_since_flush < self._maximum_flush_interval_seconds:
+            return False
+
+        return True
+
+    async def _flush_account_state_if_needed(self):
+        """
+        Writes in-memory account state to disk.
+        """
+
+        await self._persist_accounts_to_disk()
+
+        self._last_account_disk_flush_time = time.time()
+        self._pending_mutations_since_last_flush = 0
 
     async def enqueue_account_operation(
         self,
@@ -289,7 +356,7 @@ class AccountRuntime:
             setup_token = secrets.token_urlsafe(32)
 
             generated_totp_secret = (
-                generate_time_code_secret()
+                generate_totp_code_secret()
             )
 
             self._pending_account_setups[
@@ -323,15 +390,11 @@ class AccountRuntime:
                     generated_totp_secret,
             }
     
-    async def determine_initial_role(self) -> str:
-        async with self._account_write_lock:
-            return "administrator" if not self._accounts_by_username else "ordinary"
-
     async def complete_account_setup(
         self,
         *,
         setup_token: str,
-        submitted_totp_code: str,
+        totp_code: str,
     ):
         """
         Finalizes account setup ONLY after valid TOTP.
@@ -370,9 +433,9 @@ class AccountRuntime:
                 pending["generated_totp_secret"]
             )
 
-            if not verify_time_code(
+            if not verify_totp_code(
                 generated_totp_secret,
-                submitted_totp_code
+                totp_code
             ):
 
                 raise RuntimeError(
@@ -384,8 +447,6 @@ class AccountRuntime:
             plaintext_password = (
                 pending["plaintext_password"]
             )
-
-            role = await self.determine_initial_role()
 
             self._accounts_by_username[
                 username
@@ -560,7 +621,6 @@ class AccountRuntime:
     # =====================================================
     # PERSISTENCE
     # =====================================================
-
     async def _persist_accounts_to_disk(self):
         """
         Atomic encrypted persistence.
@@ -571,10 +631,7 @@ class AccountRuntime:
         - encrypted persistence only
         """
 
-        os.makedirs(
-            ACCOUNT_DIRECTORY,
-            exist_ok=True
-        )
+        ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
         serialized_account_data = json.dumps(
             self._accounts_by_username,
@@ -582,53 +639,23 @@ class AccountRuntime:
             indent=2
         )
 
-        encrypted_payload = encrypt_value(
-            serialized_account_data
-        )
+        encrypted_payload = encrypt_value(serialized_account_data)
 
-        with open(
-            TEMPORARY_WRITE_FILE,
-            "w",
-            encoding="utf-8"
-        ) as temporary_file:
+        # ensure temp file path is safe (Pathlib usage)
+        temp_path = TEMPORARY_WRITE_FILE
 
-            try:
-
-                os.chmod(
-                    ENCRYPTED_ACCOUNT_FILE,
-                    0o600
-                )
-
-            except PermissionError:
-
-                logger.warning(
-                    "[AccountRuntime] Failed to harden file permissions for encrypted account."
-                )
-
-            temporary_file.write(
-                encrypted_payload
-            )
-
+        with open(temp_path, "w", encoding="utf-8") as temporary_file:
+            temporary_file.write(encrypted_payload)
             temporary_file.flush()
+            os.fsync(temporary_file.fileno())
 
-            os.fsync(
-                temporary_file.fileno()
-            )
+        # atomic replace (Pathlib preferred)
+        temp_path.replace(ENCRYPTED_ACCOUNT_FILE)
 
-        os.replace(
-            TEMPORARY_WRITE_FILE,
-            ENCRYPTED_ACCOUNT_FILE
-        )
-
+        # chmod ONLY after file exists
         try:
-
-            os.chmod(
-                ENCRYPTED_ACCOUNT_FILE,
-                0o600
-            )
-
+            ENCRYPTED_ACCOUNT_FILE.chmod(0o600)
         except PermissionError:
-
             logger.warning(
                 "[AccountRuntime] Failed to harden file permissions for encrypted account."
             )
@@ -636,7 +663,7 @@ class AccountRuntime:
         logger.info(
             "[AccountRuntime] Persisted encrypted account snapshot."
         )
-
+        
     async def _load_accounts_from_disk(self):
         """
         Load encrypted accounts into memory.

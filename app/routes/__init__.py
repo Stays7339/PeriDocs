@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-11T14:33:00-04:00 (ISO 8601)
+# save-state 2026-05-12T13:31:15-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -20,6 +20,7 @@ from app.credentialing.authentication_middleware import (
     security_headers_middleware,
 )
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 
 
 from app.credentialing import account_routing
@@ -84,8 +85,47 @@ app.include_router(account_routing.router)
 from app.routes import donation
 app.include_router(donation.router)
 
+
+# ---------------- CORS (comes in handy once API and forked instances happen) ----------------
+
+ALLOWED_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+"""
+CSP:
+“What can this webpage do?”
+CSP is enforced by the browser on your own page. 
+CSP primarily protects against malicious code executing inside your own pages.
+
+CORS:
+“Which outside websites are allowed to talk to this backend through a browser?”
+CORS policy only affects how browsers handle requests to PeriDocs itself.
+CORS mainly controls whether browser JavaScript may READ the response sent between origins.
+This becomes important once the PeriDocs project folder is public, mainly for API calls and forkable policy decisions.
+
+CSRF:
+“Was this request intentionally made from the real site session, instead of another site secretly using the user’s login cookies?”
+CSRF protection is enforced by your backend when accepting sensitive requests.
+It helps protect against mistakenly trusting the API requests, even if the attacker cannot usually read responses.
+"""
+
+# ------------------------------------------------
+
 app.middleware("http")(auth_middleware)
 app.middleware("http")(security_headers_middleware)
+
 
 
 

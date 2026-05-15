@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-11T13:48:50-04:00
+# save-state 2026-05-12T12:18:40-04:00
 # ==========================================
 
 from fastapi import Request
@@ -99,6 +99,31 @@ async def auth_middleware(request: Request, call_next):
     # CSRF CHECK
     # =================================================
 
+    """
+
+    HttpOnly and Secure protect the cookie itself (storage and transport constraints).
+    CSRF () protects server actions that rely on those cookies.
+    CORS protects cross-origin / cross-website JavaScript from reading server responses.
+    CSP protects what your webpage is allowed to execute or load, mainly to avoid unrecognized javascript.
+
+    ----
+    Cookies = “Proof of login automatically attached by the browser when talking to your server”
+
+    HttpOnly = “JavaScript cannot read or steal the proof”
+    Secure = “The proof is only sent over HTTPS connections”
+
+    CSRF (Cross-Site Request Forgery)
+    “Can another website trick the browser into sending a request using your proof without your intent?”
+
+    CORS (Cross-Origin Resource Sharing)
+    “Can JavaScript running on another website/URL read responses from this server in the browser?”
+
+    CSP (Content Security Policy) = “Considering everything across the open internet, what scripts/resources is this page allowed to load and execute at all?”
+
+    The browser enforces CORS, CSP, HttpOnly, and Secure.
+    The backend enforces CSRF (and session validation).
+    """
+
     if request.method not in SAFE_METHODS:
 
         CSRF_EXEMPT_ROUTES = {
@@ -150,9 +175,11 @@ async def security_headers_middleware(request, call_next):
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; "
         "font-src 'self'; "
+        "connect-src 'self'; "
         "object-src 'none'; "
         "base-uri 'self'; "
         "frame-ancestors 'none';"
     )
+
 
     return response

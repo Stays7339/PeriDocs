@@ -1,13 +1,15 @@
 // account-setup-responsiveness.js
-// save-state 2026-05-12T110:40:00-04:00
+// save-state 2026-05-12T11:20:04:00-04:00
 // ==========================================
 
 let pendingTOTPSetup = null;
 
 async function createAccount() {
 
+  console.log("createAccount ENTERED");
+
   if (pendingTOTPSetup !== null) {
-    showToast("Bootstrap already started.", "error");
+    showToast("AccountSetup already started.", "error");
     return;
   }
 
@@ -16,6 +18,8 @@ async function createAccount() {
 
   const password =
     document.getElementById("password").value;
+
+  console.log("ABOUT TO FETCH");
 
   const res = await authFetch("/auth/account/setup/start", {
     method: "POST",
@@ -27,10 +31,12 @@ async function createAccount() {
     })
   });
 
+  console.log("FETCH RESOLVED:", res);
+
   const data = await res.json();
 
   if (!res.ok) {
-    showToast(data.detail || "Bootstrap failed", "error");
+    showToast(data.detail || "AccountSetup failed", "error");
     return;
   }
 
@@ -55,15 +61,15 @@ async function createAccount() {
 }
 
 
-async function completeBootstrap() {
+async function completeAccountSetup() {
 
   if (!pendingTOTPSetup) {
-    showToast("Missing bootstrap session", "error");
+    showToast("Missing AccountSetup session", "error");
     return;
   }
 
-  const submitted_totp_code =
-    document.getElementById("bootstrap-totp-code").value;
+  const totp_code =
+    document.getElementById("setup-totp-code").value;
 
   const res = await authFetch("/auth/account/setup/complete", {
     method: "POST",
@@ -71,7 +77,7 @@ async function completeBootstrap() {
     headers: authHeaders(),
     body: JSON.stringify({
       setup_token: pendingTOTPSetup.setup_token,
-      submitted_totp_code
+      totp_code
     })
   });
 
@@ -93,7 +99,7 @@ async function completeBootstrap() {
 }
 
 
-function resetBootstrap() {
+function resetAccountSetup() {
 
   pendingTOTPSetup = null;
 
@@ -104,16 +110,18 @@ function resetBootstrap() {
 
   document.getElementById("username").value = "";
   document.getElementById("password").value = "";
-  document.getElementById("bootstrap-totp-code").value = "";
+  document.getElementById("setup-totp-code").value = "";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  const createBtn =
-    document.getElementById("create-account-btn");
+  const createBtn = document.getElementById("create-account-btn");
+
+  console.log("DOM ready");
+  console.log("createBtn found:", createBtn);
 
   const completeBtn =
-    document.getElementById("complete-bootstrap-btn");
+    document.getElementById("complete-account-creation-btn");
 
   const usernameInput =
     document.getElementById("username");
@@ -122,13 +130,14 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("password");
 
   const totpInput =
-    document.getElementById("bootstrap-totp-code");
+    document.getElementById("setup-totp-code");
 
   // ---------------- Create Account ---------------- //
 
   if (createBtn) {
     createBtn.addEventListener("click", async () => {
-
+      
+      console.log("CREATE BUTTON CLICKED");
       createBtn.disabled = true;
 
       try {
@@ -159,7 +168,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------- Complete Bootstrap ---------------- //
+  // ---------------- Complete AccountSetup ---------------- //
 
   if (completeBtn) {
     completeBtn.addEventListener("click", async () => {
@@ -167,7 +176,7 @@ document.addEventListener("DOMContentLoaded", () => {
       completeBtn.disabled = true;
 
       try {
-        await completeBootstrap();
+        await completeAccountSetup();
       } finally {
         completeBtn.disabled = false;
       }
@@ -187,7 +196,7 @@ document.addEventListener("DOMContentLoaded", () => {
       completeBtn.disabled = true;
 
       try {
-        await completeBootstrap();
+        await completeAccountSetup();
       } finally {
         completeBtn.disabled = false;
       }

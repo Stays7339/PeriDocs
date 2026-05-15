@@ -7,7 +7,7 @@
 async function login() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
-  const time_code = document.getElementById("totp").value;
+  const totp_code = document.getElementById("totp").value;
 
   const res = await authFetch("/auth/login", {
     method: "POST",
@@ -16,7 +16,7 @@ async function login() {
     body: JSON.stringify({
       username,
       password,
-      time_code
+      totp_code
     })
   });
 

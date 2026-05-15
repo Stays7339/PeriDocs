@@ -1,7 +1,7 @@
 # ==========================================
 # app/routes/donation.py
 # Routing PeriDocs Users to Stripe for Donations to PeriDocs
-# save-state 2026-05-04T00:22:45-04:00
+# save-state 2026-05-12T11:42:35-04:00
 # ==========================================
 
 import os
@@ -38,15 +38,6 @@ if not STRIPE_SECRET_KEY:
     logger.warning("Stripe secret key not found in .env")
 
 stripe.api_key = STRIPE_SECRET_KEY
-
-
-# -----------------------------
-# Core config
-# -----------------------------
-STRIPE_PRODUCT_ID = os.getenv("STRIPE_PRODUCT_ID") 
-
-if not STRIPE_PRODUCT_ID:
-    logger.warning("STRIPE_PRODUCT_ID not set in .env (required for subscriptions)")
 
 
 router = APIRouter()

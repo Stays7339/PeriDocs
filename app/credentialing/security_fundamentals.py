@@ -83,11 +83,11 @@ def verify_session(token: str) -> bool:
 # TIME-BASED ONE-TIME CODE
 # ----------------------------
 
-def generate_time_code_secret():
+def generate_totp_code_secret():
     return pyotp.random_base32()
 
 
-def verify_time_code(secret: str, code: str):
+def verify_totp_code(secret: str, code: str):
     totp = pyotp.TOTP(secret)
     return totp.verify(code, valid_window=1)
 

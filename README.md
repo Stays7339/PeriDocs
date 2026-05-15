@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-11T15:25:15-04:00
+## Canonical Project Directory as of 2026-05-12T11:28:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -328,12 +328,16 @@ PeriDocs/                         # Root project folder
 │  │
 │  ├─ static/                            # raw files served directly to browser unchanged
 │  │  ├─ account_authentication.js       # We're currently considering moving this into PeriDocs/app/credentialing  
+│  │  ├─ account-login-responsiveness.js  
+│  │  ├─ account-setup-responsiveness.js  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
+│  │  ├─ base-html-responsiveness.js  
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
 │  │  ├─ custom-styled-text-field.css             # autocomplete dropdown for text fields on webpages
 │  │  ├─ donation-ui.js                  #Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
 │  │  ├─ fi-rr-search-alt.svg
+│  │  ├─ info-card-border.png
 │  │  ├─ globals.css
 │  │  ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png
 │  │  ├─ myers-reset-2.0.css           # public domain boilerplate code that helps to keep css styling consistent across different web browsers
