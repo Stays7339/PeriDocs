@@ -143,7 +143,21 @@ Create a `.env` file in the project root with your local keys:
 PERIDOCS_AES_KEY=your-secret-key
 ```
 
+To crate a new key, open a bash (Born Again Shell) terminal or a zsh terminal(Z shell),
+then past the following command and press the enter/return button on your keyboard:
+
+Should work with Linux, MacOS, and Windows
+```
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+
+
+IMPORTANT! 
 > Do **not** commit `.env` to GitHub.
+
+
+
 
 For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
