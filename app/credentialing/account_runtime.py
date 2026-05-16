@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-12T14:48:05-04:00
+# save-state 2026-05-16T10:32:35-04:00
 # ==========================================
 
 import os
@@ -133,9 +133,9 @@ class AccountRuntime:
         self._flush_pressure_smoothing_window_seconds: float = 10.0
     
     async def shutdown(self):
-    ...
-    await self._account_operation_queue.join()
-    await self._persist_accounts_to_disk()
+    
+        await self._account_operation_queue.join()
+        await self._persist_accounts_to_disk()
     
 
     # =====================================================
