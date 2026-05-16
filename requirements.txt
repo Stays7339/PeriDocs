@@ -44,6 +44,12 @@ wsproto>=1.3.2
 # Ontology
 rdflib>=7.6.0
 
+# Postgres Database
+psycopg[binary,pool]==3.3.4
+
+# JSON Contract Enforcement
+jsonschema==4.23.0
+
 # Human Moderator Credentialing
 argon2-cffi>=25.1.0
 pyotp>=2.9.0
