@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-16T10:32:35-04:00
+# save-state 2026-05-16T14:09:10-04:00
 # ==========================================
 
 import os
@@ -18,7 +18,6 @@ from app.credentialing.security_fundamentals import (
     encrypt_value,
     decrypt_value,
     hash_password,
-    verify_password,
     verify_password,
     generate_totp_code_secret,
     verify_totp_code,
@@ -76,11 +75,13 @@ class AccountRuntime:
 
     def __init__(self):
 
-        # -----------------------------------------
-        # authoritative in-memory account state
-        # -----------------------------------------
+        self._changes_waiting_to_be_saved: int = 0
 
-        self._accounts_by_username: Dict[str, Dict[str, Any]] = {}
+        self._max_changes_before_save: int = 25  # batch size trigger
+
+        self._max_seconds_without_save: float = 60.0  # safety durability trigger
+
+        self._last_save_time: float = time.time()
 
         # -----------------------------------------
         # startup state
@@ -88,11 +89,11 @@ class AccountRuntime:
 
         self._initialized = False
 
-        # -----------------------------------------
-        # prevents simultaneous mutation corruption
-        # -----------------------------------------
+        #=====================================================
+        # READ SNAPSHOT CACHE (NEW: replaces lock-protected reads)
+        # =====================================================
 
-        self._account_write_lock = asyncio.Lock()
+        self._accounts_snapshot: Dict[str, Dict[str, Any]] = {}
 
         # -----------------------------------------
         # queued mutation processing
@@ -117,27 +118,6 @@ class AccountRuntime:
 
         self._dibs_on_first_admin_account = False
 
-        # =====================================================
-        # FLUSH CONTROL (ADAPTIVE, TRAFFIC-AWARE)
-        # =====================================================
-
-        self._recent_queue_processing_timestamps: list[float] = []
-
-        self._last_account_disk_flush_time: float = 0.0
-
-        self._pending_mutations_since_last_flush: int = 0
-
-        self._minimum_flush_interval_seconds: float = 2.0
-        self._maximum_flush_interval_seconds: float = 30.0
-
-        self._flush_pressure_smoothing_window_seconds: float = 10.0
-    
-    async def shutdown(self):
-    
-        await self._account_operation_queue.join()
-        await self._persist_accounts_to_disk()
-    
-
     # =====================================================
     # INITIALIZATION
     # =====================================================
@@ -154,32 +134,30 @@ class AccountRuntime:
         - start queue worker
         """
 
-        async with self._account_write_lock:
+        if self._initialized:
+            return
 
-            if self._initialized:
-                return
+        logger.info(
+            "[AccountRuntime] Starting initialization."
+        )
 
-            logger.info(
-                "[AccountRuntime] Starting initialization."
+        ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+
+        await self._load_accounts_from_disk()
+
+        await self._verify_integrity_of_loaded_accounts()
+
+        self._background_queue_worker = (
+            asyncio.create_task(
+                self._account_operation_worker()
             )
+        )
 
-            ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
+        self._initialized = True
 
-            await self._load_accounts_from_disk()
-
-            await self._verify_integrity_of_loaded_accounts()
-
-            self._background_queue_worker = (
-                asyncio.create_task(
-                    self._account_operation_worker()
-                )
-            )
-
-            self._initialized = True
-
-            logger.info(
-                "[AccountRuntime] Initialization complete."
-            )
+        logger.info(
+            "[AccountRuntime] Initialization complete."
+        )
 
     # =====================================================
     # QUEUE WORKER
@@ -200,11 +178,10 @@ class AccountRuntime:
             try:
                 await operation()
 
-                self._pending_mutations_since_last_flush += 1
-                self._record_queue_processing_timestamp()
+                self._changes_waiting_to_be_saved += 1
 
-                if self._should_flush_account_state_to_disk():
-                    await self._flush_account_state_if_needed()
+                if self._should_save_to_disk():
+                    await self._save_changes_if_needed()
 
             except Exception as error:
                 logger.exception(
@@ -215,74 +192,15 @@ class AccountRuntime:
             finally:
                 self._account_operation_queue.task_done()
 
-    def _record_queue_processing_timestamp(self):
-        now = time.time()
-
-        self._recent_queue_processing_timestamps.append(now)
-
-        cutoff = now - self._flush_pressure_smoothing_window_seconds
-
-        self._recent_queue_processing_timestamps = [
-            t for t in self._recent_queue_processing_timestamps
-            if t >= cutoff
-        ]
-
-    def _estimate_current_write_pressure(self) -> float:
-        now = time.time()
-
-        window = self._flush_pressure_smoothing_window_seconds
-
-        ops = len(self._recent_queue_processing_timestamps)
-
-        ops_per_second = ops / max(window, 1e-6)
-
-        queue_depth = self._account_operation_queue.qsize()
-
-        queue_pressure = min(queue_depth / 50.0, 1.0)
-        rate_pressure = min(ops_per_second / 5.0, 1.0)
-
-        return max(queue_pressure, rate_pressure)
-
-    def _should_flush_account_state_to_disk(self) -> bool:
-        """
-        Determines whether disk flush should occur based on:
-        - recent load
-        - time since last flush
-        - accumulated mutation count
-        """
-
-        now = time.time()
-
-        pressure = self._estimate_current_write_pressure()
-
-        # dynamically stretch flush interval under load
-        adaptive_interval = self._minimum_flush_interval_seconds + (
-            (1.0 - pressure) * (self._maximum_flush_interval_seconds - self._minimum_flush_interval_seconds)
-        )
-
-        time_since_flush = now - self._last_account_disk_flush_time
-
-        if self._pending_mutations_since_last_flush == 0:
-            return False
-
-        if time_since_flush < adaptive_min_interval:
-            return False
-
-        # high pressure → delay flush more aggressively
-        if pressure > 0.7 and time_since_flush < self._maximum_flush_interval_seconds:
-            return False
-
-        return True
-
-    async def _flush_account_state_if_needed(self):
+    async def _save_changes_if_needed(self):
         """
         Writes in-memory account state to disk.
         """
 
         await self._persist_accounts_to_disk()
 
-        self._last_account_disk_flush_time = time.time()
-        self._pending_mutations_since_last_flush = 0
+        self._changes_waiting_to_be_saved = 0
+        self._last_save_time = time.time()
 
     async def enqueue_account_operation(
         self,
@@ -307,11 +225,11 @@ class AccountRuntime:
 
     
     async def call_dibs_on_first_admin_account(self) -> bool:
-        async with self._account_write_lock:
-            if self._dibs_on_first_admin_account:
-                return False
-            self._dibs_on_first_admin_account = True
-            return True
+    
+        if self._dibs_on_first_admin_account:
+            return False
+        self._dibs_on_first_admin_account = True
+        return True
 
     
     async def begin_account_setup(
@@ -335,61 +253,60 @@ class AccountRuntime:
             # optional: later replace with invite system
             pass
 
-        async with self._account_write_lock:
 
-            self._cleanup_expired_pending_setups()
+        self._cleanup_expired_pending_setups()
 
-            if username in self._accounts_by_username:
+        if username in self._accounts_snapshot:
 
-                raise RuntimeError(
-                    "Username already exists."
-                )
-
-            for pending in self._pending_account_setups.values():
-
-                if pending["username"] == username:
-
-                    raise RuntimeError(
-                        "Username already pending setup."
-                    )
-
-            setup_token = secrets.token_urlsafe(32)
-
-            generated_totp_secret = (
-                generate_totp_code_secret()
+            raise RuntimeError(
+                "Username already exists."
             )
 
-            self._pending_account_setups[
-                setup_token
-            ] = {
+        for pending in self._pending_account_setups.values():
 
-                "username":
-                    username,
+            if pending["username"] == username:
 
-                "plaintext_password":
-                    plaintext_password,
+                raise RuntimeError(
+                    "Username already pending setup."
+                )
 
-                "generated_totp_secret":
-                    generated_totp_secret,
+        setup_token = secrets.token_urlsafe(32)
 
-                "created_at":
-                    time.time(),
+        generated_totp_secret = (
+            generate_totp_code_secret()
+        )
 
-                "expires_at":
-                    (
-                        time.time()
-                        + self._pending_setup_expiration_seconds
-                    ),
-            }
+        self._pending_account_setups[
+            setup_token
+        ] = {
 
-            return {
-                "setup_token":
-                    setup_token,
+            "username":
+                username,
 
-                "totp_secret":
-                    generated_totp_secret,
-            }
-    
+            "plaintext_password":
+                plaintext_password,
+
+            "generated_totp_secret":
+                generated_totp_secret,
+
+            "created_at":
+                time.time(),
+
+            "expires_at":
+                (
+                    time.time()
+                    + self._pending_setup_expiration_seconds
+                ),
+        }
+
+        return {
+            "setup_token":
+                setup_token,
+
+            "totp_secret":
+                generated_totp_secret,
+        }
+
     async def complete_account_setup(
         self,
         *,
@@ -400,92 +317,86 @@ class AccountRuntime:
         Finalizes account setup ONLY after valid TOTP.
         """
 
-        async with self._account_write_lock:
-
-            is_first = len(self._accounts_by_username) == 0
-            role = "administrator" if is_first else "ordinary"
+        is_first = len(self._accounts_snapshot) == 0
+        role = "administrator" if is_first else "ordinary"
 
 
-            self._cleanup_expired_pending_setups()
+        self._cleanup_expired_pending_setups()
 
-            pending = self._pending_account_setups.get(
-                setup_token
+        pending = self._pending_account_setups.get(
+            setup_token
+        )
+
+        if not pending:
+
+            raise RuntimeError(
+                "Invalid setup token."
             )
 
-            if not pending:
-
-                raise RuntimeError(
-                    "Invalid setup token."
-                )
-
-            if time.time() > pending["expires_at"]:
-
-                self._pending_account_setups.pop(
-                    setup_token,
-                    None
-                )
-
-                raise RuntimeError(
-                    "Setup token expired."
-                )
-
-            generated_totp_secret = (
-                pending["generated_totp_secret"]
-            )
-
-            if not verify_totp_code(
-                generated_totp_secret,
-                totp_code
-            ):
-
-                raise RuntimeError(
-                    "Invalid TOTP code."
-                )
-
-            username = pending["username"]
-
-            plaintext_password = (
-                pending["plaintext_password"]
-            )
-
-            self._accounts_by_username[
-                username
-            ] = {
-
-                "user_id":
-                    secrets.token_hex(32),
-
-                "username":
-                    username,
-
-                "password_hash":
-                    hash_password(
-                        plaintext_password
-                    ),
-
-                "time_secret_encrypted":
-                    encrypt_value(
-                        generated_totp_secret
-                    ),
-
-                "role":
-                    role,
-
-                "created_at":
-                    time.time(),
-            }
+        if time.time() > pending["expires_at"]:
 
             self._pending_account_setups.pop(
                 setup_token,
                 None
             )
 
-            await self._persist_accounts_to_disk()
-
-            logger.info(
-                "[AccountRuntime] Account setup completed: %s",
-                username
+            raise RuntimeError(
+                "Setup token expired."
             )
+
+        generated_totp_secret = (
+            pending["generated_totp_secret"]
+        )
+
+        if not verify_totp_code(
+            generated_totp_secret,
+            totp_code
+        ):
+
+            raise RuntimeError(
+                "Invalid TOTP code."
+            )
+
+        username = pending["username"]
+
+        plaintext_password = (
+            pending["plaintext_password"]
+        )
+
+    # all mutations must go through queue (no direct state mutation here)
+    async def operation():
+
+        # -------------------------------------------------
+        # mutation happens inside worker context
+        # -------------------------------------------------
+        self._accounts_snapshot[username] = {
+
+            "user_id": secrets.token_hex(32),
+            "username": username,
+
+            "password_hash": hash_password(plaintext_password),
+
+            "totp_secret_encrypted": encrypt_value(
+                generated_totp_secret
+            ),
+
+            "role": role,
+            "created_at": time.time(),
+        }
+
+        self._pending_account_setups.pop(
+            setup_token,
+            None
+        )
+
+    # enqueue mutation (NEW ARCHITECTURE PATH)
+    await self.enqueue_account_operation(operation)
+
+    logger.info(
+        "[AccountRuntime] Account setup queued for completion: %s",
+        username
+    )
+
     # =====================================================
     # AUTHENTICATION
     # =====================================================
@@ -496,23 +407,17 @@ class AccountRuntime:
         username: str,
         plaintext_password: str,
     ) -> bool:
-        """
-        Verify username + password combination.
-        """
 
-        async with self._account_write_lock:
+        # snapshot-based read (no lock)
+        user = self._accounts_snapshot.get(username)
 
-            user = self._accounts_by_username.get(
-                username
-            )
+        if not user:
+            return False
 
-            if not user:
-                return False
-
-            return verify_password(
-                user["password_hash"],
-                plaintext_password
-            )
+        return verify_password(
+            user["password_hash"],
+            plaintext_password
+        )
 
     async def get_decrypted_totp_secret(
         self,
@@ -526,25 +431,21 @@ class AccountRuntime:
         - decryption only occurs during runtime
         """
 
-        async with self._account_write_lock:
+        user = self._accounts_snapshot.get(username)
 
-            user = self._accounts_by_username.get(
-                username
-            )
+        if not user:
+            return None
 
-            if not user:
-                return None
+        encrypted_secret = user.get(
+            "totp_secret_encrypted"
+        )
 
-            encrypted_secret = user.get(
-                "time_secret_encrypted"
-            )
+        if not encrypted_secret:
+            return None
 
-            if not encrypted_secret:
-                return None
-
-            return decrypt_value(
-                encrypted_secret
-            )
+        return decrypt_value(
+            encrypted_secret
+        )
 
     # =====================================================
     # LOOKUPS
@@ -555,36 +456,28 @@ class AccountRuntime:
         Returns True if ANY administrator exists.
         """
 
-        async with self._account_write_lock:
+        for user in self._accounts_snapshot.values():
 
-            for user in self._accounts_by_username.values():
+            if user.get("role") == "administrator":
+                return True
 
-                if user.get("role") == "administrator":
-                    return True
-
-            return False
+        return False
 
     async def system_has_accounts(self) -> bool:
 
-        async with self._account_write_lock:
-
-            return bool(self._accounts_by_username)
+        return bool(self._accounts_snapshot)
 
     async def get_user_role(
         self,
         username: str
     ) -> Optional[str]:
 
-        async with self._account_write_lock:
+        user = self._accounts_snapshot.get(username)
 
-            user = self._accounts_by_username.get(
-                username
-            )
+        if not user:
+            return None
 
-            if not user:
-                return None
-
-            return user.get("role")
+        return user.get("role")
 
     async def get_user_snapshot(
         self,
@@ -596,31 +489,46 @@ class AccountRuntime:
         Internal state MUST NEVER be exposed directly.
         """
 
-        async with self._account_write_lock:
+        user = self._accounts_snapshot.get(username)
 
-            user = self._accounts_by_username.get(
-                username
-            )
+        if not user:
+            return None
 
-            if not user:
-                return None
-
-            return copy.deepcopy(user)
+        return copy.deepcopy(user)
 
     async def get_all_accounts_snapshot(self):
         """
         Safe full snapshot export.
         """
 
-        async with self._account_write_lock:
-
-            return copy.deepcopy(
-                self._accounts_by_username
-            )
+        return copy.deepcopy(self._accounts_snapshot)
 
     # =====================================================
     # PERSISTENCE
     # =====================================================
+    def _should_save_to_disk(self) -> bool:
+        now = time.time()
+
+        time_since_save = now - self._last_save_time
+
+        # 1. batch rule (primary)
+        if self._changes_waiting_to_be_saved >= self._max_changes_before_save:
+            return True
+
+        # 2. time safety rule (durability guarantee)
+        if self._changes_waiting_to_be_saved > 0 and time_since_save >= self._max_seconds_without_save:
+            return True
+
+        # 3. backlog override (only for congestion protection)
+        queue_size = self._account_operation_queue.qsize()
+
+        if queue_size > 100 and self._changes_waiting_to_be_saved > 0:
+            return True
+
+        return False
+
+    
+    
     async def _persist_accounts_to_disk(self):
         """
         Atomic encrypted persistence.
@@ -634,7 +542,7 @@ class AccountRuntime:
         ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
         serialized_account_data = json.dumps(
-            self._accounts_by_username,
+            self._accounts_snapshot,
             ensure_ascii=False,
             indent=2
         )
@@ -677,7 +585,7 @@ class AccountRuntime:
                 "[AccountRuntime] No account file found. Starting clean."
             )
 
-            self._accounts_by_username = {}
+            self._accounts_snapshot = {}
 
             return
 
@@ -714,7 +622,9 @@ class AccountRuntime:
                 "Encrypted account file must contain dictionary object."
             )
 
-        self._accounts_by_username = loaded_accounts
+        self._accounts_snapshot = loaded_accounts
+        # create the in memory cache
+        self._accounts_snapshot = copy.deepcopy(loaded_accounts)
 
         logger.info(
             "[AccountRuntime] Loaded encrypted accounts from disk."
@@ -734,12 +644,12 @@ class AccountRuntime:
         -----------------
         Every account MUST contain:
         - password_hash
-        - time_secret_encrypted
+        - totp_secret_encrypted
         - role
         """
 
         for username, user in (
-            self._accounts_by_username.items()
+            self._accounts_snapshot.items()
         ):
 
             if not isinstance(user, dict):
@@ -750,7 +660,7 @@ class AccountRuntime:
 
             required_fields = {
                 "password_hash",
-                "time_secret_encrypted",
+                "totp_secret_encrypted",
                 "role",
             }
 
@@ -792,6 +702,7 @@ class AccountRuntime:
                 token,
                 None
             )
+
 
 
     # =====================================================
@@ -850,3 +761,5 @@ async def shutdown_account_runtime():
     Flushes pending writes before process exit.
     """
     await account_runtime.shutdown()
+
+

@@ -9,7 +9,7 @@ async function login() {
   const password = document.getElementById("password").value;
   const totp_code = document.getElementById("totp").value;
 
-  const res = await authFetch("/auth/login", {
+  const res = await authFetch("/auth/signin", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),

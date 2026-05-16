@@ -294,7 +294,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-12T11:28:40-04:00
+## Canonical Project Directory as of 2026-05-16T12:12:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -310,8 +310,7 @@ PeriDocs/                         # Root project folder
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
-│  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
-│  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
+│  │  ├─ entry_writing_runtime.py      # An attempt at the same end-goals desired from Write Ahead Logs. This script also does indexing.
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
 │  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │  └─ __pycache__/  
@@ -417,7 +416,7 @@ PeriDocs/                         # Root project folder
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
-│  │   ├─ entrie.json
+│  │   ├─ entries.json
 │  │   └─ entries_mean_embeddings_dump.npz
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json

@@ -94,7 +94,7 @@ async function completeAccountSetup() {
   showToast("Account created", "success");
 
   setTimeout(() => {
-    window.location.href = "/auth/login";
+    window.location.href = "/auth/signin";
   }, 1000);
 }
 

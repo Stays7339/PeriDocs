@@ -40,6 +40,6 @@ async function authFetch(url, options = {}) {
  * Central logout function
  */
 async function logout() {
-  await authFetch("/auth/logout", { method: "POST" });
-  window.location.href = "/auth/login";
+  await authFetch("/auth/signout", { method: "POST" });
+  window.location.href = "/auth/signin";
 }

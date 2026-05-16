@@ -1,8 +1,7 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-11T14:44:15-04:00
+# save-state 2026-05-16T12:26:00-04:00
 # ==========================================
-
 
 import io
 import qrcode
@@ -28,7 +27,7 @@ from app.credentialing.account_runtime import account_runtime
 
 templates = Jinja2Templates(directory="app/templates")
 
-router = APIRouter(prefix="/auth")
+router = APIRouter()
 
 
 
@@ -90,14 +89,14 @@ async def account_setup_complete(
 # ----------------------------
 # LOGIN
 # ----------------------------
-@router.get("/create-account")
+@router.get("/signup")
 async def create_account_page(request: Request):
     return templates.TemplateResponse(
         "account-setup.html",
         {"request": request}
     )
 
-@router.get("/login")
+@router.get("/signin")
 async def login_page(request: Request):
     return templates.TemplateResponse(
         "account-login.html",
@@ -106,7 +105,7 @@ async def login_page(request: Request):
 
 # router.get is fundamentally different from router.post
 
-@router.post("/login")
+@router.post("/signin")
 async def login(request: Request, data: LoginRequest):
 
     user = await (
@@ -132,12 +131,12 @@ async def login(request: Request, data: LoginRequest):
             "Invalid login"
         )
 
-    time_secret = decrypt_value(
-        user["time_secret_encrypted"]
+    totp_secret = decrypt_value(
+        user["totp_secret_encrypted"]
     )
 
     if not verify_totp_code(
-        time_secret,
+        totp_secret,
         data.totp_code
     ):
 
@@ -184,7 +183,7 @@ async def login(request: Request, data: LoginRequest):
 
     return response
 
-@router.post("/logout")
+@router.post("/signout")
 def logout():
 
     response = JSONResponse({

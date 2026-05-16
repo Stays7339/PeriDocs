@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-12T12:18:40-04:00
+# save-state 2026-05-16T12:28:40-04:00
 # ==========================================
 
 from fastapi import Request
@@ -21,11 +21,11 @@ async def auth_middleware(request: Request, call_next):
     # =================================================
 
     PUBLIC_ROUTES = {
-        "/auth/login",
-        "/auth/create",
-        "/auth/account/setup/start",
-        "/auth/account/setup/complete",
-        "/auth/logout",
+        "/signin",
+        "/signup",
+        "/signup/start",
+        "/signup/complete",
+        "/signout",
         "/favicon.ico",
     }
 
@@ -124,7 +124,10 @@ async def auth_middleware(request: Request, call_next):
     The backend enforces CSRF (and session validation).
     """
 
-    if request.method not in SAFE_METHODS:
+    if (
+        request.method not in SAFE_METHODS
+        and request.state.is_authenticated
+    ):
 
         CSRF_EXEMPT_ROUTES = {
             "/auth/account/setup/start",
