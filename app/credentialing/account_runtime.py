@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-16T14:09:10-04:00
+# save-state 2026-05-16T22:40:00-04:00
 # ==========================================
 
 import os
@@ -389,13 +389,13 @@ class AccountRuntime:
             None
         )
 
-    # enqueue mutation (NEW ARCHITECTURE PATH)
-    await self.enqueue_account_operation(operation)
+        # enqueue mutation (NEW ARCHITECTURE PATH)
+        await self.enqueue_account_operation(operation)
 
-    logger.info(
-        "[AccountRuntime] Account setup queued for completion: %s",
-        username
-    )
+        logger.info(
+            "[AccountRuntime] Account setup queued for completion: %s",
+            username
+        )
 
     # =====================================================
     # AUTHENTICATION
