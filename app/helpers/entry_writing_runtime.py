@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-04-29T03:24:39-04:00
+# Save-state: 2026-05-17T14:58:00-04:00
 # ==========================================
 import asyncio
 import copy
@@ -11,6 +11,7 @@ import logging
 import numpy as np
 from typing import List, Dict, Any
 from datetime import datetime, timezone
+import time
 from app.helpers.json_safe import json_safe
 
 logger = logging.getLogger(__name__)
@@ -51,9 +52,21 @@ class EntryWritingRuntime:
         self._embeddings: Dict[str, Any] = {}
         self._initialized: bool = False
         self._npz_path = os.path.join(DATA_DIR, "entries", "entries_mean_embeddings_dump.npz")
-        self._lock = asyncio.Lock()
         self._entry_index: Dict[str, Dict[str, Any]] = {}
         self._index_for_hashed_tokens_for_deleting_entries: Dict[str, Dict[str, Any]] = {}
+        self._changes_waiting_to_be_saved: int = 0
+
+        self._max_changes_before_save: int = 50
+
+        self._max_seconds_without_save: float = 60.0
+
+        self._last_save_time: float = time.time()
+
+        self._entry_operation_queue = asyncio.Queue()
+
+        self._background_queue_worker = None
+        self._shutdown_requested: bool = False
+
 
     async def initialize(self) -> None:
         """
@@ -62,16 +75,24 @@ class EntryWritingRuntime:
         Safe to call multiple times; only loads on first call.
         """
         logger.info("[EntryWritingRuntime] Starting initialize()")
-        async with self._lock:
-            if self._initialized:
-                return
 
-            self._entries = self._load_entries_json_from_disk()
-            self._rebuild_entry_index()
-            self._load_entries_embeddings_from_disk()
+        if self._initialized:
+            return
+
+        self._entries = self._load_entries_json_from_disk()
+        self._rebuild_entry_index()
+        self._load_entries_embeddings_from_disk()
+
+        await self._verify_integrity_on_startup()
+
+        self._background_queue_worker = (
+            asyncio.create_task(
+                self._entry_operation_worker()
+            )
+        )
 
 
-            self._initialized = True
+        self._initialized = True
         logger.info("[EntryWritingRuntime] Finished initialize()")
 
     async def _verify_integrity_on_startup(self) -> None:
@@ -155,9 +176,6 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         # DETERMINE SYSTEM STATE (cold start vs existing system)
         # ------------------------------------------------------------
-
-        has_ledger = len(ledger_entry_ids) > 0
-        has_entries = len(existing_entries) > 0
 
         system_has_history = (
             len(ledger_entry_ids) > 0
@@ -277,7 +295,119 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         logger.info("[entry_runtime] Full integrity passed (ledger ↔ entries ↔ embeddings fully consistent)")
 
+    # =====================================================
+    # QUEUE WORKER
+    # =====================================================
 
+    async def _entry_operation_worker(self):
+
+        logger.info("[EntryRuntime] Queue worker started.")
+
+        while True:
+
+            try:
+                operation = await asyncio.wait_for(
+                    self._entry_operation_queue.get(),
+                    timeout=1.0 #worker wakes every second, then checks: “has dirty state exceeded max age?”
+                                # then, flushes if necessary, then goes back to sleep
+                )
+
+            except asyncio.TimeoutError:
+
+                if self._should_save_to_disk():
+                    await self._save_changes_if_needed()
+
+                continue
+
+            if operation is None:
+
+                logger.info("[EntryRuntime] Shutdown signal received.")
+
+                if self._changes_waiting_to_be_saved > 0:
+                    await self._save_changes_if_needed()
+
+                self._entry_operation_queue.task_done()
+
+                break
+
+            try:
+
+                await operation()
+
+                self._changes_waiting_to_be_saved += 1
+
+                if self._should_save_to_disk():
+                    await self._save_changes_if_needed()
+
+            except Exception as error:
+
+                logger.exception(
+                    "[EntryRuntime] Queue operation failed: %s",
+                    error
+                )
+
+            finally:
+
+                self._entry_operation_queue.task_done()
+
+    async def enqueue_entry_operation(
+        self,
+        operation
+    ):
+        await self._entry_operation_queue.put(
+            operation
+        )
+    
+    async def shutdown(self):
+
+        logger.info("[EntryRuntime] Shutdown requested.")
+
+        self._shutdown_requested = True
+
+        await self._entry_operation_queue.put(None)
+
+        if self._background_queue_worker:
+            await self._background_queue_worker
+
+    def _should_save_to_disk(self) -> bool:
+
+        now = time.time()
+
+        time_since_save = now - self._last_save_time
+
+        # batch threshold
+        if (
+            self._changes_waiting_to_be_saved
+            >= self._max_changes_before_save
+        ):
+            return True
+
+        # durability timeout
+        if (
+            self._changes_waiting_to_be_saved > 0
+            and time_since_save >= self._max_seconds_without_save
+        ):
+            return True
+
+        # backlog pressure override
+        queue_size = self._entry_operation_queue.qsize()
+
+        if (
+            queue_size > 100
+            and self._changes_waiting_to_be_saved > 0
+        ):
+            return True
+
+        return False
+    
+    async def _save_changes_if_needed(self):
+
+        await self._persist()
+
+        self._changes_waiting_to_be_saved = 0
+
+        self._last_save_time = time.time()
+                
     async def append_entry(self, entry: Dict[str, Any]) -> None:
         """
         Append a new entry and persist.
@@ -286,48 +416,50 @@ class EntryWritingRuntime:
         No runtime reconciliation against disk is performed.
         """
 
-        async with self._lock:
 
-            # ----------------------------
-            # Strict safety validation
-            # ----------------------------
-            if not isinstance(entry, dict):
-                raise RuntimeError("Invalid entry type: must be dict")
+        # ----------------------------
+        # Strict safety validation
+        # ----------------------------
+        if not isinstance(entry, dict):
+            raise RuntimeError("Invalid entry type: must be dict")
 
-            if entry.get("crisis_flag") is True:
-                return
+        if entry.get("crisis_flag") is True:
+            return
 
-            if entry.get("safe_text") is None:
-                return
+        if entry.get("safe_text") is None:
+            return
 
-            if "entry_id" not in entry and "id" not in entry:
-                raise RuntimeError("Entry missing identifier field")
+        if "entry_id" not in entry and "id" not in entry:
+            raise RuntimeError("Entry missing identifier field")
 
-            entry_id = entry.get("entry_id") or entry.get("id")
+        entry_id = entry.get("entry_id") or entry.get("id")
 
-            # ----------------------------
-            # In-memory uniqueness awareness (non-enforcing)
-            # ----------------------------
-            existing_ids = {e.get("entry_id") or e.get("id") for e in self._entries}
+        # ----------------------------
+        # In-memory uniqueness awareness (non-enforcing)
+        # ----------------------------
 
-            if entry_id in existing_ids:
-                logger.warning(
-                    "[EntryRuntime] duplicate entry_id detected (appending anyway): %s",
-                    entry_id
-                )
+        if entry_id in self._entry_index:
+            logger.warning(
+                "[EntryRuntime] duplicate entry_id detected (appending anyway): %s",
+                entry_id
+            )
+    
+        async def operation():
 
-            # ----------------------------
-            # Append to runtime memory (source of truth)
-            # ----------------------------
             self._entries.append(entry)
-            entry_id = entry.get("entry_id") or entry.get("id")
-            self._entry_index[entry_id] = entry
-            self._index_for_hashed_tokens_for_deleting_entries[entry.get("hash_from_token_for_deleting_entries")] = entry
 
-            # ----------------------------
-            # Persist snapshot (one-way write)
-            # ----------------------------
-            await self._persist()
+            self._entry_index[entry_id] = entry
+
+            token_hash = entry.get(
+                "hash_from_token_for_deleting_entries"
+            )
+
+            if token_hash:
+                self._index_for_hashed_tokens_for_deleting_entries[
+                    token_hash
+                ] = entry
+
+    await self.enqueue_entry_operation(operation)
 
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
@@ -344,54 +476,55 @@ class EntryWritingRuntime:
         - persist() should not try to validate again
         """
 
-        async with self._lock:
+        # ------------------------------------------
+        # TYPE ENFORCEMENT (strict, no coercion yet)
+        # ------------------------------------------
+        if not isinstance(embedding, np.ndarray):
+            raise RuntimeError(
+                f"[EmbeddingContract] expected np.ndarray | eid={entry_id} "
+                f"got={type(embedding)}"
+            )
 
-            # ------------------------------------------
-            # TYPE ENFORCEMENT (strict, no coercion yet)
-            # ------------------------------------------
-            if not isinstance(embedding, np.ndarray):
-                raise RuntimeError(
-                    f"[EmbeddingContract] expected np.ndarray | eid={entry_id} "
-                    f"got={type(embedding)}"
-                )
+        # ------------------------------------------
+        # CANONICAL CONVERSION (explicit boundary)
+        # ------------------------------------------
+        embedding = np.asarray(embedding, dtype=np.float32)
 
-            # ------------------------------------------
-            # CANONICAL CONVERSION (explicit boundary)
-            # ------------------------------------------
-            embedding = np.asarray(embedding, dtype=np.float32)
+        # ------------------------------------------
+        # SHAPE CONTRACT (system invariant)
+        # ------------------------------------------
+        if embedding.shape != (EMBEDDING_DIM,):
+            raise RuntimeError(
+                f"[EmbeddingContract] invalid shape={embedding.shape} "
+                f"expected={(EMBEDDING_DIM,)} | eid={entry_id}"
+            )
 
-            # ------------------------------------------
-            # SHAPE CONTRACT (system invariant)
-            # ------------------------------------------
-            if embedding.shape != (EMBEDDING_DIM,):
-                raise RuntimeError(
-                    f"[EmbeddingContract] invalid shape={embedding.shape} "
-                    f"expected={(EMBEDDING_DIM,)} | eid={entry_id}"
-                )
+        # ------------------------------------------
+        # NUMERIC VALIDITY CHECKS
+        # ------------------------------------------
+        if np.isnan(embedding).any():
+            logger.error("[EmbeddingContract] NaN detected | eid=%s", entry_id)
+            raise RuntimeError("Embedding contains NaN")
 
-            # ------------------------------------------
-            # NUMERIC VALIDITY CHECKS
-            # ------------------------------------------
-            if np.isnan(embedding).any():
-                logger.error("[EmbeddingContract] NaN detected | eid=%s", entry_id)
-                raise RuntimeError("Embedding contains NaN")
+        if np.isinf(embedding).any():
+            logger.error("[EmbeddingContract] Inf detected | eid=%s", entry_id)
+            raise RuntimeError("Embedding contains Inf")
 
-            if np.isinf(embedding).any():
-                logger.error("[EmbeddingContract] Inf detected | eid=%s", entry_id)
-                raise RuntimeError("Embedding contains Inf")
+        # ------------------------------------------
+        # ZERO VECTOR IS INVALID STATE
+        # ------------------------------------------
+        if np.all(embedding == 0):
+            logger.error("[EmbeddingContract] zero-vector rejected | eid=%s", entry_id)
+            raise RuntimeError("Zero-vector embedding not allowed")
 
-            # ------------------------------------------
-            # ZERO VECTOR IS INVALID STATE
-            # ------------------------------------------
-            if np.all(embedding == 0):
-                logger.error("[EmbeddingContract] zero-vector rejected | eid=%s", entry_id)
-                raise RuntimeError("Zero-vector embedding not allowed")
-
-            # ------------------------------------------
-            # STORE CANONICALIZED RESULT
-            # ------------------------------------------
+        # ------------------------------------------
+        # STORE CANONICALIZED RESULT
+        # ------------------------------------------
+        async def operation():
             self._embeddings[entry_id] = embedding
-    
+
+        await self.enqueue_entry_operation(operation)
+
     async def _persist(self) -> None:
         """
         Deterministic snapshot persistence.
@@ -401,15 +534,6 @@ class EntryWritingRuntime:
         - NPZ is atomically written
         - no partial state is ever visible
         - no validation or coercion occurs here
-        """
-        """
-        # async with self._lock: has been removed since:
-        # it was causing consistent self-deadlock via re-entrant lock acquisition.
-        # it's important to NEVER call _persist directly, even within the same file 
-        # (hence the underscore for modules that have functions solely for intra-module use)
-        # ---
-        # Q: Why not call _persist directly? 
-        # A: It can very easily cause data corruption via simultaneous writes/reads (I/O) to disk.
         """
         # ------------------------------------------
         # Before trying to write, 
@@ -508,12 +632,10 @@ class EntryWritingRuntime:
 
         Uses same lock to avoid race conditions with writes.
         """
-        async with self._lock:
-            return self._embeddings.get(entry_id)
+        return self._embeddings.get(entry_id)
 
     async def get_all_embeddings(self):
-        async with self._lock:
-            return copy.deepcopy(self._embeddings)
+        return copy.deepcopy(self._embeddings)
 
     def get_all_entries(self) -> List[Dict[str, Any]]: 
         """ Return in-memory entries. 
@@ -537,26 +659,30 @@ class EntryWritingRuntime:
             False -> no-op (not found or nothing changed)
         """
 
-        async with self._lock:
+        # ----------------------------
+        
+        async def operation():
 
-            # ----------------------------
-            # FIND TARGET IN MEMORY
-            # ----------------------------
             target = None
+
             for entry in self._entries:
-                if entry.get("hash_from_token_for_deleting_entries") == token_hash:
+
+                if (
+                    entry.get(
+                        "hash_from_token_for_deleting_entries"
+                    ) == token_hash
+                ):
                     target = entry
                     break
 
             if not target:
+
                 logger.warning(
                     "[EntryRuntime] Entry not found during strip_entry."
                 )
-                return False
 
-            # ----------------------------
-            # STRIP
-            # ----------------------------
+                return
+
             stripped = {
                 "entry_id": target.get("entry_id") or target.get("id"),
                 "embedding_file": target.get("embedding_file"),
@@ -564,18 +690,25 @@ class EntryWritingRuntime:
             }
 
             index = self._entries.index(target)
+
             self._entries[index] = stripped
-            entry_id = stripped.get("entry_id") or stripped.get("id")
-            self._entry_index[entry_id] = stripped
 
-            # ----------------------------
-            # PERSIST
-            # ----------------------------
-            await self._persist()
+            stripped_entry_id = (
+                stripped.get("entry_id")
+                or stripped.get("id")
+            )
 
-            logger.info(f"[EntryRuntime] Entry {entry_id} stripped and persisted.")
+            self._entry_index[stripped_entry_id] = stripped
 
-            return True
+            logger.info(
+                "[EntryRuntime] Entry %s stripped.",
+                stripped_entry_id
+            )
+
+        await self.enqueue_entry_operation(operation)
+
+        return True
+
     def get_current_embedding_file(self) -> str:
         return self._npz_path
     

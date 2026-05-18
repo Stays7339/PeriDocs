@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-16T22:40:00-04:00
+# save-state 2026-05-18T14:12:45-04:00
 # ==========================================
 
 import os
@@ -24,6 +24,8 @@ from app.credentialing.security_fundamentals import (
 )
 
 logger = logging.getLogger(__name__)
+
+CREATE_ACCOUNT_EVENT = "create_account"
 
 
 # =========================================================
@@ -116,8 +118,6 @@ class AccountRuntime:
 
         self._pending_setup_expiration_seconds = 600
 
-        self._dibs_on_first_admin_account = False
-
     # =====================================================
     # INITIALIZATION
     # =====================================================
@@ -163,6 +163,7 @@ class AccountRuntime:
     # QUEUE WORKER
     # =====================================================
 
+
     async def _account_operation_worker(self):
         """
         Processes queued mutations and performs adaptive flushes
@@ -173,25 +174,107 @@ class AccountRuntime:
 
         while True:
 
-            operation = await self._account_operation_queue.get()
-
             try:
-                await operation()
 
-                self._changes_waiting_to_be_saved += 1
+                # =====================================================
+                # 1. WAIT FOR EVENT (WITH IDLE TIMEOUT)
+                # Without this, _should_save_to_disk() only runs on new writes
+                # =====================================================
+                try:
 
-                if self._should_save_to_disk():
-                    await self._save_changes_if_needed()
+                    event = await asyncio.wait_for(
+                        self._account_operation_queue.get(),
+                        timeout=1.0 # in seconds
+                    )
 
-            except Exception as error:
+                except asyncio.TimeoutError:
+
+                    # =================================================
+                    # IDLE FLUSH PATH (NO EVENTS RECEIVED)
+                    # =================================================
+                    if self._should_save_to_disk():
+                        await self._save_changes_if_needed()
+                        """
+                        every 1 second:
+                        worker wakes up
+                        finds no event
+                        runs _should_save_to_disk()
+
+                        If:
+
+                        _changes_waiting_to_be_saved > 0
+                        and _last_save_time is older than 60s
+
+                        → it flushes anyway
+                        """
+
+                    continue
+
+                # =====================================================
+                # 2. PRE-MUTATION VALIDATION (AUTHORITATIVE BOUNDARY)
+                # prevents race condition where two events both pass API validation
+                # =====================================================
+
+                try:
+
+                    event_type = event.get("type")
+
+                    if event_type == CREATE_ACCOUNT_EVENT:
+
+                        username = event["username"]
+
+                        if username in self._accounts_snapshot:
+                            raise RuntimeError(
+                                f"Username already exists: {username}"
+                            )
+
+                    # =================================================
+                    # 3. APPLY MUTATION
+                    # =================================================
+                    self._apply_event(event)
+
+                    # mark dirty
+                    self._changes_waiting_to_be_saved += 1
+
+                    # =================================================
+                    # 4. EAGER FLUSH CHECK
+                    # =================================================
+                    if self._should_save_to_disk():
+                        await self._save_changes_if_needed()
+
+                except Exception as error:
+
+                    # =================================================
+                    # 5. ERROR PATH (LOG + PROPAGATE TO FRONTEND LATER)
+                    # =================================================
+
+                    logger.exception(
+                        "[AccountRuntime] Queue operation failed: %s",
+                        error
+                    )
+
+                    # IMPORTANT:
+                    # This is where JS toast integration will later hook in.
+                    # We re-raise so upstream can capture + forward.
+                    raise
+
+                finally:
+
+                    self._account_operation_queue.task_done()
+
+            except Exception as fatal_error:
+
+                # =====================================================
+                # 6. CATASTROPHIC WORKER SAFETY NET
+                # =====================================================
                 logger.exception(
-                    "[AccountRuntime] Queue operation failed: %s",
-                    error
+                    "[AccountRuntime] Worker fatal error: %s",
+                    fatal_error
                 )
 
-            finally:
-                self._account_operation_queue.task_done()
-
+                # Prevent silent death of worker loop
+                await asyncio.sleep(0.5)
+                
     async def _save_changes_if_needed(self):
         """
         Writes in-memory account state to disk.
@@ -204,39 +287,24 @@ class AccountRuntime:
 
     async def enqueue_account_operation(
         self,
-        operation
+        event: Dict[str, Any]
     ):
         """
-        Queue a mutation operation.
-
-        Example:
-            await runtime.enqueue_account_operation(
-                some_async_function
-            )
+        Queue a mutation event
         """
 
-        await self._account_operation_queue.put(
-            operation
-        )
+        await self._account_operation_queue.put(event)
 
     # =====================================================
     # ACCOUNT CREATION
     # =====================================================
 
-    
-    async def call_dibs_on_first_admin_account(self) -> bool:
-    
-        if self._dibs_on_first_admin_account:
-            return False
-        self._dibs_on_first_admin_account = True
-        return True
 
     
     async def begin_account_setup(
         self,
         *,
         username: str,
-        plaintext_password: str,
     ):
         """
         Begins staged account setup.
@@ -283,9 +351,6 @@ class AccountRuntime:
             "username":
                 username,
 
-            "plaintext_password":
-                plaintext_password,
-
             "generated_totp_secret":
                 generated_totp_secret,
 
@@ -312,13 +377,12 @@ class AccountRuntime:
         *,
         setup_token: str,
         totp_code: str,
+        plaintext_password: str,
     ):
         """
         Finalizes account setup ONLY after valid TOTP.
         """
 
-        is_first = len(self._accounts_snapshot) == 0
-        role = "administrator" if is_first else "ordinary"
 
 
         self._cleanup_expired_pending_setups()
@@ -358,44 +422,30 @@ class AccountRuntime:
             )
 
         username = pending["username"]
+        
+        
+        generated_totp_secret = pending["generated_totp_secret"]
 
-        plaintext_password = (
-            pending["plaintext_password"]
+        password_hash = hash_password(
+            plaintext_password
         )
 
-    # all mutations must go through queue (no direct state mutation here)
-    async def operation():
+        setup_token_to_delete = setup_token
 
-        # -------------------------------------------------
-        # mutation happens inside worker context
-        # -------------------------------------------------
-        self._accounts_snapshot[username] = {
-
-            "user_id": secrets.token_hex(32),
+        await self.enqueue_account_operation({
+            "type": CREATE_ACCOUNT_EVENT,
             "username": username,
+            "password_hash": password_hash,
+            "totp_secret": generated_totp_secret,
+            "setup_token": setup_token_to_delete,
+        })
 
-            "password_hash": hash_password(plaintext_password),
+        self._pending_account_setups.pop(setup_token, None)
 
-            "totp_secret_encrypted": encrypt_value(
-                generated_totp_secret
-            ),
-
-            "role": role,
-            "created_at": time.time(),
+        return {
+            "username": username,
         }
 
-        self._pending_account_setups.pop(
-            setup_token,
-            None
-        )
-
-        # enqueue mutation (NEW ARCHITECTURE PATH)
-        await self.enqueue_account_operation(operation)
-
-        logger.info(
-            "[AccountRuntime] Account setup queued for completion: %s",
-            username
-        )
 
     # =====================================================
     # AUTHENTICATION
@@ -622,8 +672,6 @@ class AccountRuntime:
                 "Encrypted account file must contain dictionary object."
             )
 
-        self._accounts_snapshot = loaded_accounts
-        # create the in memory cache
         self._accounts_snapshot = copy.deepcopy(loaded_accounts)
 
         logger.info(
@@ -718,6 +766,13 @@ class AccountRuntime:
             "[AccountRuntime] Shutdown requested."
         )
 
+        # wait until queued events are fully processed
+        await self._account_operation_queue.join()
+
+        # flush remaining unsaved mutations
+        if self._changes_waiting_to_be_saved > 0:
+            await self._persist_accounts_to_disk()
+
         if self._background_queue_worker:
 
             self._background_queue_worker.cancel()
@@ -731,6 +786,48 @@ class AccountRuntime:
         logger.info(
             "[AccountRuntime] Shutdown complete."
         )
+        
+    def _apply_event(
+        self,
+        event: Dict[str, Any]
+    ) -> None:
+
+        event_type = event.get("type")
+
+        if event_type == CREATE_ACCOUNT_EVENT:
+
+            username = event["username"]
+
+            is_first_account = not self._accounts_snapshot
+
+            role = (
+                "administrator"
+                if is_first_account
+                else "ordinary"
+            )
+
+            self._accounts_snapshot[username] = {
+                "user_id": secrets.token_hex(32),
+                "username": username,
+                "password_hash": event["password_hash"],
+                "totp_secret_encrypted": encrypt_value(
+                    event["totp_secret"]
+                ),
+                "role": role,
+                "created_at": time.time(),
+            }
+
+            logger.info(
+                "[AccountRuntime] Created %s account: %s",
+                role,
+                username
+            )
+
+        else:
+
+            raise RuntimeError(
+                f"Unknown account event type: {event_type}"
+            )
 
 
 # =========================================================
