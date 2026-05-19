@@ -1,7 +1,7 @@
 
 # ==========================================
 # app/helpers/entry_similarity.py
-# Save-state: 2026-05-18T15:40:25-04:00
+# Save-state: 2026-05-19T14:14:10-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
 # ==========================================
@@ -50,8 +50,8 @@ def deterministic_mean(vectors: Sequence[np.ndarray]) -> np.ndarray:
     stacked = np.stack(vectors)
     return stacked.mean(axis=0)
 
-def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
-    emb = entry_runtime.get_embedding(entry_id)
+async def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
+    emb = await entry_runtime.get_embedding(entry_id)
 
     if emb is None:
         raise RuntimeError(f"Embedding not found in runtime for entry_id {entry_id}")

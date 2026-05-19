@@ -120,7 +120,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
 # Recheck that all the files are in order every once in a while
 # In seconds
-PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300
+PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 30000
 
 
 async def periodic_integrity_check():

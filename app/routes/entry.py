@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-05-11T14:12:10 -04:00
+# save-state 2026-05-19T14:33:40 -04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -94,9 +94,12 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
             example_variable["embedding"]
         )
 
-    await entry_runtime._persist() 
-    # it is very important to persist entries regularly;
-    # otherwise data is lost the moment power is cut.
+    await entry_runtime.request_flush()
+    # by using request_flush, rather than anything else, 
+    # all prior mutations are applied before the flush actualy happens.
+    # this is to try to make it so that flushes are always up-to-date when they're completed.
+    # it also helps to avoid multiple direct flush actions from multiple requests from multiple users,
+    # which could result in corrupted data; that would be bad since we're prioritizing auditability.
 
     # ---------------- Mark progress as complete ----------------
     progress_dict[entry_id] = 1.0

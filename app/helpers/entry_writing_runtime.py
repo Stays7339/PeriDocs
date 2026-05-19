@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-18T14:33:00-04:00
+# Save-state: 2026-05-19T17:21:10-04:00
 # ==========================================
 import asyncio
 import copy
@@ -54,19 +54,18 @@ class EntryWritingRuntime:
         self._npz_path = os.path.join(DATA_DIR, "entries", "entries_mean_embeddings_dump.npz")
         self._entry_index: Dict[str, Dict[str, Any]] = {}
         self._index_for_hashed_tokens_for_deleting_entries: Dict[str, Dict[str, Any]] = {}
-        self._changes_waiting_to_be_saved: int = 0
+        # ----------------------------
+        # Persistence coordination
+        # ----------------------------
+        self._flush_queue = asyncio.Queue()  # signals "something changed"
+        self._dirty_mutation_count: int = 0
 
-        self._max_changes_before_save: int = 50
+        self._max_mutations_before_flush: int = 50
+        self._max_seconds_without_flush: float = 60.0
+        self._last_flush_time: float = time.time()
 
-        self._max_seconds_without_save: float = 60.0
-
-        self._last_save_time: float = time.time()
-
-        self._entry_operation_queue = asyncio.Queue()
-
-        self._background_queue_worker = None
+        self._background_flush_worker = None
         self._shutdown_requested: bool = False
-
 
     async def initialize(self) -> None:
         """
@@ -85,10 +84,8 @@ class EntryWritingRuntime:
 
         await self._verify_integrity_on_startup()
 
-        self._background_queue_worker = (
-            asyncio.create_task(
-                self._entry_operation_worker()
-            )
+        self._background_flush_worker = asyncio.create_task(
+            self._flush_worker()
         )
 
 
@@ -295,156 +292,57 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         logger.info("[entry_runtime] Full integrity passed (ledger ↔ entries ↔ embeddings fully consistent)")
 
-    # =====================================================
-    # QUEUE WORKER
-    # =====================================================
-
-    async def _entry_operation_worker(self):
-
-        logger.info("[EntryRuntime] Queue worker started.")
+    async def _flush_worker(self):
+        logger.info("[EntryRuntime] Flush worker started.")
 
         while True:
-
             try:
-
-                # =====================================================
-                # 1. EVENT WAIT (heartbeat timeout pattern)
-                # =====================================================
                 try:
-
-                    operation = await asyncio.wait_for(
-                        self._entry_operation_queue.get(),
-                        timeout=1.0
-                    )
-
+                    # wait for signal or timeout
+                    await asyncio.wait_for(self._flush_queue.get(), timeout=1.0)
                 except asyncio.TimeoutError:
+                    pass
 
-                    # =================================================
-                    # idle flush path (mirrors AccountRuntime)
-                    # =================================================
-                    if self._should_save_to_disk():
-                        await self._save_changes_if_needed()
-
-                    continue
-
-                # =====================================================
-                # 2. SHUTDOWN SIGNAL
-                # =====================================================
-                if operation is None:
-
-                    logger.info("[EntryRuntime] Shutdown signal received.")
-
-                    if self._changes_waiting_to_be_saved > 0:
-                        await self._save_changes_if_needed()
-
-                    self._entry_operation_queue.task_done()
+                if self._shutdown_requested:
+                    if self._dirty_mutation_count > 0:
+                        await self._persist()
+                        self._dirty_mutation_count = 0
+                        self._last_flush_time = time.time()
                     break
 
-                # =====================================================
-                # 3. APPLY OPERATION
-                # =====================================================
-                try:
+                if self._should_flush_to_disk():
+                    await self._persist()
+                    self._dirty_mutation_count = 0
+                    self._last_flush_time = time.time()
 
-                    await operation()
-
-                    self._changes_waiting_to_be_saved += 1
-                    self._pending_flush_required = True
-
-                    if self._should_save_to_disk():
-                        await self._save_changes_if_needed()
-
-                except Exception as error:
-
-                    # =================================================
-                    # ERROR PATH (LOG + STRUCTURED FAILURE SIGNAL)
-                    # =================================================
-                    logger.exception(
-                        "[EntryRuntime] Queue operation failed: %s",
-                        error
-                    )
-
-                    logger.error(
-                        "[EntryRuntime] OPERATION_FAILED | %s",
-                        str(error)
-                    )
-
-                    # IMPORTANT:
-                    # This is where frontend toast system will hook in later.
-                    raise
-
-                finally:
-                    self._entry_operation_queue.task_done()
-
-            except Exception as fatal_error:
-
-                # =====================================================
-                # WORKER SAFETY NET (prevents silent death)
-                # =====================================================
-                logger.exception(
-                    "[EntryRuntime] Worker fatal error: %s",
-                    fatal_error
-                )
-
+            except Exception as e:
+                logger.exception("[EntryRuntime] Flush worker error: %s", e)
                 await asyncio.sleep(0.5)
 
-    async def enqueue_entry_operation(
-        self,
-        operation
-    ):
-        await self._entry_operation_queue.put(
-            operation
-        )
-
-    def _should_save_to_disk(self) -> bool:
-
+    def _should_flush_to_disk(self) -> bool:
         now = time.time()
+        time_since_flush = now - self._last_flush_time
 
-        time_since_save = now - self._last_save_time
-
-        # batch threshold
-        if (
-            self._changes_waiting_to_be_saved
-            >= self._max_changes_before_save
-        ):
+        if self._dirty_mutation_count >= self._max_mutations_before_flush:
             return True
 
-        # durability timeout
-        if (
-            self._changes_waiting_to_be_saved > 0
-            and time_since_save >= self._max_seconds_without_save
-        ):
-            return True
-
-        # backlog pressure override
-        queue_size = self._entry_operation_queue.qsize()
-
-        if (
-            queue_size > 100
-            and self._changes_waiting_to_be_saved > 0
-        ):
+        if self._dirty_mutation_count > 0 and time_since_flush >= self._max_seconds_without_flush:
             return True
 
         return False
+
+    async def _signal_flush(self) -> None:
+        # lightweight wake-up signal only
+        if self._flush_queue.empty():
+            await self._flush_queue.put(True)
     
-    async def _save_changes_if_needed(self):
-
+    async def _request_flush_to_disk(self):
         await self._persist()
-
-        self._changes_waiting_to_be_saved = 0
-        self._last_save_time = time.time()
+        self._dirty_mutation_count = 0
+        self._last_flush_time = time.time()
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
-        """
-        Append a new entry and persist.
 
-        Memory is authoritative. Disk is write-only durability.
-        No runtime reconciliation against disk is performed.
-        """
-
-
-        # ----------------------------
-        # Strict safety validation
-        # ----------------------------
         if not isinstance(entry, dict):
             raise RuntimeError("Invalid entry type: must be dict")
 
@@ -454,34 +352,30 @@ class EntryWritingRuntime:
         if entry.get("safe_text") is None:
             return
 
-        if "entry_id" not in entry and "id" not in entry:
+        entry_id = entry.get("entry_id") or entry.get("id")
+        if not entry_id:
             raise RuntimeError("Entry missing identifier field")
 
-        entry_id = entry.get("entry_id") or entry.get("id")
+        # ----------------------------
+        # immediate memory mutation
+        # ----------------------------
+        self._entries.append(entry)
+        self._entry_index[entry_id] = entry
+
+        token_hash = entry.get("hash_from_token_for_deleting_entries")
+        if token_hash:
+            self._index_for_hashed_tokens_for_deleting_entries[token_hash] = entry
 
         # ----------------------------
-        # In-memory uniqueness awareness (non-enforcing)
+        # dirty tracking
         # ----------------------------
+        self._dirty_mutation_count += 1
 
-        if entry_id in self._entry_index:
-            logger.warning(
-                "[EntryRuntime] duplicate entry_id detected (appending anyway): %s",
-                entry_id
-            )
-    
-        async def operation():
-
-            self._entries.append(entry)
-
-            self._entry_index[entry_id] = entry
-
-            token_hash = entry.get("hash_from_token_for_deleting_entries")
-
-            if token_hash:
-                self._index_for_hashed_tokens_for_deleting_entries[token_hash] = entry
-
-        await self.enqueue_entry_operation(operation)
-
+        # ----------------------------
+        # wake flush worker (non-blocking)
+        # ----------------------------
+        await self._signal_flush()
+        
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
         Contract enforcement layer for embeddings.
@@ -539,12 +433,12 @@ class EntryWritingRuntime:
             raise RuntimeError("Zero-vector embedding not allowed")
 
         # ------------------------------------------
-        # STORE CANONICALIZED RESULT
+        # STORE CANONICALIZED RESULT (memory is now immediate, no queueing)
         # ------------------------------------------
-        async def operation():
-            self._embeddings[entry_id] = embedding
+        self._embeddings[entry_id] = embedding # direct synchronous mutation
 
-        await self.enqueue_entry_operation(operation)
+        self._dirty_mutation_count += 1
+        await self._signal_flush()
 
     async def _persist(self) -> None:
         """
@@ -605,21 +499,61 @@ class EntryWritingRuntime:
             len(self._embeddings),
         )
 
-    async def shutdown(self):
+    async def shutdown(self) -> None:
+        """
+        Graceful shutdown of EntryWritingRuntime.
+
+        Guarantees:
+        - Flushes all pending in-memory mutations to disk if possible
+        - Signals flush worker to terminate
+        - Performs final fallback persist if worker does not drain queue
+        """
 
         logger.info("[EntryRuntime] Shutdown requested.")
 
+        # Mark shutdown intent
         self._shutdown_requested = True
 
-        # signal worker to exit after draining queue
-        await self._entry_operation_queue.put(None)
+        try:
+            # ------------------------------------------------------------
+            # 1. Wake flush worker so it can observe shutdown flag
+            # ------------------------------------------------------------
+            await self._flush_queue.put(True)
 
-        if self._background_queue_worker:
-            await self._background_queue_worker
+            # ------------------------------------------------------------
+            # 2. Wait briefly for background worker to exit cleanly
+            # ------------------------------------------------------------
+            if self._background_flush_worker:
+                try:
+                    await asyncio.wait_for(self._background_flush_worker, timeout=5.0)
+                except asyncio.TimeoutError:
+                    logger.warning(
+                        "[EntryRuntime] Flush worker did not exit in time; forcing final persist."
+                    )
 
-        # FINAL SAFETY NET (only if worker missed last flush)
-        if self._changes_waiting_to_be_saved > 0:
-            await self._save_changes_if_needed()
+            # ------------------------------------------------------------
+            # 3. Final safety flush (authoritative disk write)
+            # ------------------------------------------------------------
+            if self._dirty_mutation_count > 0:
+                logger.info(
+                    "[EntryRuntime] Performing final shutdown persist | dirty_mutations=%d",
+                    self._dirty_mutation_count,
+                )
+                await self._persist()
+                self._dirty_mutation_count = 0
+                self._last_flush_time = time.time()
+
+        except Exception as e:
+            logger.exception("[EntryRuntime] Shutdown encountered error: %s", e)
+
+            # LAST-RESORT GUARANTEE: attempt persistence even on failure
+            try:
+                await self._persist()
+            except Exception as final_err:
+                logger.critical(
+                    "[EntryRuntime] FINAL PERSIST FAILED DURING SHUTDOWN: %s",
+                    final_err,
+                )
 
     def _load_entries_json_from_disk(self) -> List[Dict[str, Any]]:
         """
@@ -696,53 +630,40 @@ class EntryWritingRuntime:
             False -> no-op (not found or nothing changed)
         """
 
-        # ----------------------------
-        
-        async def operation():
+        # memory mutation now immediate
 
-            target = None
+        target = None
 
-            for entry in self._entries:
+        for entry in self._entries:  # moved out of operation
+            if (
+                entry.get("hash_from_token_for_deleting_entries")
+                == token_hash
+            ):
+                target = entry
+                break
 
-                if (
-                    entry.get(
-                        "hash_from_token_for_deleting_entries"
-                    ) == token_hash
-                ):
-                    target = entry
-                    break
+        if not target:
+            logger.warning("[EntryRuntime] Entry not found during strip_entry.")
+            return True
 
-            if not target:
+        stripped = {
+            "entry_id": target.get("entry_id") or target.get("id"),
+            "embedding_file": target.get("embedding_file"),
+            "crisis_flag": target.get("crisis_flag"),
+        }
 
-                logger.warning(
-                    "[EntryRuntime] Entry not found during strip_entry."
-                )
+        index = self._entries.index(target)
 
-                return
+        self._entries[index] = stripped
 
-            stripped = {
-                "entry_id": target.get("entry_id") or target.get("id"),
-                "embedding_file": target.get("embedding_file"),
-                "crisis_flag": target.get("crisis_flag"),
-            }
+        stripped_entry_id = stripped.get("entry_id") or stripped.get("id")
 
-            index = self._entries.index(target)
+        self._entry_index[stripped_entry_id] = stripped
 
-            self._entries[index] = stripped
+        logger.info("[EntryRuntime] Entry %s stripped.", stripped_entry_id)
 
-            stripped_entry_id = (
-                stripped.get("entry_id")
-                or stripped.get("id")
-            )
-
-            self._entry_index[stripped_entry_id] = stripped
-
-            logger.info(
-                "[EntryRuntime] Entry %s stripped.",
-                stripped_entry_id
-            )
-
-        await self.enqueue_entry_operation(operation)
+        self._dirty_mutation_count += 1
+        await self._signal_flush()
 
         return True
 
@@ -783,3 +704,6 @@ class EntryWritingRuntime:
     
     def get_entry_by_token_hash(self, token_hash: str):
         return self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
+    
+    async def request_flush(self) -> None:
+        await self._signal_flush()

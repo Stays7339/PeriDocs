@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-04-28T14:49:45-04:00
+# Save-state: 2026-05-19T17:07:50-04:00
 # ==========================================
 
 """
@@ -90,7 +90,7 @@ class DeletionManager:
             last_vector = prev.vector  # preserve prior state
 
             if entry_ids:
-                vectors = [safe_load_embedding(j) for j in entry_ids]
+                vectors = [await safe_load_embedding(j, self._entry_runtime) for j in entry_ids]
                 vector = deterministic_mean(vectors)
             else:
                 logger.info(

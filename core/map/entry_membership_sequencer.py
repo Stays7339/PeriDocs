@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-05-18T17:06:22-04:00
+# Save-state: 2026-05-19T14:19:50-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -337,4 +337,9 @@ async def reconcile_centroid_membership_after_approval(
 
         if updated:
             logger.info("[reconcile] updated=%s", updated)
-            await entry_runtime._persist()
+            await entry_runtime.request_flush()
+            # by using request_flush, rather than anything else, 
+            # all prior mutations are applied before the flush actualy happens.
+            # this is to try to make it so that flushes are always up-to-date when they're completed.
+            # it also helps to avoid multiple direct flush actions from multiple requests from multiple users,
+            # which could result in corrupted data; that would be bad since we're prioritizing auditability.
