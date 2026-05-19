@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-17T14:58:00-04:00
+# Save-state: 2026-05-18T14:33:00-04:00
 # ==========================================
 import asyncio
 import copy
@@ -306,49 +306,86 @@ class EntryWritingRuntime:
         while True:
 
             try:
-                operation = await asyncio.wait_for(
-                    self._entry_operation_queue.get(),
-                    timeout=1.0 #worker wakes every second, then checks: “has dirty state exceeded max age?”
-                                # then, flushes if necessary, then goes back to sleep
-                )
 
-            except asyncio.TimeoutError:
+                # =====================================================
+                # 1. EVENT WAIT (heartbeat timeout pattern)
+                # =====================================================
+                try:
 
-                if self._should_save_to_disk():
-                    await self._save_changes_if_needed()
+                    operation = await asyncio.wait_for(
+                        self._entry_operation_queue.get(),
+                        timeout=1.0
+                    )
 
-                continue
+                except asyncio.TimeoutError:
 
-            if operation is None:
+                    # =================================================
+                    # idle flush path (mirrors AccountRuntime)
+                    # =================================================
+                    if self._should_save_to_disk():
+                        await self._save_changes_if_needed()
 
-                logger.info("[EntryRuntime] Shutdown signal received.")
+                    continue
 
-                if self._changes_waiting_to_be_saved > 0:
-                    await self._save_changes_if_needed()
+                # =====================================================
+                # 2. SHUTDOWN SIGNAL
+                # =====================================================
+                if operation is None:
 
-                self._entry_operation_queue.task_done()
+                    logger.info("[EntryRuntime] Shutdown signal received.")
 
-                break
+                    if self._changes_waiting_to_be_saved > 0:
+                        await self._save_changes_if_needed()
 
-            try:
+                    self._entry_operation_queue.task_done()
+                    break
 
-                await operation()
+                # =====================================================
+                # 3. APPLY OPERATION
+                # =====================================================
+                try:
 
-                self._changes_waiting_to_be_saved += 1
+                    await operation()
 
-                if self._should_save_to_disk():
-                    await self._save_changes_if_needed()
+                    self._changes_waiting_to_be_saved += 1
+                    self._pending_flush_required = True
 
-            except Exception as error:
+                    if self._should_save_to_disk():
+                        await self._save_changes_if_needed()
 
+                except Exception as error:
+
+                    # =================================================
+                    # ERROR PATH (LOG + STRUCTURED FAILURE SIGNAL)
+                    # =================================================
+                    logger.exception(
+                        "[EntryRuntime] Queue operation failed: %s",
+                        error
+                    )
+
+                    logger.error(
+                        "[EntryRuntime] OPERATION_FAILED | %s",
+                        str(error)
+                    )
+
+                    # IMPORTANT:
+                    # This is where frontend toast system will hook in later.
+                    raise
+
+                finally:
+                    self._entry_operation_queue.task_done()
+
+            except Exception as fatal_error:
+
+                # =====================================================
+                # WORKER SAFETY NET (prevents silent death)
+                # =====================================================
                 logger.exception(
-                    "[EntryRuntime] Queue operation failed: %s",
-                    error
+                    "[EntryRuntime] Worker fatal error: %s",
+                    fatal_error
                 )
 
-            finally:
-
-                self._entry_operation_queue.task_done()
+                await asyncio.sleep(0.5)
 
     async def enqueue_entry_operation(
         self,
@@ -357,17 +394,6 @@ class EntryWritingRuntime:
         await self._entry_operation_queue.put(
             operation
         )
-    
-    async def shutdown(self):
-
-        logger.info("[EntryRuntime] Shutdown requested.")
-
-        self._shutdown_requested = True
-
-        await self._entry_operation_queue.put(None)
-
-        if self._background_queue_worker:
-            await self._background_queue_worker
 
     def _should_save_to_disk(self) -> bool:
 
@@ -405,9 +431,8 @@ class EntryWritingRuntime:
         await self._persist()
 
         self._changes_waiting_to_be_saved = 0
-
         self._last_save_time = time.time()
-                
+
     async def append_entry(self, entry: Dict[str, Any]) -> None:
         """
         Append a new entry and persist.
@@ -450,16 +475,12 @@ class EntryWritingRuntime:
 
             self._entry_index[entry_id] = entry
 
-            token_hash = entry.get(
-                "hash_from_token_for_deleting_entries"
-            )
+            token_hash = entry.get("hash_from_token_for_deleting_entries")
 
             if token_hash:
-                self._index_for_hashed_tokens_for_deleting_entries[
-                    token_hash
-                ] = entry
+                self._index_for_hashed_tokens_for_deleting_entries[token_hash] = entry
 
-    await self.enqueue_entry_operation(operation)
+        await self.enqueue_entry_operation(operation)
 
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
@@ -544,7 +565,7 @@ class EntryWritingRuntime:
         # ------------------------------------------
         # JSON SNAPSHOT (source of truth)
         # ------------------------------------------
-        snapshot = json_safe(self._entries)
+        snapshot = json_safe(copy.deepcopy(self._entries))
 
         json_tmp = self._entries_path + ".tmp"
 
@@ -563,7 +584,7 @@ class EntryWritingRuntime:
 
         os.makedirs(os.path.dirname(npz_path), exist_ok=True)
 
-        embedding_snapshot = self._embeddings
+        embedding_snapshot = copy.deepcopy(self._embeddings)
 
         logging.debug("IN-MEMORY:", len(self._embeddings))
 
@@ -583,6 +604,22 @@ class EntryWritingRuntime:
             len(self._entries),
             len(self._embeddings),
         )
+
+    async def shutdown(self):
+
+        logger.info("[EntryRuntime] Shutdown requested.")
+
+        self._shutdown_requested = True
+
+        # signal worker to exit after draining queue
+        await self._entry_operation_queue.put(None)
+
+        if self._background_queue_worker:
+            await self._background_queue_worker
+
+        # FINAL SAFETY NET (only if worker missed last flush)
+        if self._changes_waiting_to_be_saved > 0:
+            await self._save_changes_if_needed()
 
     def _load_entries_json_from_disk(self) -> List[Dict[str, Any]]:
         """

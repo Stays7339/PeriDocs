@@ -1,6 +1,7 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-05-03T17:01:20-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-05-18T15:41:22-04:00 (YYYYMMDDhhmm)
+# mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
 import logging

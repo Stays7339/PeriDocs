@@ -308,7 +308,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-16T12:12:40-04:00
+## Canonical Project Directory as of 2026-05-18T14:48:50-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -320,11 +320,13 @@ PeriDocs/                         # Root project folder
 │  │  ├─ account_routing.py
 │  │  ├─ account_runtime.py       
 │  │  ├─ authentication_middleware.py    
-│  │  └─ security_fundamentals.py 
+│  │  ├─ security_fundamentals.py 
+│  │  └─ __pycache__/  
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
 │  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
-│  │  ├─ entry_writing_runtime.py      # An attempt at the same end-goals desired from Write Ahead Logs. This script also does indexing.
+│  │  ├─ entry_writing_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
+│  │  ├─ file_ops.py                  # Thin script to persist short plaintext strings of feedback to the backend in an isolated dumb json file.
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
 │  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │  └─ __pycache__/  

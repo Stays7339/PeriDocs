@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-29T03:31:55-04:00
+# Save-state: 2026-05-18T17:06:22-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -44,35 +44,12 @@ class CandidateDecision:
 # ---------------- Runtime-backed embedding access ----------------
 
 async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
-    """
-    Runtime-aware embedding fetch.
-
-    Behavior:
-    1. Prefer in-memory embedding (fast path)
-    2. Fallback to safe_load_embedding (full validation path)
-    3. Cache result into runtime for future calls
-
-    Guarantees:
-    - Preserves duplicate detection and validation from safe_load_embedding
-    - Never silently returns None
-    """
-
-    # ---- Step 1: Try runtime (fast path) ----
     emb = await entry_runtime.get_embedding(entry_id)
-    if emb is not None:
-        return emb
 
-    # ---- Step 2: Fallback to canonical loader (disk + validation) ----
-    emb = await centroid_system.run_sync_in_thread(
-        safe_load_embedding,
-        entry_id
-    )
+    if emb is None:
+        raise RuntimeError(f"Runtime missing embedding for entry_id={entry_id}")
 
-    # ---- Step 3: Cache into runtime (so next call is memory-only) ----
-    # This does NOT skip validation, it only memoizes after validation
-    await entry_runtime.set_embedding(entry_id, emb)
-
-    return emb
+    return np.asarray(emb, dtype=np.float32)
 
 async def evaluate_centroid_candidates(
     entry_id: str,
