@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-05-19T14:19:50-04:00
+# Save-state: 2026-05-20T23:02:50-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -283,6 +283,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
         raise
 
+
 async def reconcile_centroid_membership_after_approval(
     centroid_suffix: str,
     event_index: int,
@@ -294,52 +295,66 @@ async def reconcile_centroid_membership_after_approval(
 
     centroid_suffix: e.g., "10" if precentroid_10 → centroid_10
     event_index: ledger event index for this approval
-    summary_entries: list of entry dicts representing the authoritative snapshot
-                     (already in memory, no disk I/O)
+    summary_entries: authoritative snapshot (already in memory)
     """
+
     logger.info(
         "[reconcile] start centroid=%s event_index=%s entries=%d",
         centroid_suffix,
         event_index,
         len(entry_runtime._entries),
     )
-    
-    # Extract entry_ids from summary snapshot
-    entry_ids = {e["entry_id"] for e in summary_entries}
 
     centroid_id = f"centroid_{centroid_suffix}"
     precentroid_id = f"precentroid_{centroid_suffix}"
 
-    # Lock the runtime before mutating entries
-    async with entry_runtime._lock:
-        updated = False
+    # Build deterministic filter set outside mutation loop
+    entry_ids = {e["entry_id"] for e in summary_entries}
 
-        for entry in entry_runtime._entries:
+    updated = False
 
-            logger.info(
-                "[reconcile] inspecting entry=%s centroids=%s",
-                entry.get("entry_id"),
-                len(entry.get("centroids", []))
-            )
-            if entry.get("entry_id") not in entry_ids:
-                continue
+    # ------------------------------------------------------------
+    # IMPORTANT:
+    # No lock here anymore.
+    # entry_runtime is already single-writer serialized via:
+    # - in-memory single asyncio loop execution model
+    # - flush worker + mutation discipline
+    # ------------------------------------------------------------
+    for entry in entry_runtime._entries:
 
-            centroids_list = entry.get("centroids", [])
-            if not isinstance(centroids_list, list):
-                continue
+        if entry.get("entry_id") not in entry_ids:
+            continue
 
-            for c in centroids_list:
-                if c.get("centroid_id") == precentroid_id:
-                    c["centroid_id"] = centroid_id
-                    c["event_index"] = event_index
-                    logger.debug("Just so you know, reconcile_centroid_membership_after_approval ran just now.")
-                    updated = True
+        centroids_list = entry.get("centroids", [])
+        if not isinstance(centroids_list, list):
+            continue
 
-        if updated:
-            logger.info("[reconcile] updated=%s", updated)
-            await entry_runtime.request_flush()
-            # by using request_flush, rather than anything else, 
-            # all prior mutations are applied before the flush actualy happens.
-            # this is to try to make it so that flushes are always up-to-date when they're completed.
-            # it also helps to avoid multiple direct flush actions from multiple requests from multiple users,
-            # which could result in corrupted data; that would be bad since we're prioritizing auditability.
+        logger.info(
+            "[reconcile] inspecting entry=%s centroids=%d",
+            entry.get("entry_id"),
+            len(centroids_list),
+        )
+
+        for c in centroids_list:
+            if c.get("centroid_id") == precentroid_id:
+                c["centroid_id"] = centroid_id
+                c["event_index"] = event_index
+                updated = True
+
+                logger.debug(
+                    "[reconcile] remapped entry=%s %s → %s",
+                    entry.get("entry_id"),
+                    precentroid_id,
+                    centroid_id,
+                )
+
+    # ------------------------------------------------------------
+    # Flush only if we actually mutated memory
+    # This respects your design: memory is authoritative,
+    # disk is a delayed batched persistence layer
+    # ------------------------------------------------------------
+    if updated:
+        logger.info("[reconcile] updated=True triggering flush")
+        await entry_runtime.request_flush()
+    else:
+        logger.info("[reconcile] no-op (no matching precentroid entries)")
