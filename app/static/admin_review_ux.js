@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-05-10T12:53:10-04:00
+// save-state 2026-05-20T22:23:10-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -117,7 +117,7 @@ async function toggleEntries(precentroidId) {
     p.textContent = e.safe_text;
     entriesContainer.appendChild(p);
   }
-  
+
   entriesContainer.style.display = "block";
   el.scrollIntoView({ behavior: "smooth" });
 
@@ -145,8 +145,6 @@ window.addEventListener("popstate", event => {
     });
   }
 });
-
-fetchQueue();
 
 // =====================================================
 // HEURISTICS + TYPEAHEAD SYSTEM
@@ -305,3 +303,34 @@ function updateActive(items, index) {
     items[index].classList.add("active");
   }
 }
+
+// =====================================================
+// SAFE WIRING LAYER (NEW)
+// =====================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  // logout
+  const logoutBtn = document.getElementById("logout-btn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", () => logout());
+  }
+
+  // heuristics buttons
+  const addGivenBtn = document.getElementById("add-given-btn");
+  if (addGivenBtn) {
+    addGivenBtn.addEventListener("click", () => addGiven());
+  }
+
+  const addOutputBtn = document.getElementById("add-output-btn");
+  if (addOutputBtn) {
+    addOutputBtn.addEventListener("click", () => addOutput());
+  }
+
+  const submitBtn = document.getElementById("submit-heuristic-btn");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", () => submitHeuristic());
+  }
+
+  // initial load
+  fetchQueue();
+});

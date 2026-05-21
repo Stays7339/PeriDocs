@@ -1,9 +1,10 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-05-10T12:32:30-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-05-20T22:23:20-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
 {% block content %}
-<button class="general-button" onclick="logout()">Logout</button>
+
+<button id="logout-btn" class="general-button">Logout</button>
 
 <div class="card-grid">
 <div class="card">
@@ -15,20 +16,19 @@
   <h2>Create Heuristic</h2>
 
   <div id="givens-container"></div>
-  <button class="general-button" onclick="addGiven()">+ Add Given</button>
+  <button id="add-given-btn" class="general-button">+ Add Given</button>
 
   <hr>
 
   <div id="outputs-container"></div>
-  <button class="general-button" onclick="addOutput()">+ Add Output</button>
+  <button id="add-output-btn" class="general-button">+ Add Output</button>
 
   <br><br>
-  <button class="general-button" onclick="submitHeuristic()">Submit</button>
+  <button id="submit-heuristic-btn" class="general-button">Submit</button>
 
 </div>
 </div>
-
-
 
 <script src="/static/admin_review_ux.js" defer></script>
+
 {% endblock %}

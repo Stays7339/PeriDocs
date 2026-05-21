@@ -168,7 +168,7 @@ async def login(request: Request, data: LoginRequest):
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
-        httponly=True, #
+        httponly=False,  # allow JS access for X-CSRF-Token header injection
         secure=request.app.state.production_mode,
         samesite="Strict",
         path="/",

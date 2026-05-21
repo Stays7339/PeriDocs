@@ -1,13 +1,16 @@
 // account_authentication.js
-// save-state 2026-05-20T19:37:55-04:00
+// save-state 2026-05-20T22:29:50-04:00
 // centralized authentication helpers (PeriDocs)
 
 function getCookie(name) {
-  return document.cookie
-    .split("; ")
-    .find(row => row.startsWith(name + "="))
-    ?.split("=")[1];
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(";").shift();
+  return null;
 }
+
+console.log("cookie raw:", document.cookie);
+console.log("csrf parsed:", getCookie("csrf_token"));
 
 /**
  * Returns headers that are safe for authenticated requests.
