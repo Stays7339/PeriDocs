@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-18T14:12:45-04:00
+# save-state 2026-05-20T19:57:35-04:00
 # ==========================================
 
 import os
@@ -305,6 +305,7 @@ class AccountRuntime:
         self,
         *,
         username: str,
+        password_hash: str,
     ):
         """
         Begins staged account setup.
@@ -351,6 +352,9 @@ class AccountRuntime:
             "username":
                 username,
 
+            "password_hash":
+                password_hash,
+
             "generated_totp_secret":
                 generated_totp_secret,
 
@@ -377,7 +381,6 @@ class AccountRuntime:
         *,
         setup_token: str,
         totp_code: str,
-        plaintext_password: str,
     ):
         """
         Finalizes account setup ONLY after valid TOTP.
@@ -426,9 +429,7 @@ class AccountRuntime:
         
         generated_totp_secret = pending["generated_totp_secret"]
 
-        password_hash = hash_password(
-            plaintext_password
-        )
+        password_hash = pending["password_hash"]
 
         setup_token_to_delete = setup_token
 

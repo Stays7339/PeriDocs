@@ -1,5 +1,5 @@
 // account_authentication.js
-// save-state 2026-05-11T12:12:55-04:00
+// save-state 2026-05-20T19:37:55-04:00
 // centralized authentication helpers (PeriDocs)
 
 function getCookie(name) {
@@ -40,6 +40,6 @@ async function authFetch(url, options = {}) {
  * Central logout function
  */
 async function logout() {
-  await authFetch("/auth/signout", { method: "POST" });
-  window.location.href = "/auth/signin";
+  await authFetch("/signout", { method: "POST" });
+  window.location.href = "/signout";
 }

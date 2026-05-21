@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-05-11T14:23:00-04:00
+# save-state 2026-05-20T20:31:35-04:00
 # ==========================================
 
 import os
@@ -23,6 +23,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 AES_KEY = os.environ.get("PERIDOCS_AES_KEY")
 if not AES_KEY:
     raise RuntimeError("PERIDOCS_AES_KEY env variable not found")
+
+AES_KEY = AES_KEY.encode()
 
 fernet = Fernet(AES_KEY)
 

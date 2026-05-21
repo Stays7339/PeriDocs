@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-16T12:28:40-04:00
+# save-state 2026-05-20T19:36:20-04:00
 # ==========================================
 
 from fastapi import Request
@@ -23,8 +23,8 @@ async def auth_middleware(request: Request, call_next):
     PUBLIC_ROUTES = {
         "/signin",
         "/signup",
-        "/signup/start",
-        "/signup/complete",
+        "/account/signup/start",
+        "/account/signup/complete",
         "/signout",
         "/favicon.ico",
     }
@@ -130,8 +130,8 @@ async def auth_middleware(request: Request, call_next):
     ):
 
         CSRF_EXEMPT_ROUTES = {
-            "/auth/account/setup/start",
-            "/auth/account/setup/complete",
+            "/account/setup/start",
+            "/account/setup/complete",
         }
 
         if path not in CSRF_EXEMPT_ROUTES:

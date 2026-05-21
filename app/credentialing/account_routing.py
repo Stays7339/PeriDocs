@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-16T12:26:00-04:00
+# save-state 2026-05-20T20:48:20-04:00
 # ==========================================
 
 import io
@@ -59,7 +59,7 @@ async def account_setup_start(
     result = await (
         account_runtime.begin_account_setup(
             username=data.username,
-            plaintext_password=data.password,
+            password_hash=hash_password(data.password),
         )
     )
 
@@ -145,13 +145,7 @@ async def login(request: Request, data: LoginRequest):
             "Invalid login"
         )
 
-    session_token = create_session({
-        "user_id":
-            user["user_id"],
-
-        "username":
-            user["username"],
-    })
+    session_token = create_session(user["username"])
 
     csrf_token = (
         generate_cross_site_request_forgery_token()

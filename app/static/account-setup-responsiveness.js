@@ -1,5 +1,5 @@
 // account-setup-responsiveness.js
-// save-state 2026-05-12T11:20:04:00-04:00
+// save-state 2026-05-20T19:30:20:00-04:00
 // ==========================================
 
 let pendingTOTPSetup = null;
@@ -21,7 +21,7 @@ async function createAccount() {
 
   console.log("ABOUT TO FETCH");
 
-  const res = await authFetch("/auth/account/setup/start", {
+  const res = await authFetch("/account/setup/start", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
@@ -56,7 +56,7 @@ async function createAccount() {
   document.getElementById("totp-uri").textContent = uri;
 
   const qr = document.getElementById("qr");
-  qr.src = "/auth/account/setup/qr?uri=" + encodeURIComponent(uri);
+  qr.src = "/account/setup/qr?uri=" + encodeURIComponent(uri);
   qr.style.display = "block";
 }
 
@@ -71,7 +71,7 @@ async function completeAccountSetup() {
   const totp_code =
     document.getElementById("setup-totp-code").value;
 
-  const res = await authFetch("/auth/account/setup/complete", {
+  const res = await authFetch("/account/setup/complete", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
@@ -94,7 +94,7 @@ async function completeAccountSetup() {
   showToast("Account created", "success");
 
   setTimeout(() => {
-    window.location.href = "/auth/signin";
+    window.location.href = "/signin";
   }, 1000);
 }
 

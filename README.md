@@ -304,6 +304,58 @@ You now have PeriDocs running locally.
 
 ---
 
+## The Dynamic Process Workflow (The Opposite)
+
+```
+[ Raw User Submission ]
+          │
+          ▼
+┌───────────────────┐
+│    app/routes     │  <--- Establishes the connection & captures payload
+└───────────────────┘
+          │
+          ▼
+┌───────────────────┐
+│    core/nlp/pii   │  <--- ACTION: Runs regex patterns
+└───────────────────┘
+          │
+          ▼  (State Change: Text is now sanitized/anonymous)
+          │
+┌───────────────────┐
+│ core/nlp/clauses  │  <--- ACTION: Breaks text into sentence-level chunks
+└───────────────────┘
+          │
+          ▼
+┌───────────────────────────┐
+│ core/nlp/crisis_detector  │
+└───────────────────────────┘
+          │
+          ├── [ IF CRISIS TRIGGERED ] ──► core/nlp/crisis_recorder ──► [ Encrypted Isolation Lockfile ]
+          │
+          └── [ IF CLEAR ] 
+                  │
+                  ▼
+      ┌───────────────────────┐
+      │  core/nlp/embeddings  │  <--- ACTION: Passes clean text to RoBERTa model
+      └───────────────────────┘
+                  │
+                  ▼  (State Change: Text becomes a 1024-dimension vector float)
+                  │
+      ┌───────────────────────────────┐
+      │ core/map/membership_sequencer │  <--- ACTION: Evaluates mathematical cluster overlap
+      └───────────────────────────────┘
+                  │
+                  ▼
+      ┌───────────────────────┐
+      │    core/map/ledger    │  <--- ACTION: Registers the event in numerical order
+      └───────────────────────┘
+                  │
+                  ▼  (Final State: Persisted to disk)
+                  │
+         [ data/entries.json ]
+
+```
+
 # Canonical Project Directory 
 
 <details>
@@ -370,7 +422,7 @@ PeriDocs/                         # Root project folder
 │   ├─ about.html                     # About page template
 │   ├─ account-login.html                # includes in-line javascript
 │   ├─ account-setup.html             # includes in-line javascript
-│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
+│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an common theme populated by user entries.
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ create-entry.html 
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
@@ -393,7 +445,7 @@ PeriDocs/                         # Root project folder
 ├─ core/
 │   ├─ map/
 │   │   ├─ __init__.py                    # to avoid having to redfine the same value everywhere, this is being used as a config file for this specific package
-│   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
+│   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced common theme and some (but not all) SAAJE affiliations.
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
@@ -403,7 +455,7 @@ PeriDocs/                         # Root project folder
 │   │   └─ __pycache__/
 │   │
 │   ├─  nlp/
-│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
+│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, common theme, and crisis utilities.
 │   |   ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
 │   |   ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
 │   |   ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
