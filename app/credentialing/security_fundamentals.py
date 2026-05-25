@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-05-20T20:31:35-04:00
+# save-state 2026-05-25T16:03:15-04:00
 # ==========================================
 
 import os
@@ -30,7 +30,12 @@ fernet = Fernet(AES_KEY)
 
 _password_hasher = PasswordHasher()
 
-SESSION_TTL_SECONDS = 3600
+
+# ----------------------------
+Session_Time_to_Live_in_Seconds =  86400 # 24 hours
+# ----------------------------
+
+
 
 # ----------------------------
 # SESSION SYSTEM
@@ -39,7 +44,7 @@ SESSION_TTL_SECONDS = 3600
 def create_session(username: str) -> str:
     session_payload = {
         "username": username,
-        "expires_at": time.time() + SESSION_TTL_SECONDS,
+        "expires_at": time.time() + Session_Time_to_Live_in_Seconds,
         "number_used_once": secrets.token_urlsafe(16)
     }
 

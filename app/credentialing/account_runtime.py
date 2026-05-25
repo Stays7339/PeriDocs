@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-20T19:57:35-04:00
+# save-state 2026-05-25T16:02:50-04:00
 # ==========================================
 
 import os
@@ -13,6 +13,7 @@ import logging
 
 from typing import Dict, Optional, Any
 from pathlib import Path
+from fastapi import HTTPException
 
 from app.credentialing.security_fundamentals import (
     encrypt_value,
@@ -21,12 +22,14 @@ from app.credentialing.security_fundamentals import (
     verify_password,
     generate_totp_code_secret,
     verify_totp_code,
+    create_session,
+    generate_cross_site_request_forgery_token
 )
 
 logger = logging.getLogger(__name__)
 
 CREATE_ACCOUNT_EVENT = "create_account"
-
+DELETE_ACCOUNT_EVENT = "delete_account"
 
 # =========================================================
 # CONFIGURATION
@@ -67,12 +70,15 @@ class AccountRuntime:
     - Does not generate TOTP secrets
     - Does not verify TOTP codes
 
-    Architectural Rule
+    Architectural Rules
     ------------------
     Routes should NEVER directly mutate account files.
 
     All account changes MUST flow through:
         account_runtime
+
+    # A successfully completed signup results in an authenticated session.
+    # Signup completion is treated as an implicit login event.
     """
 
     def __init__(self):
@@ -114,9 +120,9 @@ class AccountRuntime:
 
         self._background_queue_worker = None
 
-        self._pending_account_setups = {}
+        self._pending_account_signups = {}
 
-        self._pending_setup_expiration_seconds = 600
+        self._pending_signup_expiration_seconds = 600
 
     # =====================================================
     # INITIALIZATION
@@ -227,6 +233,15 @@ class AccountRuntime:
                             raise RuntimeError(
                                 f"Username already exists: {username}"
                             )
+                    elif event_type == DELETE_ACCOUNT_EVENT:
+
+                        username = event["username"]
+
+                        if username not in self._accounts_snapshot:
+
+                            raise RuntimeError(
+                                f"Cannot delete nonexistent account: {username}"
+                            )
 
                     # =================================================
                     # 3. APPLY MUTATION
@@ -300,15 +315,32 @@ class AccountRuntime:
     # =====================================================
 
 
+    async def get_pending_signup_snapshot(
+        self,
+        signup_token: str,
+    ):
+        """
+        Returns safe copy of pending signup state.
+        """
+
+        pending = self._pending_account_signups.get(
+            signup_token
+        )
+
+        if not pending:
+            return None
+
+        return copy.deepcopy(pending)
+
     
-    async def begin_account_setup(
+    async def begin_account_signup(
         self,
         *,
         username: str,
         password_hash: str,
     ):
         """
-        Begins staged account setup.
+        Begins staged account signup.
 
         Account is NOT persisted yet.
 
@@ -323,7 +355,7 @@ class AccountRuntime:
             pass
 
 
-        self._cleanup_expired_pending_setups()
+        self._cleanup_expired_pending_signups()
 
         if username in self._accounts_snapshot:
 
@@ -331,22 +363,32 @@ class AccountRuntime:
                 "Username already exists."
             )
 
-        for pending in self._pending_account_setups.values():
+        expired_or_replaced_tokens = []
+
+        for token, pending in (
+            self._pending_account_signups.items()
+        ):
 
             if pending["username"] == username:
 
-                raise RuntimeError(
-                    "Username already pending setup."
-                )
+                expired_or_replaced_tokens.append(token)
 
-        setup_token = secrets.token_urlsafe(32)
+        for token in expired_or_replaced_tokens:
+
+            self._pending_account_signups.pop(
+                token,
+                None
+            )
+
+        signup_token = secrets.token_urlsafe(32)
+        # generates cryptographically random bytes
 
         generated_totp_secret = (
             generate_totp_code_secret()
         )
 
-        self._pending_account_setups[
-            setup_token
+        self._pending_account_signups[
+            signup_token
         ] = {
 
             "username":
@@ -364,51 +406,53 @@ class AccountRuntime:
             "expires_at":
                 (
                     time.time()
-                    + self._pending_setup_expiration_seconds
+                    + self._pending_signup_expiration_seconds
                 ),
         }
 
         return {
-            "setup_token":
-                setup_token,
+            "signup_token":
+                signup_token,
 
             "totp_secret":
                 generated_totp_secret,
         }
 
-    async def complete_account_setup(
+    async def complete_account_signup(
         self,
         *,
-        setup_token: str,
+        signup_token: str,
         totp_code: str,
     ):
         """
-        Finalizes account setup ONLY after valid TOTP.
+        Finalizes account signup ONLY after valid TOTP.
         """
 
 
 
-        self._cleanup_expired_pending_setups()
+        self._cleanup_expired_pending_signups()
 
-        pending = self._pending_account_setups.get(
-            setup_token
+        pending = self._pending_account_signups.get(
+            signup_token
         )
 
         if not pending:
 
-            raise RuntimeError(
-                "Invalid setup token."
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid TOTP code"
             )
 
         if time.time() > pending["expires_at"]:
 
-            self._pending_account_setups.pop(
-                setup_token,
+            self._pending_account_signups.pop(
+                signup_token,
                 None
             )
 
-            raise RuntimeError(
-                "Setup token expired."
+            raise HTTPException(
+                status_code=401,
+                detail="Singup token expired"
             )
 
         generated_totp_secret = (
@@ -420,8 +464,9 @@ class AccountRuntime:
             totp_code
         ):
 
-            raise RuntimeError(
-                "Invalid TOTP code."
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid TOTP code"
             )
 
         username = pending["username"]
@@ -431,21 +476,47 @@ class AccountRuntime:
 
         password_hash = pending["password_hash"]
 
-        setup_token_to_delete = setup_token
+        signup_token_to_delete = signup_token
 
         await self.enqueue_account_operation({
             "type": CREATE_ACCOUNT_EVENT,
             "username": username,
             "password_hash": password_hash,
             "totp_secret": generated_totp_secret,
-            "setup_token": setup_token_to_delete,
+            "signup_token": signup_token_to_delete,
         })
 
-        self._pending_account_setups.pop(setup_token, None)
+        self._pending_account_signups.pop(signup_token, None)
+
+        session_token = create_session(username)
+        csrf_token = generate_cross_site_request_forgery_token()
 
         return {
             "username": username,
+            "session_token": session_token,
+            "csrf_token": csrf_token,
         }
+
+    # =====================================================
+    # ACCOUNT DELETION
+    # =====================================================
+
+    async def delete_account(
+        self,
+        *,
+        username: str,
+    ):
+        """
+        Queue account deletion.
+
+        Runtime memory is authoritative.
+        Disk persistence occurs later via normal flush rules.
+        """
+
+        await self.enqueue_account_operation({
+            "type": DELETE_ACCOUNT_EVENT,
+            "username": username,
+        })
 
 
     # =====================================================
@@ -731,14 +802,14 @@ class AccountRuntime:
             "[AccountRuntime] Account integrity verification passed."
         )
 
-    def _cleanup_expired_pending_setups(self):
+    def _cleanup_expired_pending_signups(self):
 
         current_time = time.time()
 
         expired_tokens = []
 
         for token, pending in (
-            self._pending_account_setups.items()
+            self._pending_account_signups.items()
         ):
 
             if current_time > pending["expires_at"]:
@@ -747,7 +818,7 @@ class AccountRuntime:
 
         for token in expired_tokens:
 
-            self._pending_account_setups.pop(
+            self._pending_account_signups.pop(
                 token,
                 None
             )
@@ -823,6 +894,26 @@ class AccountRuntime:
                 role,
                 username
             )
+        
+        elif event_type == DELETE_ACCOUNT_EVENT:
+
+            username = event["username"]
+
+            deleted_user = self._accounts_snapshot.pop(
+                username,
+                None
+            )
+
+            if deleted_user is None:
+
+                raise RuntimeError(
+                    f"Account vanished during deletion: {username}"
+                )
+
+            logger.info(
+                "[AccountRuntime] Deleted account: %s",
+                username
+            )
 
         else:
 
@@ -832,16 +923,21 @@ class AccountRuntime:
 
 
 # =========================================================
-# GLOBAL SINGLETON
-# =========================================================
-
-account_runtime = AccountRuntime()
-
-# =========================================================
 # OPTIONAL CONVENIENCE ACCESSORS
 # These are intentionally thin wrappers so the rest of the
 # codebase does not need to directly touch the singleton.
 # =========================================================
+
+# ---------------------------------------------------------
+# GLOBAL SINGLETON
+
+account_runtime = AccountRuntime()
+
+# ---------------------------------------------------------
+
+
+
+
 
 async def initialize_account_runtime():
     """

@@ -1,5 +1,5 @@
 // account_authentication.js
-// save-state 2026-05-25T13:52:25-04:00
+// save-state 2026-05-25T16:53:05-04:00
 // centralized authentication helpers (PeriDocs)
 
 function getCookie(name) {
@@ -88,6 +88,78 @@ document.addEventListener(
           console.error(
             "Signout error:",
             error
+          );
+        }
+      }
+    );
+  }
+);
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const deleteAccountButton =
+      document.getElementById("delete-account-btn");
+
+    if (!deleteAccountButton) {
+      return;
+    }
+
+    deleteAccountButton.addEventListener(
+      "click",
+      async () => {
+
+        const password = prompt(
+          "Just to let you know, account deletion is permanent and irreversible.\n\nIf you'd like to delete your account, please provide your current password below:"
+        );
+
+        if (!password) {
+          return;
+        }
+
+        try {
+
+          const response = await authFetch("/account/delete", {
+            method: "POST",
+            body: JSON.stringify({ password })
+          });
+
+          const data = await response.json().catch(() => ({}));
+
+          if (!response.ok) {
+
+            const message =
+              data.detail || "Account deletion failed";
+
+            showToast(message, "error");
+
+            console.error(
+              "Account deletion failed:",
+              response.status
+            );
+
+            return;
+          }
+
+          showToast("Account deleted successfully", "success");
+
+          setTimeout(() => {
+            requestAnimationFrame(() => {
+              window.location.href = "/";
+            });
+          }, 1500);
+
+        } catch (error) {
+
+          console.error(
+            "Delete account error:",
+            error
+          );
+
+          showToast(
+            "Account deletion failed",
+            "error"
           );
         }
       }

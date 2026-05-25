@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/account-signup.html save-state 2026-05-11T15:36:27-04:00 #}
+{# PeriDocs/app/templates/account-signup.html save-state 2026-05-25T17:04:50-04:00 #}
 {% extends "base.html" %}
 {% block content %}
 
@@ -14,6 +14,13 @@
       <div style="height:10px"></div>
 
       <input class="typeahead-dropdown typeahead-item" id="password" type="password" placeholder="password" />
+      
+      <div style="height:10px"></div>
+
+      <input class="typeahead-dropdown typeahead-item"
+       id="password-confirm"
+       type="password"
+       placeholder="re-type password" />
 
       <div style="height:20px"></div>
 
@@ -27,16 +34,18 @@
         <p><strong>Save this TOTP secret:</strong></p>
         <div class="excerpt" id="totp-secret"></div>
 
-        <p style="margin-top:10px;"><strong>Manual setup URI:</strong></p>
-        <div class="excerpt" id="totp-uri"></div>
+        <details>
+          <summary>Show manual URI</summary>
+          <div class="excerpt" id="totp-uri"></div>
+        </details>
 
-        <!-- FIX: hide initially -->
-        <img id="qr" style="margin-top:15px; display:none;" />
+        <!-- hide the image until there's something to render  -->
+        <img id="qr" style="margin-top:15px; width:180px; height:180px; image-rendering:pixelated; display:none;" />
 
         <br>
 
         <input
-          id="setup-totp-code"
+          id="signup-totp-code"
           type="text"
           placeholder="Enter current TOTP code"
         />

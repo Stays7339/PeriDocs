@@ -1,15 +1,15 @@
 // account-signup-responsiveness.js
-// save-state 2026-05-20T19:30:20:00-04:00
+// save-state 2026-05-25T16:59:55:00-04:00
 // ==========================================
 
-let pendingTOTPSetup = null;
+let pendingTOTPsignup = null;
 
 async function createAccount() {
 
   console.log("createAccount ENTERED");
 
-  if (pendingTOTPSetup !== null) {
-    showToast("AccountSetup already started.", "error");
+  if (pendingTOTPsignup !== null) {
+    showToast("Accountsignup already started.", "error");
     return;
   }
 
@@ -19,9 +19,17 @@ async function createAccount() {
   const password =
     document.getElementById("password").value;
 
+  const passwordConfirm =
+    document.getElementById("password-confirm").value;
+
+  if (password !== passwordConfirm) {
+    showToast("Passwords do not match", "error");
+    return;
+  }
+
   console.log("ABOUT TO FETCH");
 
-  const res = await authFetch("/account/setup/start", {
+  const res = await authFetch("/signup/start", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
@@ -36,12 +44,12 @@ async function createAccount() {
   const data = await res.json();
 
   if (!res.ok) {
-    showToast(data.detail || "AccountSetup failed", "error");
+    showToast(data.detail || "Accountsignup failed", "error");
     return;
   }
 
-  pendingTOTPSetup = Object.freeze({
-    setup_token: data.setup_token,
+  pendingTOTPsignup = Object.freeze({
+    signup_token: data.signup_token,
     username
   });
 
@@ -56,27 +64,33 @@ async function createAccount() {
   document.getElementById("totp-uri").textContent = uri;
 
   const qr = document.getElementById("qr");
-  qr.src = "/account/setup/qr?uri=" + encodeURIComponent(uri);
+
+  qr.src =
+    "/signup/qr?signup_token="
+    + encodeURIComponent(
+        pendingTOTPsignup.signup_token
+      );
+
   qr.style.display = "block";
 }
 
 
-async function completeAccountSetup() {
+async function completeAccountsignup() {
 
-  if (!pendingTOTPSetup) {
-    showToast("Missing AccountSetup session", "error");
+  if (!pendingTOTPsignup) {
+    showToast("Missing account signup session", "error");
     return;
   }
 
   const totp_code =
-    document.getElementById("setup-totp-code").value;
+    document.getElementById("signup-totp-code").value;
 
-  const res = await authFetch("/account/setup/complete", {
+  const res = await authFetch("/signup/complete", {
     method: "POST",
     credentials: "same-origin",
     headers: authHeaders(),
     body: JSON.stringify({
-      setup_token: pendingTOTPSetup.setup_token,
+      signup_token: pendingTOTPsignup.signup_token,
       totp_code
     })
   });
@@ -91,17 +105,19 @@ async function completeAccountSetup() {
     return;
   }
 
-  showToast("Account created", "success");
+  showToast("Account created successfully", "success");
 
   setTimeout(() => {
-    window.location.href = "/signin";
-  }, 1000);
+    requestAnimationFrame(() => {
+      window.location.href = "/account";
+    });
+  }, 1500);
 }
 
 
-function resetAccountSetup() {
+function resetAccountsignup() {
 
-  pendingTOTPSetup = null;
+  pendingTOTPsignup = null;
 
   document.getElementById("totp-section").style.display = "none";
   document.getElementById("totp-secret").textContent = "";
@@ -110,7 +126,7 @@ function resetAccountSetup() {
 
   document.getElementById("username").value = "";
   document.getElementById("password").value = "";
-  document.getElementById("setup-totp-code").value = "";
+  document.getElementById("signup-totp-code").value = "";
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -130,7 +146,7 @@ document.addEventListener("DOMContentLoaded", () => {
     document.getElementById("password");
 
   const totpInput =
-    document.getElementById("setup-totp-code");
+    document.getElementById("signup-totp-code");
 
   // ---------------- Create Account ---------------- //
 
@@ -168,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------- Complete AccountSetup ---------------- //
+  // ---------------- Complete Account Signup ---------------- //
 
   if (completeBtn) {
     completeBtn.addEventListener("click", async () => {
@@ -176,7 +192,7 @@ document.addEventListener("DOMContentLoaded", () => {
       completeBtn.disabled = true;
 
       try {
-        await completeAccountSetup();
+        await completeAccountsignup();
       } finally {
         completeBtn.disabled = false;
       }
@@ -196,7 +212,7 @@ document.addEventListener("DOMContentLoaded", () => {
       completeBtn.disabled = true;
 
       try {
-        await completeAccountSetup();
+        await completeAccountsignup();
       } finally {
         completeBtn.disabled = false;
       }

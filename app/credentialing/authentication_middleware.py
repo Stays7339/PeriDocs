@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-20T19:36:20-04:00
+# save-state 2026-05-25T15:25:45-04:00
 # ==========================================
 
 from fastapi import Request
@@ -23,8 +23,8 @@ async def auth_middleware(request: Request, call_next):
     PUBLIC_ROUTES = {
         "/signin",
         "/signup",
-        "/account/signup/start",
-        "/account/signup/complete",
+        "/signup/start",
+        "/signup/complete",
         "/signout",
         "/favicon.ico",
     }
@@ -58,13 +58,34 @@ async def auth_middleware(request: Request, call_next):
 
         if payload:
 
-            request.state.is_authenticated = True
-            request.state.username = payload["username"]
-
-            user = await account_runtime.get_user_snapshot(payload["username"])
+            user = await account_runtime.get_user_snapshot(
+                payload["username"]
+            )
 
             if user:
+
+                request.state.is_authenticated = True
+                request.state.username = payload["username"]
                 request.state.role = user.get("role")
+
+                """
+                #this matter during deletion. If a session token were somehow copied prior to deletion,
+                #and then attempted to be used after deletion, the middleware reloads user snapshot every request:
+
+                #' user = await account_runtime.get_user_snapshot(payload["username"]) '
+
+                #and later:
+                #```
+                #    if user:
+                #        request.state.role = user.get("role")
+                #```    
+                #    So after deletion: the user lookup returns None, the role becomes None,
+                # and so the protected routes fail authorization.
+                # on top of that, checking for the username in the payload one more time helps 
+                # because without that second check:
+                #  deleted accounts would still appear “authenticated” despite user object no longer existing. 
+                # (that fix was now added in within this code blame)
+                """
 
     # =================================================
     # AUTH ENFORCEMENT
@@ -130,8 +151,8 @@ async def auth_middleware(request: Request, call_next):
     ):
 
         CSRF_EXEMPT_ROUTES = {
-            "/account/setup/start",
-            "/account/setup/complete",
+            "/signup/start",
+            "/signup/complete",
         }
 
         if path not in CSRF_EXEMPT_ROUTES:

@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-10T13:12:12-04:00
+save-state 2026-05-25T18:34:50-04:00
 */
 
 /* =========================
@@ -239,14 +239,17 @@ header {
     justify-self: start;
 }
 
-.header-right {
-    justify-self: end;
-}
-
 .header-logo img {
   width: auto;
   object-fit: contain;
   display: block;
+}
+
+.header-right {
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 0 0 auto;
+  justify-self: end;
 }
 
 /* =========================
@@ -258,8 +261,6 @@ header {
 
   width: 60px;
   height: 60px;
-
-  transform: translateX(20px);
 
   align-items: center;
   justify-content: center;
@@ -283,34 +284,39 @@ header {
    RIGHT SVG STACKED BUTTON
 ========================= */
 
-.header-svg-layer {
-  justify-content: center;
-
-  translate: 48px;
-
-  z-index: 2;
-  pointer-events: none;
-}
-
 .header-action-button {
-  display: flex;
   width: 60px;
   height: 60px;
+
+  display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
-  position: relative;
-  background-color: var(--brandmuted-periwinklemuted-periwinkle-004); /* color the button itself purple */
+  justify-content: center;
+
+  flex: 0 0 auto;
+
   border-radius: 20px;
-  aspect-ratio: 1;
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
   box-shadow: var(--box-shadow-typical);
 }
 
-.header-right {
-  position: relative;
+
+.header-action-group {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
+  gap: 12px;
+
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.header-action-button img {
+  width: 24px;
+  height: 24px;
+  display: block;
+
+  object-fit: contain;
+  flex: 0 0 auto;
 }
 
 /* =========================

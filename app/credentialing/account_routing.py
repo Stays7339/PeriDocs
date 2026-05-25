@@ -1,16 +1,16 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-20T20:48:20-04:00
+# save-state 2026-05-25T17:07:25-04:00
 # ==========================================
 
 import io
 import qrcode
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from fastapi import Request
-
+from fastapi import Request, Body
+from typing import Optional
 
 
 from app.credentialing.security_fundamentals import (
@@ -21,6 +21,7 @@ from app.credentialing.security_fundamentals import (
     encrypt_value,
     decrypt_value,
     generate_cross_site_request_forgery_token,
+    Session_Time_to_Live_in_Seconds,
 )
 
 from app.credentialing.account_runtime import account_runtime
@@ -32,32 +33,35 @@ router = APIRouter()
 
 
 
-class AccountSetupStartRequest(BaseModel):
+class AccountSignupStartRequest(BaseModel):
     username: str
     password: str
 
 
-class AccountSetupCompleteRequest(BaseModel):
-    setup_token: str
+class AccountSignupCompleteRequest(BaseModel):
+    signup_token: str
     totp_code: str
 
 
-class signinRequest(BaseModel):
+class SigninRequest(BaseModel):
     username: str
     password: str
     totp_code: str
 
+class DeleteAccountRequest(BaseModel):
+    password: str
+
 
 # ----------------------------
-# Account Setup START
+# Account signup START
 # ----------------------------
-@router.post("/account/setup/start")
-async def account_setup_start(
-    data: AccountSetupStartRequest
+@router.post("/signup/start")
+async def account_signup_start(
+    data: AccountSignupStartRequest
 ):
 
     result = await (
-        account_runtime.begin_account_setup(
+        account_runtime.begin_account_signup(
             username=data.username,
             password_hash=hash_password(data.password),
         )
@@ -67,28 +71,60 @@ async def account_setup_start(
 
 
 # ----------------------------
-# Account Setup COMPLETE
+# Account signup COMPLETE
 # ----------------------------
-@router.post("/account/setup/complete")
-async def account_setup_complete(
-    data: AccountSetupCompleteRequest
+@router.post("/signup/complete")
+async def account_signup_complete(
+    request: Request,
+    data: AccountSignupCompleteRequest
 ):
 
-    await (
-        account_runtime.complete_account_setup(
-            setup_token=data.setup_token,
-            totp_code=data.totp_code,
-        )
+    result = await account_runtime.complete_account_signup(
+        signup_token=data.signup_token,
+        totp_code=data.totp_code,
     )
 
-    return {
-        "status": "ok"
-    }
+    response = JSONResponse({
+        "status": "ok",
+        "username": result["username"]
+    })
 
+    response.set_cookie(
+        key="session",
+        value=result["session_token"],
+        httponly=True,
+        secure=request.app.state.production_mode,
+        samesite="Strict",
+        path="/",
+        max_age=Session_Time_to_Live_in_Seconds,
+    )
+
+    response.set_cookie(
+        key="csrf_token",
+        value=result["csrf_token"],
+        httponly=False,
+        secure=request.app.state.production_mode,
+        samesite="Strict",
+        path="/",
+        max_age=Session_Time_to_Live_in_Seconds,
+    )
+
+    return response
 
 # ----------------------------
 # signin
 # ----------------------------
+@router.get("/account")
+async def account_page(request: Request):
+    return templates.TemplateResponse(
+        "account.html",
+        {
+            "request": request,
+            "is_authenticated": request.state.is_authenticated,
+            "username": request.state.username
+        }
+    )
+
 @router.get("/signup")
 async def create_account_page(request: Request):
     return templates.TemplateResponse(
@@ -98,6 +134,10 @@ async def create_account_page(request: Request):
 
 @router.get("/signin")
 async def signin_page(request: Request):
+
+    if request.state.is_authenticated:
+        return RedirectResponse(url="/account")
+
     return templates.TemplateResponse(
         "account-signin.html",
         {"request": request}
@@ -106,7 +146,7 @@ async def signin_page(request: Request):
 # router.get is fundamentally different from router.post
 
 @router.post("/signin")
-async def signin(request: Request, data: signinRequest):
+async def signin(request: Request, data: SigninRequest):
 
     user = await (
         account_runtime.get_user_snapshot(
@@ -162,7 +202,7 @@ async def signin(request: Request, data: signinRequest):
         secure=request.app.state.production_mode,
         samesite="Strict", # Prevents cookie interception on unencrypted networks. The cookie is ONLY sent over HTTPS, never HTTP.
         path="/",
-        max_age=604800,
+        max_age=Session_Time_to_Live_in_Seconds,
     )
 
     response.set_cookie(
@@ -172,7 +212,7 @@ async def signin(request: Request, data: signinRequest):
         secure=request.app.state.production_mode,
         samesite="Strict",
         path="/",
-        max_age=604800,
+        max_age=Session_Time_to_Live_in_Seconds,
     )
 
     return response
@@ -196,10 +236,38 @@ def signout():
 
     return response
 
-@router.get("/account/setup/qr")
-def account_setup_qr(uri: str):
+@router.get("/signup/qr")
+async def account_signup_qr(
+    signup_token: str
+):
 
-    img = qrcode.make(uri)
+    pending = (
+        await account_runtime.get_pending_signup_snapshot(
+            signup_token
+        )
+    )
+
+    if not pending:
+
+        raise HTTPException(
+            404,
+            "Invalid signup token"
+        )
+
+    username = pending["username"]
+
+    totp_secret = pending[
+        "generated_totp_secret"
+    ]
+
+    otp_uri = (
+        "otpauth://totp/"
+        f"PeriDocs:{username}"
+        f"?secret={totp_secret}"
+        "&issuer=PeriDocs"
+    )
+
+    img = qrcode.make(otp_uri)
 
     buffer = io.BytesIO()
 
@@ -207,7 +275,62 @@ def account_setup_qr(uri: str):
 
     buffer.seek(0)
 
-    return StreamingResponse(
+    response = StreamingResponse(
         buffer,
         media_type="image/png"
     )
+
+    response.headers["Cache-Control"] = (
+        "no-store"
+    )
+
+    return response
+
+
+@router.post("/account/delete")
+async def delete_account(
+    request: Request,
+    data: DeleteAccountRequest,
+):
+    # ----------------------------
+    # Auth check (middleware also enforces this, but keep as safety net)
+    # ----------------------------
+    if not request.state.is_authenticated:
+        raise HTTPException(401, "Unauthorized")
+
+    username = request.state.username
+
+    if not username:
+        raise HTTPException(401, "Unauthorized")
+
+    # ----------------------------
+    # Fetch user snapshot
+    # ----------------------------
+    user = await account_runtime.get_user_snapshot(username)
+
+    if not user:
+        raise HTTPException(401, "Unauthorized")
+
+    # ----------------------------
+    # Password verification
+    # ----------------------------
+    if not verify_password(
+        user["password_hash"],
+        data.password
+    ):
+        raise HTTPException(401, "Invalid password")
+
+    # ----------------------------
+    # Perform deletion
+    # ----------------------------
+    await account_runtime.delete_account(username=username)
+
+    # ----------------------------
+    # Clear auth cookies
+    # ----------------------------
+    response = JSONResponse({"status": "account_deleted"})
+
+    response.delete_cookie(key="session", path="/")
+    response.delete_cookie(key="csrf_token", path="/")
+
+    return response

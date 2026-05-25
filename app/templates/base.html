@@ -1,6 +1,6 @@
 <!--
 PeriDocs/app/templates/base.html
-save-state 2026-05-12T10:34:05-04:00
+save-state 2026-05-25T18:32:35-04:00
 -->
 
 <!doctype html>
@@ -69,20 +69,25 @@ save-state 2026-05-12T10:34:05-04:00
     </nav>
 
     <!-- RIGHT: ACTION AREA -->
-    <div class="header-right">
+<div class="header-right">
 
-    <button class="header-hamburger-button" aria-label="Menu">
-      <span class="header-hamburger-icon">☰</span>
-    </button>
+  <button class="header-hamburger-button" aria-label="Menu">
+    <span class="header-hamburger-icon">☰</span>
+  </button>
 
-      <!-- SVG icon layer (decorative or interactive depending on your intent) -->
-      <img class="header-svg-layer" src="/static/fi-rr-search-alt.svg" alt="" />
+  <div class="header-action-group">
 
-      <!-- Button under SVG z-layer -->
-      <a class="header-action-button" href="/create-entry" aria-label="Primary Action">
-</a>
+    <a class="header-action-button" href="/account" aria-label="Account">
+      <img src="/static/user-icon.svg" alt="" />
+    </a>
 
-    </div>
+    <a class="header-action-button" href="/create-entry" aria-label="Create Entry">
+      <img src="/static/fi-rr-search-alt.svg" alt="" />
+    </a>
+
+  </div>
+
+</div>
 
   </header>
 
