@@ -395,8 +395,8 @@ PeriDocs/                         # Root project folder
 │  │
 │  ├─ static/                            # raw files served directly to browser unchanged
 │  │  ├─ account_authentication.js       # We're currently considering moving this into PeriDocs/app/credentialing  
-│  │  ├─ account-login-responsiveness.js  
-│  │  ├─ account-setup-responsiveness.js  
+│  │  ├─ account-signin-responsiveness.js  
+│  │  ├─ account-signup-responsiveness.js  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
 │  │  ├─ base-html-responsiveness.js  
@@ -420,8 +420,8 @@ PeriDocs/                         # Root project folder
 │  │
 │  └─ templates/                        # server-rendered files processed by Jinja
 │   ├─ about.html                     # About page template
-│   ├─ account-login.html                # includes in-line javascript
-│   ├─ account-setup.html             # includes in-line javascript
+│   ├─ account-signin.html                # includes in-line javascript
+│   ├─ account-signup.html             # includes in-line javascript
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an common theme populated by user entries.
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ create-entry.html 

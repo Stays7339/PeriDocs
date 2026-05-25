@@ -116,7 +116,7 @@ CORS mainly controls whether browser JavaScript may READ the response sent betwe
 This becomes important once the PeriDocs project folder is public, mainly for API calls and forkable policy decisions.
 
 CSRF:
-“Was this request intentionally made from the real site session, instead of another site secretly using the user’s login cookies?”
+“Was this request intentionally made from the real site session, instead of another site secretly using the user’s signin cookies?”
 CSRF protection is enforced by your backend when accepting sensitive requests.
 It helps protect against mistakenly trusting the API requests, even if the attacker cannot usually read responses.
 """

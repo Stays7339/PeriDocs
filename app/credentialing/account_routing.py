@@ -42,7 +42,7 @@ class AccountSetupCompleteRequest(BaseModel):
     totp_code: str
 
 
-class LoginRequest(BaseModel):
+class signinRequest(BaseModel):
     username: str
     password: str
     totp_code: str
@@ -87,26 +87,26 @@ async def account_setup_complete(
 
 
 # ----------------------------
-# LOGIN
+# signin
 # ----------------------------
 @router.get("/signup")
 async def create_account_page(request: Request):
     return templates.TemplateResponse(
-        "account-setup.html",
+        "account-signup.html",
         {"request": request}
     )
 
 @router.get("/signin")
-async def login_page(request: Request):
+async def signin_page(request: Request):
     return templates.TemplateResponse(
-        "account-login.html",
+        "account-signin.html",
         {"request": request}
     )
 
 # router.get is fundamentally different from router.post
 
 @router.post("/signin")
-async def login(request: Request, data: LoginRequest):
+async def signin(request: Request, data: signinRequest):
 
     user = await (
         account_runtime.get_user_snapshot(
@@ -118,7 +118,7 @@ async def login(request: Request, data: LoginRequest):
 
         raise HTTPException(
             401,
-            "Invalid login"
+            "Invalid signin"
         )
 
     if not verify_password(
@@ -128,7 +128,7 @@ async def login(request: Request, data: LoginRequest):
 
         raise HTTPException(
             401,
-            "Invalid login"
+            "Invalid signin"
         )
 
     totp_secret = decrypt_value(
@@ -142,7 +142,7 @@ async def login(request: Request, data: LoginRequest):
 
         raise HTTPException(
             401,
-            "Invalid login"
+            "Invalid signin"
         )
 
     session_token = create_session(user["username"])
@@ -178,7 +178,7 @@ async def login(request: Request, data: LoginRequest):
     return response
 
 @router.post("/signout")
-def logout():
+def signout():
 
     response = JSONResponse({
         "status": "logged_out"

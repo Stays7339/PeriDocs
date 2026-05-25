@@ -1,4 +1,4 @@
-// account-setup-responsiveness.js
+// account-signup-responsiveness.js
 // save-state 2026-05-20T19:30:20:00-04:00
 // ==========================================
 

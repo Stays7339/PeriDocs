@@ -1,8 +1,8 @@
-// account-login-responsiveness.js
+// account-signin-responsiveness.js
 // save-state 2026-05-20T20:25:15-04:00
 // ==========================================
 
-async function login() {
+async function signin() {
   const username = document.getElementById("username").value;
   const password = document.getElementById("password").value;
   const totp_code = document.getElementById("totp").value;
@@ -23,32 +23,32 @@ async function login() {
     data = JSON.parse(text);
   } catch (e) {
     console.error("Non-JSON response from server:", text);
-    showToast("Server error during login", "error");
+    showToast("Server error during signin", "error");
     return;
   }
 
   if (data.status === "ok") {
     window.location.href = "/";
   } else {
-    showToast(data.detail || "Login failed", "error");
+    showToast(data.detail || "signin failed", "error");
   }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  const loginButton =
-    document.getElementById("login-button");
+  const signinButton =
+    document.getElementById("signin-button");
 
-  if (loginButton) {
+  if (signinButton) {
 
-    loginButton.addEventListener("click", async () => {
+    signinButton.addEventListener("click", async () => {
 
-      loginButton.disabled = true;
+      signinButton.disabled = true;
 
       try {
-        await login();
+        await signin();
       } finally {
-        loginButton.disabled = false;
+        signinButton.disabled = false;
       }
 
     });

@@ -107,7 +107,7 @@ async def auth_middleware(request: Request, call_next):
     CSP protects what your webpage is allowed to execute or load, mainly to avoid unrecognized javascript.
 
     ----
-    Cookies = “Proof of login automatically attached by the browser when talking to your server”
+    Cookies = “Proof of signin automatically attached by the browser when talking to your server”
 
     HttpOnly = “JavaScript cannot read or steal the proof”
     Secure = “The proof is only sent over HTTPS connections”

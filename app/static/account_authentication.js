@@ -1,5 +1,5 @@
 // account_authentication.js
-// save-state 2026-05-20T22:29:50-04:00
+// save-state 2026-05-25T13:52:25-04:00
 // centralized authentication helpers (PeriDocs)
 
 function getCookie(name) {
@@ -40,9 +40,57 @@ async function authFetch(url, options = {}) {
 }
 
 /**
- * Central logout function
+ * Central signout function
  */
-async function logout() {
-  await authFetch("/signout", { method: "POST" });
-  window.location.href = "/signout";
+async function signout() {
+
+  const response = await authFetch(
+    "/signout",
+    {
+      method: "POST"
+    }
+  );
+
+  if (!response.ok) {
+
+    console.error(
+      "signout failed:",
+      response.status
+    );
+
+    return;
+  }
+
+  window.location.href = "/signin";
 }
+
+document.addEventListener(
+  "DOMContentLoaded",
+  () => {
+
+    const signoutButton =
+      document.getElementById("signout-btn");
+
+    if (!signoutButton) {
+      return;
+    }
+
+    signoutButton.addEventListener(
+      "click",
+      async () => {
+
+        try {
+
+          await signout();
+
+        } catch (error) {
+
+          console.error(
+            "Signout error:",
+            error
+          );
+        }
+      }
+    );
+  }
+);

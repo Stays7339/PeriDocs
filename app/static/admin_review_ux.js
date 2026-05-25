@@ -309,10 +309,10 @@ function updateActive(items, index) {
 // =====================================================
 
 document.addEventListener("DOMContentLoaded", () => {
-  // logout
-  const logoutBtn = document.getElementById("logout-btn");
-  if (logoutBtn) {
-    logoutBtn.addEventListener("click", () => logout());
+  // signout
+  const signoutBtn = document.getElementById("signout-btn");
+  if (signoutBtn) {
+    signoutBtn.addEventListener("click", () => signout());
   }
 
   // heuristics buttons
