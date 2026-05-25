@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-25T18:34:50-04:00
+save-state 2026-05-25T19:07:10-04:00
 */
 
 /* =========================
@@ -320,7 +320,8 @@ header {
 }
 
 /* =========================
-   RESPONSIVE STRUCTURAL RULE
+LOOK #2 - FOR NARROWED DESKTOP ONLY
+RESPONSIVE STRUCTURAL RULE 
    ≤ 1.65 ASPECT RATIO = "COMPRESSED LAYOUT MODE"
 ========================= */
 
@@ -352,6 +353,73 @@ header {
 
   .layout-vertical-only {
     display: block !important;
+  }
+}
+
+/* =========================
+LOOK #3 - FOR MOBILE DEVICES 
+(Lower aspect ratio does not effectively 
+get around the fractioning / aspect ratio trick)
+========================= */
+
+@media (max-width: 850px) {
+
+  header {
+    padding: 0 16px;
+  }
+
+  .header-logo img {
+    height: 32px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-action-group {
+    gap: 8px;
+  }
+
+  .header-action-button,
+  .header-hamburger-button {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .header-action-button img {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* =========================
+LOOK-4   
+MOBILE LANDSCAPE
+========================= */
+
+@media (max-width: 900px) and (max-height: 500px) {
+
+  .header-center {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .header-hamburger-button {
+    display: flex;
+  }
+
+  .page-content {
+    padding-top: calc(var(--app-header-height) + 24px);
+  }
+
+  .mobile-menu-panel {
+    translate: 0px 50px;
+    max-height: 70vh;
+
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
@@ -731,6 +799,7 @@ The next mention is to control the width as button are added and removed from th
 .entry-wrapper[data-locked="true"] .entry-overlay-streaks {
   opacity:1; visibility:visible; transition: opacity 0.6s ease, visibility 0s;
 }
+
 
 /* =========================
    Consent Toggle
