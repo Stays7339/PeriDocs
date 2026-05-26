@@ -1,12 +1,10 @@
 // account-signup-responsiveness.js
-// save-state 2026-05-25T16:59:55:00-04:00
+// save-state 2026-05-26T15:20:00:00-04:00
 // ==========================================
 
 let pendingTOTPsignup = null;
 
 async function createAccount() {
-
-  console.log("createAccount ENTERED");
 
   if (pendingTOTPsignup !== null) {
     showToast("Accountsignup already started.", "error");
@@ -27,8 +25,6 @@ async function createAccount() {
     return;
   }
 
-  console.log("ABOUT TO FETCH");
-
   const res = await authFetch("/signup/start", {
     method: "POST",
     credentials: "same-origin",
@@ -38,8 +34,6 @@ async function createAccount() {
       password
     })
   });
-
-  console.log("FETCH RESOLVED:", res);
 
   const data = await res.json();
 
@@ -133,9 +127,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const createBtn = document.getElementById("create-account-btn");
 
-  console.log("DOM ready");
-  console.log("createBtn found:", createBtn);
-
   const completeBtn =
     document.getElementById("complete-account-creation-btn");
 
@@ -153,7 +144,6 @@ document.addEventListener("DOMContentLoaded", () => {
   if (createBtn) {
     createBtn.addEventListener("click", async () => {
       
-      console.log("CREATE BUTTON CLICKED");
       createBtn.disabled = true;
 
       try {

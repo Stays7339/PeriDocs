@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-05-19T14:33:40 -04:00
+# save-state 2026-05-26T15:15:05 -04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -104,6 +104,11 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str)
     # ---------------- Mark progress as complete ----------------
     progress_dict[entry_id] = 1.0
 
+
+@app.middleware("http")
+async def debug_all_requests(request: Request, call_next):
+    response = await call_next(request)
+    return response
 
 # ---------- Submit entry ----------
 @app.post("/submit", response_class=HTMLResponse)

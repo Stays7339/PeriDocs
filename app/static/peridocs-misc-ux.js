@@ -1,5 +1,5 @@
 // peridocs-misc-ux.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-11T16:43:50-04:00
+// save-state 2026-05-26T15:20:00-04:00
 // ==========================================
 
 /* Notes:
@@ -266,7 +266,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------------- entry Form Submission ---------------------- //
+  // ---------------------- Entry Submission for /create-entry page ---------------------- //
   if (entryForm) {
     entryForm.addEventListener('submit', async e => {
       e.preventDefault();
@@ -275,7 +275,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const formData = new FormData(entryForm);
       const payload = Object.fromEntries(formData.entries());
       try {
-        const res = await fetch(entryForm.action, { method:entryForm.method||'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
+        const res = await authFetch(entryForm.action, {
+          method: entryForm.method || 'POST',
+          body: JSON.stringify(payload)
+        });
         if (!res.ok) throw new Error('Network response not ok');
         const data = await res.json();
         if (data.status==='ok') { 

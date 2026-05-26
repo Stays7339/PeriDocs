@@ -360,7 +360,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-18T14:48:50-04:00
+## Canonical Project Directory as of 2026-05-26T15:14:50-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -411,7 +411,7 @@ PeriDocs/                         # Root project folder
 │  │  ├─ peridocs-logo-icon-2026-05-05.svg
 │  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
 │  │  ├─ peridocs-logo-workmark-2026-05-05.svg
-│  │  ├─ peridocs-misc-ux.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry
+│  │  ├─ peridocs-misc-ux.js                  # unified localStorage UI state: entry submissions, modals, feedback submission, theme toggle (light mode / dark mode), cooldowns... A LOT is in this one file.
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
