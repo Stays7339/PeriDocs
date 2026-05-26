@@ -1,12 +1,7 @@
 // peridocs-misc-ux.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-26T15:20:00-04:00
+// save-state 2026-05-26T15:44:00-04:00
 // ==========================================
 
-/* Notes:
-  - Cooldowns are client-side and privacy-first.
-  - Theme state persists on refresh.
-  - Privacy toast only shows once per user unless localStorage is cleared.
-*/
 
 document.addEventListener("DOMContentLoaded", () => {
   // ---------------------- DOM Elements ---------------------- //
@@ -213,41 +208,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return true;
   }
 
-  // ---------------------- Toast ---------------------- //
-  const activeToasts = [];
-
-
-  window.showToast = function(message, type='info', duration=2500) {
-    if (!toastContainer) return;
-
-    const toast = document.createElement('div');
-    toast.className = 'stacked-toast';
-
-    /* adds a CSS class to the toast element, choosing the class name based on the type, 
-    but if the type is "info", it swaps it to "neutral" instead. */
-    toast.classList.add(`toast-${type === 'info' ? 'neutral' : type}`);
-    
-    toast.textContent = message;
-
-    toastContainer.appendChild(toast);
-    activeToasts.push(toast);
-
-    // Trigger slide-in/fade-in
-    requestAnimationFrame(() => {
-      toast.classList.add('show');
-    });
-
-    setTimeout(() => {
-      toast.classList.remove('show');
-      toast.classList.add('hide');
-      setTimeout(() => {
-        toast.remove();
-        const idx = activeToasts.indexOf(toast);
-        if (idx > -1) activeToasts.splice(idx, 1);
-      }, 400);
-    }, duration);
-  }
-
   // ---------------------- Feedback/Report Form Submission ---------------------- //
   if (feedbackForm) {
     feedbackForm.addEventListener("submit", async e => {
@@ -262,94 +222,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const data = await res.json();
         if (data.status==="ok") { showToast(type==='feedback'?'Feedback submitted!':'Report submitted!', 'success'); feedbackForm.reset(); closeModal(type); }
         else { showToast(data.message || 'Submission failed. Please try again.', 'error'); }
-      } catch (err) { console.error(err); showToast('Submission failed. Please try again.', 'error'); }
-    });
-  }
-
-  // ---------------------- Entry Submission for /create-entry page ---------------------- //
-  if (entryForm) {
-    entryForm.addEventListener('submit', async e => {
-      e.preventDefault();
-      if (!canSubmit('entry')) return;
-
-      const formData = new FormData(entryForm);
-      const payload = Object.fromEntries(formData.entries());
-      try {
-        const res = await authFetch(entryForm.action, {
-          method: entryForm.method || 'POST',
-          body: JSON.stringify(payload)
-        });
-        if (!res.ok) throw new Error('Network response not ok');
-        const data = await res.json();
-        if (data.status==='ok') { 
-          showToast(data.message||'Entry submitted!', 'success'); 
-          entryForm.reset();
-
-          // ---------------------- Progress toast using general-toast style ---------------------- //
-          const spinnerToast = document.createElement('div');
-          spinnerToast.className = 'stacked-toast';
-          spinnerToast.style.display = 'inline-flex';
-          spinnerToast.classList.add('toast-neutral');
-          spinnerToast.style.alignItems = 'center';
-          spinnerToast.style.gap = '10px';
-          spinnerToast.innerHTML = `
-            <span id="progress-text">Processing... 0%</span>
-            <div class="spinner" style="border: 3px solid #ccc; border-top: 3px solid #333; border-radius: 50%; width: 18px; height: 18px; animation: spin 1s linear infinite;"></div>
-          `;
-          toastContainer.appendChild(spinnerToast);
-          requestAnimationFrame(() => spinnerToast.classList.add('show'));
-
-          if (!document.getElementById('spinner-style')) {
-            const style = document.createElement('style');
-            style.id = 'spinner-style';
-            style.innerHTML = `
-              @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-            `;
-            document.head.appendChild(style);
-          }
-
-          // ---------------------- Connect WebSocket ---------------------- //
-          let crisisTriggered = false; // <-- ADDED FLAG
-
-          const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
-          const ws = new WebSocket(`${wsProtocol}://${window.location.host}/ws/progress/${data.entry_id}`);
-          ws.onopen = () => console.log("WS connected!");
-          ws.onclose = () => console.log("WS closed");
-          ws.onerror = (err) => console.error("WS error:", err);
-          ws.onmessage = (event) => {
-            const msg = JSON.parse(event.data);
-            console.log("WS message received:", msg);
-
-            // ---------------------- Crisis check (Option A) ---------------------- //
-            if (msg.type === "crisis" && !crisisTriggered) {
-              crisisTriggered = true; // <-- SET FLAG
-              ws.close();
-              spinnerToast.classList.remove('show');
-              spinnerToast.classList.add('hide');
-              setTimeout(() => spinnerToast.remove(), 400);
-              openModal("crisis");
-              return; // stop further processing
-            }
-
-            // ---------------------- Skip updates if crisis triggered ---------------------- //
-            if (crisisTriggered) return;
-
-            const progress = Math.min(Math.max(msg.progress || 0, 0), 1); 
-            const percent = Math.round(progress * 100);
-            const progressText = document.getElementById("progress-text");
-            if (progressText) progressText.textContent = `Processing... ${percent}%`;
-
-            // ---------------------- Redirect when done ---------------------- //
-            if (progress >= 1) {
-              ws.close();
-              spinnerToast.classList.remove('show');
-              spinnerToast.classList.add('hide');
-              setTimeout(() => spinnerToast.remove(), 400);
-              const real_id = msg.real_id || data.entry_id;
-              setTimeout(() => { window.location.href = `/submit-success?id=${real_id}`; }, 200);
-            }
-          };
-        } else { showToast(data.message||'Submission failed. Please try again.', 'error'); }
       } catch (err) { console.error(err); showToast('Submission failed. Please try again.', 'error'); }
     });
   }
@@ -387,33 +259,33 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // ---------------------- Copy Text to Clipboard ---------------------- //
-function copySafeTextToClipboard(safeText) {
-  if (!safeText) return;
-  navigator.clipboard.writeText(safeText).then(() => {
-    showToast("Copy to clipboard successful!", "success");
-  }).catch(err => {
-    console.error("Clipboard copy failed:", err);
-    showToast("Copy to clipboard failed. Please contact support.", "error");
-  });
-}
+    // ---------------------- Copy Text to Clipboard ---------------------- //
+  function copySafeTextToClipboard(safeText) {
+    if (!safeText) return;
+    navigator.clipboard.writeText(safeText).then(() => {
+      showToast("Copy to clipboard successful!", "success");
+    }).catch(err => {
+      console.error("Clipboard copy failed:", err);
+      showToast("Copy to clipboard failed. Please contact support.", "error");
+    });
+  }
 
-// ---------------------- Copy Entry Button Binding ---------------------- //
-const copyEntryBtn = document.getElementById("copy-entry-btn");
-if (copyEntryBtn) {  
-  const safeText = copyEntryBtn.dataset.safeText; // read from data attribute
-  copyEntryBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
-}
+  // ---------------------- Copy Entry Button Binding ---------------------- //
+  const copyEntryBtn = document.getElementById("copy-entry-btn");
+  if (copyEntryBtn) {  
+    const safeText = copyEntryBtn.dataset.safeText; // read from data attribute
+    copyEntryBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
+  }
 
-// ---------------------- Copy Delete Token Button Binding ---------------------- //
-const copyDeleteTokenBtn = document.getElementById("copy-delete-token-btn");
-if (copyDeleteTokenBtn) {  
-  const safeText = copyDeleteTokenBtn.dataset.safeText; // read from data attribute
-  copyDeleteTokenBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
-}
+  // ---------------------- Copy Delete Token Button Binding ---------------------- //
+  const copyDeleteTokenBtn = document.getElementById("copy-delete-token-btn");
+  if (copyDeleteTokenBtn) {  
+    const safeText = copyDeleteTokenBtn.dataset.safeText; // read from data attribute
+    copyDeleteTokenBtn.addEventListener("click", () => copySafeTextToClipboard(safeText));
+  }
 
-// Expose globally
-window.copySafeTextToClipboard = copySafeTextToClipboard;
+  // Expose globally
+  window.copySafeTextToClipboard = copySafeTextToClipboard;
 
   // ---------------------- Delete Entry Form Submission ---------------------- //
   const deleteForm = document.getElementById("delete-form");
@@ -465,6 +337,8 @@ window.copySafeTextToClipboard = copySafeTextToClipboard;
       }
   }); // end deleteForm submit listener
     }
+
+    window.canSubmit = canSubmit;
 
 }); // end DOMContentLoaded
 

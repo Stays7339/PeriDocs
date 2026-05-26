@@ -16,8 +16,10 @@
       See our <a href="/privacy-policy">privacy and data policy</a>.
     </p>
 
+    <span><h2> ------------------------------ </h2></span>
     <!-- Full text submission, PII-redacted -->
     <div class="excerpt">{{ safe_text }}</div>
+    <span><h2> ------------------------------ </h2></span>
 
     <!-- ---------------- Delete Token ---------------- -->
     {% if delete_token %}
@@ -41,13 +43,13 @@
     <br>
     <!-- Metrics summary -->
     <ul class="metrics">
-      <li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li>
+      <br><li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li><br>
     </ul>
 
     <!-- Top 20 matched entries -->
     {% if top_matches %}
     <blockquote class="matched-snippet">
-      <strong>Closest match(es) found:</strong><br>
+      <strong>Closest match(es) found:<br><br></strong>
       {% for match in top_matches %}
         <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
           <span>{{ match.excerpt }}[...]</span>
