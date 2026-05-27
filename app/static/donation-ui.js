@@ -2,7 +2,7 @@
 // donation-ui.js
 // PeriDocs Stripe Donation Frontend Module
 // Works alongside peridocs-misc-ux.js
-// save-state 2026-05-03T23:10:40-04:00
+// save-state 2026-05-27T14:25:30-04:00
 // ==========================================
 
 /*
@@ -26,14 +26,10 @@ const DonationAPI = {
 
 async function createDonationSession(endpoint, amount, type = "donation") {
   try {
-    const res = await fetch(endpoint, {
+    const res = await authFetch(endpoint, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
       body: JSON.stringify({ amount })
     });
-
     const data = await res.json();
 
     // -------------------------
@@ -125,6 +121,26 @@ function valuecheckMonthlyDonation() {
 
   startMonthlyDonation(val);
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+
+  const oneTimeBtn =
+    document.getElementById("onetime-donation-btn");
+
+  const monthlyBtn =
+    document.getElementById("monthly-donation-btn");
+
+  oneTimeBtn?.addEventListener(
+    "click",
+    valuecheckOneTimeDonation
+  );
+
+  monthlyBtn?.addEventListener(
+    "click",
+    valuecheckMonthlyDonation
+  );
+
+});
 
 /* =========================
    GLOBAL EXPORTS

@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/crisis_detector.py
-# Save-state updated 2026-04-05T14:01:15-04:00 (YYYYMMDDhhmm)
+# Save-state updated 2026-05-27T14:01:15-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 """
@@ -80,6 +80,7 @@ logger = logging.getLogger(__name__)
 # ========================
 _CRISIS_PHRASES = [
     "kill myself",
+    "kms",
     "want to die",
     "end my life",
     "suicide",

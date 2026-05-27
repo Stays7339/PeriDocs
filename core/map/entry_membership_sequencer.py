@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-05-20T23:02:50-04:00
+# Save-state: 2026-05-27T15:53:05-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -298,12 +298,13 @@ async def reconcile_centroid_membership_after_approval(
     summary_entries: authoritative snapshot (already in memory)
     """
 
-    logger.info(
+    logger.debug(
         "[reconcile] start centroid=%s event_index=%s entries=%d",
         centroid_suffix,
         event_index,
         len(entry_runtime._entries),
     )
+    logger.warning("[RECONCILE runtime id=%s]", id(entry_runtime))
 
     centroid_id = f"centroid_{centroid_suffix}"
     precentroid_id = f"precentroid_{centroid_suffix}"
@@ -329,7 +330,7 @@ async def reconcile_centroid_membership_after_approval(
         if not isinstance(centroids_list, list):
             continue
 
-        logger.info(
+        logger.debug(
             "[reconcile] inspecting entry=%s centroids=%d",
             entry.get("entry_id"),
             len(centroids_list),
@@ -354,7 +355,7 @@ async def reconcile_centroid_membership_after_approval(
     # disk is a delayed batched persistence layer
     # ------------------------------------------------------------
     if updated:
-        logger.info("[reconcile] updated=True triggering flush")
+        logger.debug("[reconcile] updated=True; marking dirty and waking the background flush worker")
         await entry_runtime.request_flush()
     else:
-        logger.info("[reconcile] no-op (no matching precentroid entries)")
+        logger.debug("[reconcile] no-op (no matching precentroid entries)")

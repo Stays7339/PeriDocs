@@ -1,4 +1,4 @@
-{# index.html - homepage, extends base.html save-state 2026-05-09T17:58:50-04:00 #}
+{# index.html - homepage, extends base.html save-state 2026-05-27T14:22:15-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
@@ -220,10 +220,11 @@
                                    placeholder="One-time charge" id="onetime-amount"/>
                         </div>
 
-                        <button class="banner-1-button"
-                                type="button"
-                                onclick="PeriDocsDonations.valuecheckOneTimeDonation()">
-                            Checkout via Stripe
+                        <button
+                        class="banner-1-button"
+                        type="button"
+                        id="onetime-donation-btn">
+                        Checkout via Stripe
                         </button>
                     </div>
                 </div>
@@ -238,10 +239,11 @@
                                    placeholder="Recurring monthly charge" id="monthly-amount"/>
                         </div>
 
-                        <button class="banner-1-button"
-                                type="button"
-                                onclick="PeriDocsDonations.valuecheckMonthlyDonation()">
-                            Checkout via Stripe
+                        <button
+                        class="banner-1-button"
+                        type="button"
+                        id="monthly-donation-btn">
+                        Checkout via Stripe
                         </button>
                     </div>
                 </div>

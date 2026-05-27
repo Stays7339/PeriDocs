@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-12T13:31:15-04:00 (ISO 8601)
+# save-state 2026-05-27T15:25:25-04:00 (ISO 8601)
 # ========================================== 
 
 from fastapi import FastAPI
@@ -39,7 +39,7 @@ from core.map.mapping_runtime import initialize_runtime
 # ------------------- logging setup -------------------
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.INFO,       # or DEBUG
+    level=logging.DEBUG,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
@@ -104,21 +104,25 @@ app.add_middleware(
 
 
 """
-CSP:
-“What can this webpage do?”
+CSP (Content Security Policy) generally asks:
+“Considering everything across the open internet, what scripts/resources is this page allowed to load and execute at all?”
 CSP is enforced by the browser on your own page. 
 CSP primarily protects against malicious code executing inside your own pages.
 
-CORS:
-“Which outside websites are allowed to talk to this backend through a browser?”
+CORS (Cross-Origin Resource Sharing):
+“Which outside websites are allowed to talk to this website through the user's browser?”
 CORS policy only affects how browsers handle requests to PeriDocs itself.
 CORS mainly controls whether browser JavaScript may READ the response sent between origins.
 This becomes important once the PeriDocs project folder is public, mainly for API calls and forkable policy decisions.
 
-CSRF:
+CSRF (Cross-Site Request Forgery) generally asks:
 “Was this request intentionally made from the real site session, instead of another site secretly using the user’s signin cookies?”
 CSRF protection is enforced by your backend when accepting sensitive requests.
 It helps protect against mistakenly trusting the API requests, even if the attacker cannot usually read responses.
+
+HttpOnly = “JavaScript cannot read or steal the proof”
+Secure = “The proof is only sent over HTTPS connections”
+
 """
 
 # ------------------------------------------------

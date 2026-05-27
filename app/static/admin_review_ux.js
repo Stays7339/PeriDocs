@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-05-20T22:23:10-04:00
+// save-state 2026-05-27T15:16:50-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -15,36 +15,28 @@ async function fetchQueue() {
 
   const params = new URLSearchParams(window.location.search);
   const pid = params.get("precentroid");
-  if (pid) openPrecentroid(pid);
+
 }
 
 function renderQueue() {
   reviewListContainer.innerHTML = "";
 
+  const template = document.getElementById("review-item-template");
+
   reviewQueue.forEach(item => {
-    const el = document.createElement("div");
-    el.className = "excerpt";
+    const el = template.content.cloneNode(true).firstElementChild;
+
     el.dataset.id = item.id;
 
-    el.innerHTML = `
-      <strong class="clickable">${item.id}</strong><br>
-      ${item.summary}<br>
-      Entries: ${item.meta.entry_count}
-      <div style="margin-top:10px;">
-        <button class="btn primary expand-btn">View Entries</button>
-        <button class="btn primary approve-btn">Approve</button>
-        <button class="btn ghost reject-btn">Reject</button>
-      </div>
-      <div class="entries-container" style="display:none; margin-top:10px;"></div>
-    `;
+    el.querySelector(".clickable").textContent = item.id;
+    el.querySelector(".summary").textContent = item.summary;
+    el.querySelector(".entry-count").textContent = item.meta.entry_count;
 
     const expandBtn = el.querySelector(".expand-btn");
     const approveBtn = el.querySelector(".approve-btn");
     const rejectBtn = el.querySelector(".reject-btn");
-    const clickableTitle = el.querySelector(".clickable");
 
     expandBtn.addEventListener("click", () => toggleEntries(item.id));
-    clickableTitle.addEventListener("click", () => openPrecentroid(item.id));
 
     approveBtn.addEventListener("click", async () => {
       const description_from_human_moderator =
@@ -56,7 +48,6 @@ function renderQueue() {
 
       await authFetch("/admin/approve-precentroid", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({
           id: item.id,
           description_from_human_moderator,
@@ -71,7 +62,6 @@ function renderQueue() {
     rejectBtn.addEventListener("click", async () => {
       await authFetch("/admin/reject-precentroid", {
         method: "POST",
-        headers: authHeaders(),
         body: JSON.stringify({ id: item.id })
       });
 
@@ -103,7 +93,6 @@ async function toggleEntries(precentroidId) {
 
   const res = await authFetch("/admin/entries-safe-text", {
     method: "POST",
-    headers: authHeaders(),
     body: JSON.stringify({ entry_ids: entryIds })
   });
 
@@ -133,7 +122,7 @@ window.addEventListener("popstate", event => {
   const pid = event.state?.precentroid;
 
   if (pid) {
-    openPrecentroid(pid);
+  
   } else {
     reviewQueue.forEach(item => {
       const el = [...reviewListContainer.children]
@@ -200,7 +189,6 @@ async function submitHeuristic() {
 
   const res = await authFetch("/admin/create-heuristic", {
     method: "POST",
-    headers: authHeaders(),
     body: JSON.stringify({ givens, outputs })
   });
 

@@ -1,5 +1,5 @@
 // account-signup-responsiveness.js
-// save-state 2026-05-26T15:20:00:00-04:00
+// save-state 2026-05-27T14:56:30:00-04:00
 // ==========================================
 
 let pendingTOTPsignup = null;
@@ -28,7 +28,6 @@ async function createAccount() {
   const res = await authFetch("/signup/start", {
     method: "POST",
     credentials: "same-origin",
-    headers: authHeaders(),
     body: JSON.stringify({
       username,
       password
@@ -82,7 +81,7 @@ async function completeAccountsignup() {
   const res = await authFetch("/signup/complete", {
     method: "POST",
     credentials: "same-origin",
-    headers: authHeaders(),
+
     body: JSON.stringify({
       signup_token: pendingTOTPsignup.signup_token,
       totp_code

@@ -360,7 +360,7 @@ You now have PeriDocs running locally.
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-26T15:14:50-04:00
+## Canonical Project Directory as of 2026-05-27T14:21:20-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -399,29 +399,32 @@ PeriDocs/                         # Root project folder
 │  │  ├─ account-signup-responsiveness.js  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
 │  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
-│  │  ├─ base-html-responsiveness.js  
+│  │  ├─ base-html-responsiveness.js      # this is the part of the code that helps us do custom widths on the header's navigation bar without us having to hardcode position and width in that nav bar.
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
-│  │  ├─ custom-styled-text-field.css             # autocomplete dropdown for text fields on webpages
-│  │  ├─ donation-ui.js                  #Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
-│  │  ├─ fi-rr-search-alt.svg
-│  │  ├─ info-card-border.png
-│  │  ├─ globals.css
+│  │  ├─ custom-styled-text-field.css     # autocomplete dropdown for text fields on webpages
+│  │  ├─ donation-ui.js                   # Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
+│  │  ├─ entry-frontend.js                # controls the javascript for transporting the entry from the page to the server while being sure CSRF is enabled. Also calls on the toast system and websocket
+│  │  ├─ feedback-ui.js                   # controls the transportation of feedback from the page to the server. This file also uses CSRF.
+│  │  ├─ fi-rr-search-alt.svg             # icon for the button leading to the create-entry page
+│  │  ├─ globals.css                      # webpage styling that should be applied everywhere
+│  │  ├─ info-card-border.png             # decorative framing for landing page content
+│  │  ├─ modal-ui.js                      # Controls the behavior of modals (i.e., site-official popups)
 │  │  ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png
-│  │  ├─ myers-reset-2.0.css           # public domain boilerplate code that helps to keep css styling consistent across different web browsers
+│  │  ├─ myers-reset-2.0.css              # public domain boilerplate code that helps to keep css styling consistent across different web browsers
 │  │  ├─ peridocs-logo-icon-2026-05-05.svg
 │  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
 │  │  ├─ peridocs-logo-workmark-2026-05-05.svg
-│  │  ├─ peridocs-misc-ux.js                  # unified localStorage UI state: entry submissions, modals, feedback submission, theme toggle (light mode / dark mode), cooldowns... A LOT is in this one file.
+│  │  ├─ peridocs-misc-ux.js                  # handles many things including but not limited to: theme toggle (light mode / dark mode), cooldowns...
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
-│  └─ templates/                        # server-rendered files processed by Jinja
-│   ├─ about.html                     # About page template
+│  └─ templates/                          # server-rendered files processed by Jinja
+│   ├─ about.html                         # About page template
 │   ├─ account-signin.html                # includes in-line javascript
-│   ├─ account-signup.html             # includes in-line javascript
+│   ├─ account-signup.html                # includes in-line javascript
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an common theme populated by user entries.
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ create-entry.html 

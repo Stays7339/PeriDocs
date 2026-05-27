@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-03-29T16:44:20-04:00 #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-05-27T14:00:30-04:00 #}
 {% extends "base.html" %}
 {% block title %}Entry saved | PeriDocs{% endblock %}
 
@@ -12,7 +12,7 @@
 
     <!-- Privacy note -->
     <p class="privacy-summary">
-      Your submission is stored securely. All data other than timestamp, pseudonymized text, and affiliations to centroids remains only visible to authorized PeriDocs staff for moderation and safety review.
+      Your submission is stored securely. All data (other than timestamp, pseudonymized text, and affiliations to centroids) remains only visible to authorized PeriDocs staff for moderation and safety review.
       See our <a href="/privacy-policy">privacy and data policy</a>.
     </p>
 
@@ -71,7 +71,11 @@
     <!-- Parse feedback button -->
     <blockquote class="parse-feedback-bar">
       <span>Matching seems unusual?</span>
-      <button type="button" class="report-parse-btn general-button" onclick="openReportModal()">Report Issue</button>
+      <button
+      type="button"
+      class="report-parse-btn general-button">
+      Report Issue
+    </button>
     </blockquote>
 
     <span><h2> ------------------------------ </h2></span>

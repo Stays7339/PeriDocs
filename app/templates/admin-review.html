@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-05-25T16:05:20-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-05-27T15:07:50-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
@@ -8,6 +8,21 @@
 <div class="card">
   <h1>Review Queue</h1>
   <div id="review-list" class="card-content"></div>
+  <template id="review-item-template">
+  <div class="excerpt" data-id="">
+    <strong class="clickable"></strong><br>
+    <span class="summary"></span><br>
+    Entries: <span class="entry-count"></span>
+
+    <div style="margin-top:10px;">
+      <button class="btn primary expand-btn">View Entries</button>
+      <button class="btn primary approve-btn">Approve</button>
+      <button class="btn ghost reject-btn">Reject</button>
+    </div>
+
+    <div class="entries-container" style="display:none; margin-top:10px;"></div>
+  </div>
+</template>
 </div>
 
 <div class="card">

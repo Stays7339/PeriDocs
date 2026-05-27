@@ -1,6 +1,6 @@
 <!--
 PeriDocs/app/templates/base.html
-save-state 2026-05-25T18:32:35-04:00
+save-state 2026-05-27T13:34:00-04:00
 -->
 
 <!doctype html>
@@ -20,16 +20,19 @@ save-state 2026-05-25T18:32:35-04:00
   <link rel="stylesheet" href="/static/custom-styled-text-field.css" />
 </head>
 
-<!-- ADDED: mobile menu overlay -->
+
+
+
+
+<body data-production-mode="{{ 'true' if ProductionMode else 'false' }}">
+
+  <!-- ADDED: mobile menu overlay -->
 <div class="mobile-menu-overlay" id="mobileMenuOverlay">
   <nav class="mobile-menu-panel" aria-label="Mobile navigation">
     <!-- we reuse the SAME menu HTML via JS clone -->
   </nav>
 </div>
 
-
-
-<body data-production-mode="{{ 'true' if ProductionMode else 'false' }}">
 <!-- required for peridocs-misc-ux.js toast system -->
 <div id="general-toast-container"></div>
 <div id="privacy-toast"></div>
@@ -100,10 +103,15 @@ save-state 2026-05-25T18:32:35-04:00
     {% block content %}{% endblock %}
   </main>
 
-<!-- brings in existing UI system (toasts, etc.) -->
+  {% include 'includes/modal-feedback.html' %}
+  {% include 'includes/modal-crisis.html' %}
+
+<!-- brings in existing UI system-->
 <script src="/static/base-html-responsiveness.js"></script>
 <script src="/static/toast-ui.js"></script>
+<script src="/static/modal-ui.js"></script>
 <script src="/static/peridocs-misc-ux.js"></script>
+<script src="/static/feedback-ui.js"></script>
 <script src="/static/entry-frontend.js"></script>
 <script src="/static/donation-ui.js"></script>
 <script src="/static/account_authentication.js"></script>

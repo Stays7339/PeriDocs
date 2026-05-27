@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-19T17:21:10-04:00
+# Save-state: 2026-05-27T16:15:50-04:00
 # ==========================================
 import asyncio
 import copy
@@ -61,11 +61,12 @@ class EntryWritingRuntime:
         self._dirty_mutation_count: int = 0
 
         self._max_mutations_before_flush: int = 50
-        self._max_seconds_without_flush: float = 60.0
+        self._max_seconds_without_flush: float = 15.0
         self._last_flush_time: float = time.time()
 
         self._background_flush_worker = None
         self._shutdown_requested: bool = False
+        logger.warning("[INIT EntryRuntime] id=%s", id(self))
 
     async def initialize(self) -> None:
         """
@@ -74,6 +75,7 @@ class EntryWritingRuntime:
         Safe to call multiple times; only loads on first call.
         """
         logger.info("[EntryWritingRuntime] Starting initialize()")
+        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
 
         if self._initialized:
             return
@@ -294,8 +296,10 @@ class EntryWritingRuntime:
 
     async def _flush_worker(self):
         logger.info("[EntryRuntime] Flush worker started.")
+        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
 
         while True:
+            logger.debug("[FlushWorker] heartbeat loop tick")
             try:
                 try:
                     # wait for signal or timeout
@@ -323,6 +327,12 @@ class EntryWritingRuntime:
         now = time.time()
         time_since_flush = now - self._last_flush_time
 
+        logger.debug(
+            "[FlushCheck] dirty=%d time=%f",
+            self._dirty_mutation_count,
+            time_since_flush
+        )
+
         if self._dirty_mutation_count >= self._max_mutations_before_flush:
             return True
 
@@ -333,10 +343,13 @@ class EntryWritingRuntime:
 
     async def _signal_flush(self) -> None:
         # lightweight wake-up signal only
+        logger.debug("[FlushSignal] dirty=%d", self._dirty_mutation_count)
+        logger.warning("[SIGNAL runtime id=%s dirty=%d]", id(self), self._dirty_mutation_count)
         if self._flush_queue.empty():
             await self._flush_queue.put(True)
     
     async def _request_flush_to_disk(self):
+        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
         await self._persist()
         self._dirty_mutation_count = 0
         self._last_flush_time = time.time()
@@ -450,6 +463,8 @@ class EntryWritingRuntime:
         - no partial state is ever visible
         - no validation or coercion occurs here
         """
+        logger.warning("[PERSIST ENTERED]")
+        logger.warning("WRITING TO: %s", self._entries_path)
         # ------------------------------------------
         # Before trying to write, 
         # Double check that the filepath that the rest of the software expects actually exists.
@@ -480,13 +495,13 @@ class EntryWritingRuntime:
 
         embedding_snapshot = copy.deepcopy(self._embeddings)
 
-        logging.debug("IN-MEMORY:", len(self._embeddings))
+        logging.debug(f"IN-MEMORY: {len(self._embeddings)}")
 
         existing = 0
         for f in glob.glob("data/entries/*.npz"):
             existing += len(np.load(f).files)
 
-        logging.debug("ON-DISK TOTAL:", existing)
+        logging.debug(f"ON-DISK TOTAL: {existing}")
 
         with open(npz_tmp, "wb") as f:
             np.savez_compressed(f, **embedding_snapshot)

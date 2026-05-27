@@ -1,15 +1,10 @@
-// peridocs-misc-ux.js — unified UI state: theme, cooldowns, modals, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-26T15:44:00-04:00
+// peridocs-misc-ux.js — unified UI state: theme, cooldowns, toasts, feedback/entry, privacy toast 
+// save-state 2026-05-26T16:40:40-04:00
 // ==========================================
 
 
 document.addEventListener("DOMContentLoaded", () => {
   // ---------------------- DOM Elements ---------------------- //
-  const feedbackModal = document.querySelector(".feedback-modal");
-  const feedbackBtns = document.querySelectorAll("#feedback-btn, .feedback-btn");
-  const reportBtns = document.querySelectorAll(".report-parse-btn");
-  const cancelBtn = document.getElementById("cancel-feedback");
-  const feedbackForm = document.querySelector("#feedback-form");
   const entryForm = document.querySelector('#entry-form');
 
   /* ================================
@@ -94,72 +89,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const themeBtn = document.getElementById('theme-toggle-btn');
   const root = document.documentElement;
 
-  // ---------------------- Crisis Modal ---------------------- //
-  const crisisModal = document.getElementById("crisis-modal");
-  const crisisCloseBtn = document.getElementById("crisis-close-btn");
-
-  // ---------------------- Unified Modal ---------------------- //
-  function openModal(type="feedback") {
-    let modal;
-    if(type === "crisis") {
-      modal = crisisModal;
-    } else {
-      modal = feedbackModal;
-    }
-    if(!modal) return;
-
-    modal.style.display = "flex";
-    document.body.style.overflow = "hidden";
-
-    // Only focus textarea for feedback/report
-    if(type !== "crisis") {
-      const ta = modal.querySelector("textarea");
-      if(ta) { 
-        ta.value = ""; 
-        ta.dataset.type = type; 
-        ta.focus(); 
-      }
-    }
-  }
-
-  function closeModal(type="feedback") {
-    let modal;
-    if(type === "crisis") {
-      modal = crisisModal;
-    } else {
-      modal = feedbackModal;
-    }
-    if(!modal) return;
-
-    modal.style.display = "none";
-    document.body.style.overflow = "";
-  }
-
-  // ---------------------- Hook up modal buttons ---------------------- //
-  feedbackBtns.forEach(btn => btn.addEventListener("click", () => openModal("feedback")));
-  reportBtns.forEach(btn => btn.addEventListener("click", () => openModal("report")));
-  cancelBtn?.addEventListener("click", () => closeModal("feedback"));
-  crisisCloseBtn?.addEventListener("click", () => closeModal("crisis"));
-
-  // Close modal when clicking outside
-  window.addEventListener("click", e => {
-    if (e.target === feedbackModal) closeModal("feedback");
-    if (e.target === crisisModal) closeModal("crisis");
-  });
-
-  // Close modal on Escape key
-  document.addEventListener("keydown", e => {
-    if (e.key === "Escape") {
-      closeModal("feedback");
-      closeModal("crisis");
-    }
-  });
-
-  // Expose globally
-  window.openFeedbackModal = () => openModal("feedback");
-  window.openReportModal = () => openModal("report");
-  window.openCrisisModal = () => openModal("crisis");
-
   // ---------------------- Persistent State Helper ---------------------- //
   const State = {
     _KEY_THEME: 'PeriDocs_Theme',
@@ -206,24 +135,6 @@ document.addEventListener("DOMContentLoaded", () => {
     state[type] = now;
     State.saveCooldowns(state);
     return true;
-  }
-
-  // ---------------------- Feedback/Report Form Submission ---------------------- //
-  if (feedbackForm) {
-    feedbackForm.addEventListener("submit", async e => {
-      const textarea = feedbackForm.querySelector('textarea'); // <-- Trying to prevent crisis entries from passing through
-      const type = textarea?.dataset.type || 'feedback';
-      if (!canSubmit(type)) return;
-
-      const payload = { feedback_text: textarea?.value.trim() || "", type, ip_hash:"unknown" };
-      try {
-        const res = await fetch(feedbackForm.action, { method:'POST', headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload) });
-        if (!res.ok) throw new Error('Network response not ok');
-        const data = await res.json();
-        if (data.status==="ok") { showToast(type==='feedback'?'Feedback submitted!':'Report submitted!', 'success'); feedbackForm.reset(); closeModal(type); }
-        else { showToast(data.message || 'Submission failed. Please try again.', 'error'); }
-      } catch (err) { console.error(err); showToast('Submission failed. Please try again.', 'error'); }
-    });
   }
 
   // ---------------------- Privacy / Cookie Notice ---------------------- //

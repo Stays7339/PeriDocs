@@ -614,6 +614,27 @@ The next mention is to control the width as button are added and removed from th
 }
 
 
+/* =========================
+   Modals
+========================= */
+.modal { display:none; position:fixed; inset:0; background: var(--modal-overlay-bg); backdrop-filter: blur(var(--modal-backdrop-blur)); justify-content:center; align-items:center; z-index: var(--modal-z); }
+.modal.is-active { display:flex; }
+.modal-content {
+  background: var(--modal-content-bg); border-radius: var(--modal-content-radius);
+  padding: var(--modal-content-padding); width: var(--modal-content-width);
+  max-width: var(--modal-content-max-width); box-shadow: var(--modal-content-shadow);
+}
+.modal-actions { display:flex; justify-content:flex-end; gap: var(--modal-actions-gap); }
+
+/* ---------------------- Feedback Modal ---------------------- */
+.feedback-modal{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:1002;}
+.feedback-modal-content{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
+.feedback-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+.feedback-modal.is-open {
+  display: flex;
+}
+
+
 
 /* ---------------------- Toasts Animation---------------------- */
 #general-toast-container{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:10px;pointer-events:none;z-index:1001;}
@@ -787,6 +808,7 @@ The next mention is to control the width as button are added and removed from th
   backdrop-filter: blur(var(--streaks-blur)) saturate(120%);
   border-radius:inherit; border:1px solid rgba(255,255,255,0.15);
   opacity:0; transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
+  overflow-y: auto;
 }
 .entry-wrapper[data-locked="true"] .entry-overlay { opacity:1; pointer-events:auto; }
 .entry-overlay-streaks {
@@ -799,6 +821,8 @@ The next mention is to control the width as button are added and removed from th
 .entry-wrapper[data-locked="true"] .entry-overlay-streaks {
   opacity:1; visibility:visible; transition: opacity 0.6s ease, visibility 0s;
 }
+
+.overlay-content { overflow-y: auto;}
 
 
 /* =========================
@@ -817,24 +841,6 @@ The next mention is to control the width as button are added and removed from th
 }
 .consent-toggle[data-state="on"] .toggle-knob { transform: translateX(var(--toggle-knob-transform-on)); }
 .consent-toggle[data-state="on"] { background: var(--accent); color: var(--white); }
-
-/* =========================
-   Modals
-========================= */
-.modal { display:none; position:fixed; inset:0; background: var(--modal-overlay-bg); backdrop-filter: blur(var(--modal-backdrop-blur)); justify-content:center; align-items:center; z-index: var(--modal-z); }
-.modal.is-active { display:flex; }
-.modal-content {
-  background: var(--modal-content-bg); border-radius: var(--modal-content-radius);
-  padding: var(--modal-content-padding); width: var(--modal-content-width);
-  max-width: var(--modal-content-max-width); box-shadow: var(--modal-content-shadow);
-}
-.modal-actions { display:flex; justify-content:flex-end; gap: var(--modal-actions-gap); }
-
-/* ---------------------- Feedback Modal ---------------------- */
-.feedback-modal{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:1002;}
-.feedback-modal-content{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
-.feedback-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
-
 
 /* =========================
    FONTS
