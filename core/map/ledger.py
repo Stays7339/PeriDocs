@@ -14,6 +14,7 @@ Sole authority for:
 """
 
 import os
+import copy
 import json
 import logging
 import asyncio

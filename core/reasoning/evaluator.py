@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/evaluator.py
-# Save-state: 2026-04-22T19:52:40-04:00
+# Save-state: 2026-05-27T22:05:10-04:00
 # ==========================================
 
 from __future__ import annotations
@@ -217,6 +217,11 @@ def integrate_inference(
     - diversity weighting
 
     Returns whether it meaningfully changed pool_of_active_concepts.
+
+    it functions as a property of how concepts evolve over time, not how they are selected or emitted. 
+    In practical terms, it biases the long-term shape of the concept pool 
+    rather than initial heuristic firing. 
+    That is internally coherent with your model.
     """
 
     from .damping import apply_damping  # local import to avoid cycles

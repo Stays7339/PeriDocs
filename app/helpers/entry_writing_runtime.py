@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-27T20:14:07-04:00
+# Save-state: 2026-05-27T23:12:00-04:00
 # ==========================================
 import asyncio
 import copy
@@ -305,7 +305,7 @@ class EntryWritingRuntime:
         logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
 
         while True:
-            logger.debug("[FlushWorker] heartbeat loop tick")
+            # logger.debug("[FlushWorker] heartbeat loop tick")
             try:
                 try:
                     # wait for signal or timeout
@@ -336,13 +336,13 @@ class EntryWritingRuntime:
     def _should_flush_to_disk(self) -> bool:
         now = time.time()
         time_since_flush = now - self._last_flush_time
-
+        """
         logger.debug(
             "[FlushCheck] dirty=%d time=%f",
             self._dirty_mutation_count,
             time_since_flush
         )
-
+        """
         if self._dirty_mutation_count >= self._max_mutations_before_flush:
             return True
 
@@ -354,8 +354,8 @@ class EntryWritingRuntime:
 
     async def _signal_dirty_queue(self) -> None:
         # lightweight wake-up signal only. Does not actually flush.
-        logger.debug("[FlushSignal] dirty=%d", self._dirty_mutation_count)
-        logger.warning("[SIGNAL runtime id=%s dirty=%d]", id(self), self._dirty_mutation_count)
+        # logger.debug("[FlushSignal] dirty=%d", self._dirty_mutation_count)
+        # logger.warning("[SIGNAL runtime id=%s dirty=%d]", id(self), self._dirty_mutation_count)
         if self._flush_queue.empty():
             await self._flush_queue.put(True)
     
@@ -460,66 +460,100 @@ class EntryWritingRuntime:
         await self._signal_dirty_queue()
 
     async def _persist(self) -> None:
-        """
-        Deterministic snapshot persistence.
-
-        Guarantees:
-        - JSON is atomically written
-        - NPZ is atomically written
-        - no partial state is ever visible
-        - no validation or coercion occurs here
-        """
         logger.warning("[PERSIST ENTERED]")
-        logger.warning("WRITING TO: %s", self._entries_path)
-        # ------------------------------------------
-        # Before trying to write, 
-        # Double check that the filepath that the rest of the software expects actually exists.
-        # ------------------------------------------
-        os.makedirs(os.path.dirname(self._npz_path), exist_ok=True)
-        
-        # ------------------------------------------
-        # JSON SNAPSHOT (source of truth)
-        # ------------------------------------------
-        snapshot = json_safe(copy.deepcopy(self._entries))
+        logger.warning("WRITING TO JSON: %s", self._entries_path)
+        logger.warning("WRITING TO NPZ: %s", self._npz_path)
+        logger.debug("CWD=%s PID=%s", os.getcwd(), os.getpid())
 
-        json_tmp = f"{self._entries_path}.{os.getpid()}.tmp"
+        json_dir = os.path.dirname(self._entries_path)
+        npz_dir = os.path.dirname(self._npz_path)
 
-        with open(json_tmp, "w", encoding="utf-8") as f:
-            json.dump(snapshot, f, ensure_ascii=False, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
+        os.makedirs(json_dir, exist_ok=True)
+        os.makedirs(npz_dir, exist_ok=True)
 
-        os.replace(npz_tmp, self._npz_path)
+        # ============================================================
+        # 1. JSON WRITE (MUST NEVER BE TIED TO NPZ SUCCESS)
+        # ============================================================
+        try:
+            snapshot = json_safe(copy.deepcopy(self._entries))
+            json_tmp = f"{self._entries_path}.{os.getpid()}.tmp"
 
-        # ------------------------------------------
-        # NPZ SNAPSHOT (derived embeddings cache)
-        # ------------------------------------------
-        npz_tmp = f"{self._npz_path}.{os.getpid()}.tmp"
+            logger.debug("JSON tmp path=%s", json_tmp)
 
-        os.makedirs(os.path.dirname(self._npz_path), exist_ok=True)
+            with open(json_tmp, "w", encoding="utf-8") as f:
+                json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                f.flush()
+                os.fsync(f.fileno())
+
+            os.replace(json_tmp, self._entries_path)
+
+            logger.info("[PERSIST] JSON committed successfully -> %s", self._entries_path)
+
+        except Exception as e:
+            logger.exception("[PERSIST] CRITICAL: JSON write failed: %s", e)
+            raise  # ONLY JSON failure should crash system
+
+        # ------------------------------------------------------------
+        # 2. WRITE NPZ
+        # ------------------------------------------------------------
+        logger.debug("Calling np.savez_compressed...")
 
         embedding_snapshot = copy.deepcopy(self._embeddings)
 
-        logging.debug(f"IN-MEMORY: {len(self._embeddings)}")
+        pid = os.getpid()
+        tmp_path = f"{self._npz_path}.tmp.{pid}.{time.time_ns()}.npz"
 
-        existing = 0
-        if logger.isEnabledFor(logging.DEBUG):
-            for f in glob.glob(os.path.join(tmp_dir, "*.npz")):
-                existing += len(np.load(f).files)
+        logger.debug("NPZ tmp path=%s", tmp_path)
 
-        logging.debug(f"ON-DISK TOTAL: {existing}")
+        try:
+            np.savez_compressed(tmp_path, **embedding_snapshot) # When tmp_path does NOT end in .npz, NumPy always transforms it, so it is added here
+            logger.debug("np.savez_compressed returned")
 
-        np.savez_compressed(npz_tmp, **embedding_snapshot)
-        os.replace(npz_tmp, self._npz_path)
+            # DO NOT USE os.path.exists HERE
+            if not os.path.isfile(tmp_path):
+                raise RuntimeError(f"[Persist] tmp NPZ not found as file: {tmp_path}")
 
-        os.replace(npz_tmp, self._npz_path)
+            # sanity check (lightweight, reliable)
+            if os.path.getsize(tmp_path) == 0:
+                raise RuntimeError(f"[Persist] tmp NPZ is empty: {tmp_path}")
 
-        logger.info(
-            "[PersistOK] entries=%d embeddings=%d",
-            len(self._entries),
-            len(self._embeddings),
-        )
+            fd = os.open(tmp_path, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
 
+            committed = False
+            last_err = None
+
+            for attempt in range(5):
+                try:
+                    os.replace(tmp_path, self._npz_path)
+                    committed = True
+                    break
+                except Exception as e:
+                    last_err = e
+                    logger.warning(
+                        "[Persist] os.replace failed attempt=%d err=%s",
+                        attempt + 1,
+                        repr(e)
+                    )
+                    time.sleep(0.05 * (attempt + 1))
+
+            if not committed:
+                raise RuntimeError(f"[Persist] failed to commit NPZ after retries: {last_err}")
+
+            logger.debug("NPZ commit complete -> %s", self._npz_path)
+
+        except Exception:
+            logger.exception("[Persist] NPZ write failed")
+            try:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            except Exception:
+                pass
+            return
+            
     async def shutdown(self) -> None:
         """
         Graceful shutdown of EntryWritingRuntime.
@@ -605,19 +639,32 @@ class EntryWritingRuntime:
 
         return data
 
+
     def _load_entries_embeddings_from_disk(self) -> None:
         self._embeddings = {}
 
         entries_dir = os.path.dirname(self._entries_path)
-        mean_files = sorted(
-            glob.glob(os.path.join(entries_dir, "entries_mean_embeddings_dump.npz"))
-        )
+        file_path = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
 
-        for file_path in mean_files:
+        if not os.path.exists(file_path):
+            logger.warning("[NPZ LOAD] missing file, skipping: %s", file_path)
+            return
+
+        try:
+            # validate before trusting
             with np.load(file_path) as data:
                 for k, v in data.items():
-                    self._embeddings[k] = v
+                    if isinstance(v, np.ndarray) and v.shape == (EMBEDDING_DIM,):
+                        self._embeddings[k] = v
+                    else:
+                        logger.warning("[NPZ LOAD] skipping invalid vector %s shape=%s", k, getattr(v, "shape", None))
 
+        except EOFError:
+            logger.error("[NPZ LOAD] corrupted NPZ (EOF), ignoring file: %s", file_path)
+
+        except Exception as e:
+            logger.error("[NPZ LOAD] unreadable NPZ: %s err=%s", file_path, e)
+                    
     async def get_embedding(self, entry_id: str):
         """
         Safe in-memory embedding read.

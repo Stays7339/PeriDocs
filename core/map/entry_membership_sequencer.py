@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-05-27T15:53:05-04:00
+# Save-state: 2026-05-27T23:38:00-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -262,7 +262,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
 
                 # ---- DEBUG: print centroid norm ----
                 centroid_norm = np.linalg.norm(c.current.vector)
-                logger.debug("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
+                logger.debug(f"CENTROID: {c.centroid_id} NORM: {centroid_norm}")
 
                 sim = cosine_similarity(entry_vec, c.current.vector)
 
