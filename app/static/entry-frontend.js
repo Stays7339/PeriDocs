@@ -1,5 +1,5 @@
 // entry-frontend.js — isolated entry submission + progress orchestration
-// save-state 2026-05-26T15:43:00-04:00
+// save-state 2026-05-27T20:20:10-04:00
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -65,13 +65,13 @@ document.addEventListener("DOMContentLoaded", () => {
             `${wsProtocol}://${window.location.host}/ws/progress/${data.entry_id}`
           );
 
-          ws.onopen = () => console.log("WS connected!");
-          ws.onclose = () => console.log("WS closed");
-          ws.onerror = (err) => console.error("WS error:", err);
+          ws.onopen = () => console.log("WebSocket connected!");
+          ws.onclose = () => console.log("WebSocket closed");
+          ws.onerror = (err) => console.error("WebSocket error:", err);
 
           ws.onmessage = (event) => {
             const msg = JSON.parse(event.data);
-            console.log("WS message received:", msg);
+            console.log("WebSocket message received:", msg);
 
             // ---------------------- Crisis check (Option A) ---------------------- //
             if (msg.type === "crisis" && !crisisTriggered) {

@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-25T16:02:50-04:00
+# save-state 2026-05-27T20:20:40-04:00
 # ==========================================
 
 import os
@@ -777,6 +777,11 @@ class AccountRuntime:
                 raise RuntimeError(
                     f"Invalid account object for user: {username}"
                 )
+
+            try:
+                decrypt_value(user["totp_secret_encrypted"])
+            except Exception:
+                raise RuntimeError(f"Corrupt encrypted secret for {username}")
 
             required_fields = {
                 "password_hash",

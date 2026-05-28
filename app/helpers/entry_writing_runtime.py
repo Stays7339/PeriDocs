@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-27T16:15:50-04:00
+# Save-state: 2026-05-27T20:14:07-04:00
 # ==========================================
 import asyncio
 import copy
@@ -57,6 +57,8 @@ class EntryWritingRuntime:
         # ----------------------------
         # Persistence coordination
         # ----------------------------
+        self._persist_lock = asyncio.Lock()
+
         self._flush_queue = asyncio.Queue()  # signals "something changed"
         self._dirty_mutation_count: int = 0
 
@@ -294,6 +296,10 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         logger.info("[entry_runtime] Full integrity passed (ledger ↔ entries ↔ embeddings fully consistent)")
 
+    async def _persist_guarded(self) -> None:
+        async with self._persist_lock:
+            await self._persist()
+            
     async def _flush_worker(self):
         logger.info("[EntryRuntime] Flush worker started.")
         logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
@@ -303,19 +309,23 @@ class EntryWritingRuntime:
             try:
                 try:
                     # wait for signal or timeout
-                    await asyncio.wait_for(self._flush_queue.get(), timeout=1.0)
+                    await asyncio.wait_for(self._flush_queue.get(), timeout=5.0)
                 except asyncio.TimeoutError:
                     pass
 
                 if self._shutdown_requested:
-                    if self._dirty_mutation_count > 0:
-                        await self._persist()
-                        self._dirty_mutation_count = 0
-                        self._last_flush_time = time.time()
-                    break
+                    try:
+                        # immediate final flush (no batching delay)
+                        if self._dirty_mutation_count > 0:
+                            await self._persist_guarded()
+                            self._dirty_mutation_count = 0
+                            self._last_flush_time = time.time()
+                    finally:
+                        # ensure loop always exits immediately
+                        return
 
                 if self._should_flush_to_disk():
-                    await self._persist()
+                    await self._persist_guarded()
                     self._dirty_mutation_count = 0
                     self._last_flush_time = time.time()
 
@@ -336,23 +346,19 @@ class EntryWritingRuntime:
         if self._dirty_mutation_count >= self._max_mutations_before_flush:
             return True
 
-        if self._dirty_mutation_count > 0 and time_since_flush >= self._max_seconds_without_flush:
-            return True
+        if self._dirty_mutation_count > 0:
+            if time_since_flush >= self._max_seconds_without_flush:
+                return True
 
         return False
 
-    async def _signal_flush(self) -> None:
-        # lightweight wake-up signal only
+    async def _signal_dirty_queue(self) -> None:
+        # lightweight wake-up signal only. Does not actually flush.
         logger.debug("[FlushSignal] dirty=%d", self._dirty_mutation_count)
         logger.warning("[SIGNAL runtime id=%s dirty=%d]", id(self), self._dirty_mutation_count)
         if self._flush_queue.empty():
             await self._flush_queue.put(True)
     
-    async def _request_flush_to_disk(self):
-        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
-        await self._persist()
-        self._dirty_mutation_count = 0
-        self._last_flush_time = time.time()
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
 
@@ -387,7 +393,7 @@ class EntryWritingRuntime:
         # ----------------------------
         # wake flush worker (non-blocking)
         # ----------------------------
-        await self._signal_flush()
+        await self._signal_dirty_queue()
         
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
@@ -451,7 +457,7 @@ class EntryWritingRuntime:
         self._embeddings[entry_id] = embedding # direct synchronous mutation
 
         self._dirty_mutation_count += 1
-        await self._signal_flush()
+        await self._signal_dirty_queue()
 
     async def _persist(self) -> None:
         """
@@ -469,44 +475,44 @@ class EntryWritingRuntime:
         # Before trying to write, 
         # Double check that the filepath that the rest of the software expects actually exists.
         # ------------------------------------------
-        os.makedirs(os.path.dirname(self._entries_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self._npz_path), exist_ok=True)
         
         # ------------------------------------------
         # JSON SNAPSHOT (source of truth)
         # ------------------------------------------
         snapshot = json_safe(copy.deepcopy(self._entries))
 
-        json_tmp = self._entries_path + ".tmp"
+        json_tmp = f"{self._entries_path}.{os.getpid()}.tmp"
 
         with open(json_tmp, "w", encoding="utf-8") as f:
             json.dump(snapshot, f, ensure_ascii=False, indent=2)
             f.flush()
             os.fsync(f.fileno())
 
-        os.replace(json_tmp, self._entries_path)
+        os.replace(npz_tmp, self._npz_path)
 
         # ------------------------------------------
         # NPZ SNAPSHOT (derived embeddings cache)
         # ------------------------------------------
-        npz_path = self._npz_path
-        npz_tmp = npz_path + ".tmp"
+        npz_tmp = f"{self._npz_path}.{os.getpid()}.tmp"
 
-        os.makedirs(os.path.dirname(npz_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self._npz_path), exist_ok=True)
 
         embedding_snapshot = copy.deepcopy(self._embeddings)
 
         logging.debug(f"IN-MEMORY: {len(self._embeddings)}")
 
         existing = 0
-        for f in glob.glob("data/entries/*.npz"):
-            existing += len(np.load(f).files)
+        if logger.isEnabledFor(logging.DEBUG):
+            for f in glob.glob(os.path.join(tmp_dir, "*.npz")):
+                existing += len(np.load(f).files)
 
         logging.debug(f"ON-DISK TOTAL: {existing}")
 
-        with open(npz_tmp, "wb") as f:
-            np.savez_compressed(f, **embedding_snapshot)
+        np.savez_compressed(npz_tmp, **embedding_snapshot)
+        os.replace(npz_tmp, self._npz_path)
 
-        os.replace(npz_tmp, npz_path)
+        os.replace(npz_tmp, self._npz_path)
 
         logger.info(
             "[PersistOK] entries=%d embeddings=%d",
@@ -608,9 +614,9 @@ class EntryWritingRuntime:
         )
 
         for file_path in mean_files:
-            data = np.load(file_path)
-            for k, v in data.items():
-                self._embeddings[k] = v
+            with np.load(file_path) as data:
+                for k, v in data.items():
+                    self._embeddings[k] = v
 
     async def get_embedding(self, entry_id: str):
         """
@@ -678,7 +684,7 @@ class EntryWritingRuntime:
         logger.info("[EntryRuntime] Entry %s stripped.", stripped_entry_id)
 
         self._dirty_mutation_count += 1
-        await self._signal_flush()
+        await self._signal_dirty_queue()
 
         return True
 
@@ -721,4 +727,4 @@ class EntryWritingRuntime:
         return self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
     
     async def request_flush(self) -> None:
-        await self._signal_flush()
+        await self._signal_dirty_queue()

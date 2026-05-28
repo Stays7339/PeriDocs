@@ -73,8 +73,8 @@ async def evaluate_centroid_candidates(
         ]
 
     for c in centroids:
-        logger.debug("entry_vec:", type(entry_vec))
-        logger.debug("centroid_vec:", type(c.current.vector))
+        logger.debug(f"entry_vec: {type(entry_vec)}")
+        logger.debug(f"centroid_vec: {type(c.current.vector)}")
         try:
             sim = cosine_similarity(entry_vec, c.current.vector)
         except ValueError:
@@ -251,7 +251,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
         entry_vec = await get_embedding_for_entry(entry_id)
 
         # ---- DEBUG: print entry norm ----
-        logger.debug("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
+        logger.debug(f"ENTRY: {entry_id} NORM: {np.linalg.norm(entry_vec)}")
 
         async with system._lock:
             if not system._centroids:

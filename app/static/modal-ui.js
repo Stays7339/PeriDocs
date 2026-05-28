@@ -1,5 +1,5 @@
 // modal-ui.js
-// save-state 2026-05-27T13:27:55-04:00
+// save-state 2026-05-27T20:21:00-04:00
 
 document.addEventListener("DOMContentLoaded", () => {
 
@@ -11,19 +11,18 @@ document.addEventListener("DOMContentLoaded", () => {
   );
 
   document.addEventListener("click", (e) => {
-    console.log("DOCUMENT CLICK FIRED");
+
 
     const btn = e.target.closest(".report-parse-btn");
 
-    console.log("BTN:", btn);
+
 
     if (!btn) return;
 
-    console.log("ABOUT TO OPEN");
+
 
     openModal("report");
 
-    console.log("OPEN CALLED");
   });
 
   const cancelBtn = document.getElementById("cancel-feedback");

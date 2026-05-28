@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-04-19T14:38:27-04:00
+# Save-state: 2026-05-27T20:31:27-04:00
 # ==========================================
 
 """
@@ -237,7 +237,7 @@ class IdentifierLedger:
 
     async def snapshot(self) -> Dict[str, Any]:
         async with _ledger_lock:
-            return json.loads(json.dumps(await _load()))
+            return copy.deepcopy(await _load())
 
     async def is_loaded(self) -> bool:
         return _ledger_cache is not None
