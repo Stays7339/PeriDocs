@@ -64,6 +64,9 @@ logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 
 load_dotenv()
 ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
+
+logger.warning("ProductionMode=%s", ProductionMode)
+
 app.state.production_mode = ProductionMode
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["ProductionMode"] = ProductionMode

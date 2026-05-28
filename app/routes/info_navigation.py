@@ -7,7 +7,7 @@
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.routes import app  # FastAPI instance from __init__.py
+from app.routes import app, ProductionMode  # FastAPI instance from __init__.py
 
 # Jinja2 templates directory
 templates = Jinja2Templates(directory="app/templates")
@@ -25,7 +25,7 @@ async def about(request: Request):
     """
     Render the Create Entry page.
     """
-    return templates.TemplateResponse("create-entry.html", {"request": request})
+    return templates.TemplateResponse("create-entry.html", {"request": request, "ProductionMode": ProductionMode,})
 
 
 @app.get("/about", response_class=HTMLResponse)

@@ -72,16 +72,44 @@ document.addEventListener("DOMContentLoaded", () => {
   applyConsentState(consentGranted);
 
   /* --- Listening For Click on the Consent Toggle (production mode sensitive) --- */
-  if (!productionMode && consentToggle) {
-    consentToggle.addEventListener("click", (e) => {
-      e.stopPropagation();
-      // Disable toggle for 3 seconds to prevent accidental double-click
+  if (consentToggle) {
+
+    // ------------------------------------------------
+    // PRODUCTION MODE:
+    // hard-disable consent interaction
+    // ------------------------------------------------
+    if (productionMode) {
+
       consentToggle.disabled = true;
-      setTimeout(() => {
-        consentToggle.disabled = false;
-      }, 3000);
-      applyConsentState(!consentGranted);
-    });
+
+      consentToggle.setAttribute("aria-disabled", "true");
+
+      // optional visual cue
+      consentToggle.classList.add("disabled");
+
+    }
+
+    // ------------------------------------------------
+    // DEVELOPMENT MODE:
+    // allow normal interaction
+    // ------------------------------------------------
+    else {
+
+      consentToggle.addEventListener("click", (e) => {
+
+        e.stopPropagation();
+
+        consentToggle.disabled = true;
+
+        setTimeout(() => {
+          consentToggle.disabled = false;
+        }, 3000);
+
+        applyConsentState(!consentGranted);
+
+      });
+
+    }
   }
 
   const toastContainer = document.querySelector("#general-toast-container");
