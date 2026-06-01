@@ -268,6 +268,35 @@ app/static/CabineyGrotesk_Complete/*
 
 ### Step 5. Run the App Locally
 
+FIRST, run these commands in terminal so that HTTPS (encrypted web connection) is working properly
+
+```bash
+uvicorn app.routes:app \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --proxy-headers \
+  --forwarded-allow-ips="*"
+```
+
+(or add them into systemd if you're running a server on Liunx)
+
+```bash
+ExecStart=/path/to/venv/bin/uvicorn app.routes:app \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --proxy-headers \
+  --forwarded-allow-ips=127.0.0.1
+  ```
+
+then for nginx configuration file
+
+```
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+THEN, AFTER you're done with that first command,
+
+
 Run this command inside the project folder:
 
 ```bash
@@ -279,6 +308,11 @@ You should see output similar to:
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
+
+(or for an already configured server)
+
+git pull && sudo systemctl restart peridocs
+
 
 ---
 
@@ -293,6 +327,12 @@ http://127.0.0.1:8000/
 You now have PeriDocs running locally.
 
 ---
+
+For public servers AFTER thoroughly configuring firewalld, nginx, let's encrypt, FastAPI, and systemctl 
+
+go to: {yourChosenName}.yourTopLevelDomain
+
+You should automatically get connected to HTTPS without having to specify it in your browser.
 
 ### Step 7. (Optional) Developer Tooling Setup
 

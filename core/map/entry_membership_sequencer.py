@@ -304,7 +304,7 @@ async def reconcile_centroid_membership_after_approval(
         event_index,
         len(entry_runtime._entries),
     )
-    logger.warning("[RECONCILE runtime id=%s]", id(entry_runtime))
+    logger.debug("[RECONCILE runtime id=%s]", id(entry_runtime))
 
     centroid_id = f"centroid_{centroid_suffix}"
     precentroid_id = f"precentroid_{centroid_suffix}"

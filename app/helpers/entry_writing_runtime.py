@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-05-27T23:12:00-04:00
+# Save-state: 2026-06-01T16:18:00-04:00
 # ==========================================
 import asyncio
 import copy
@@ -68,7 +68,32 @@ class EntryWritingRuntime:
 
         self._background_flush_worker = None
         self._shutdown_requested: bool = False
-        logger.warning("[INIT EntryRuntime] id=%s", id(self))
+        self._clause_embeddings: Dict[str, np.ndarray] = {}
+        self._clause_windows: Dict[str, np.ndarray] = {}
+        self._standout_flags: Dict[str, np.ndarray] = {}
+
+        self._clause_embeddings_npz_path = os.path.join(
+            DATA_DIR,
+            "entries",
+            "entries_clause_embeddings_dump.npz"
+        )
+
+        self._clause_windows_npz_path = os.path.join(
+            DATA_DIR,
+            "entries",
+            "entries_clause_windows_dump.npz"
+        )
+
+        self._standout_flags_npz_path = os.path.join(
+            DATA_DIR,
+            "entries",
+            "entries_standout_flags_dump.npz"
+        )
+        logger.debug("[INIT EntryRuntime] id=%s", id(self))
+
+        self._load_clause_embeddings_from_disk()
+        self._load_clause_windows_from_disk()
+        self._load_standout_flags_from_disk()
 
     async def initialize(self) -> None:
         """
@@ -77,7 +102,7 @@ class EntryWritingRuntime:
         Safe to call multiple times; only loads on first call.
         """
         logger.info("[EntryWritingRuntime] Starting initialize()")
-        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
+        logger.debug("ENTRY_RUNTIME_ID=%s", id(self))
 
         if self._initialized:
             return
@@ -120,7 +145,6 @@ class EntryWritingRuntime:
         entries_path = self._entries_path
         entries_dir = os.path.dirname(entries_path)
         mean_file = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
-        mean_files = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
 
         # ------------------------------------------------------------
         # LOAD LEDGER SNAPSHOT
@@ -187,32 +211,26 @@ class EntryWritingRuntime:
         # LOAD / REQUIRE EMBEDDING FILE BASED ON STATE
         # ------------------------------------------------------------
 
+
         if not os.path.exists(mean_file):
 
             if system_has_history:
-                # ---- STRICT MODE: data should exist ----
                 raise RuntimeError(
                     f"[entry_runtime] Missing embedding store but system has history. "
                     f"Cannot bootstrap safely: {mean_file}"
                 )
 
-            else:
-                # ---- COLD START MODE: safe to initialize ----
-                logger.warning(
-                    "[entry_runtime] Cold start detected. Creating empty embedding store."
-                )
-                np.savez(mean_file, _init=True)
-                mean_data = np.load(mean_file)
+            logger.debug("[entry_runtime] Cold start detected. No embedding store exists yet.")
+            mean_data = {}   # in-memory empty state only
 
         else:
-            # ---- NORMAL PATH ----
-            mean_data = np.load(mean_file)
-
-        try:
-            mean_data = np.load(mean_file)
-        except Exception as e:
-            raise RuntimeError(f"[entry_runtime] Failed to load canonical embedding file: {e}")
-        
+            try:
+                mean_data = np.load(mean_file)
+                mean_data = dict(mean_data)  # normalize NPZ -> dict view
+            except Exception as e:
+                raise RuntimeError(
+                    f"[entry_runtime] Failed to load canonical embedding file: {mean_file} | {e}"
+                )
 
         # ------------------------------------------------------------
         # BUILD ENTRY SETS (EMBEDDING TABLES)
@@ -302,7 +320,7 @@ class EntryWritingRuntime:
             
     async def _flush_worker(self):
         logger.info("[EntryRuntime] Flush worker started.")
-        logger.warning("ENTRY_RUNTIME_ID=%s", id(self))
+        logger.debug("ENTRY_RUNTIME_ID=%s", id(self))
 
         while True:
             # logger.debug("[FlushWorker] heartbeat loop tick")
@@ -459,10 +477,37 @@ class EntryWritingRuntime:
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
+    async def set_clause_windows(self, entry_id: str, windows: np.ndarray) -> None:
+        windows = np.asarray(windows, dtype=str)
+        self._clause_windows[entry_id] = windows
+        self._dirty_mutation_count += 1
+        await self._signal_dirty_queue()
+
+
+    async def set_clause_embeddings(self, entry_id: str, embeddings: np.ndarray) -> None:
+        embeddings = np.asarray(embeddings, dtype=np.float32)
+
+        if embeddings.ndim != 2:
+            raise RuntimeError("clause embeddings must be 2D")
+
+        if embeddings.shape[1] != EMBEDDING_DIM:
+            raise RuntimeError("invalid embedding dim")
+
+        self._clause_embeddings[entry_id] = embeddings
+        self._dirty_mutation_count += 1
+        await self._signal_dirty_queue()
+
+
+    async def set_standout_flags(self, entry_id: str, flags: np.ndarray) -> None:
+        flags = np.asarray(flags, dtype=bool)
+        self._standout_flags[entry_id] = flags
+        self._dirty_mutation_count += 1
+        await self._signal_dirty_queue()
+
     async def _persist(self) -> None:
-        logger.warning("[PERSIST ENTERED]")
-        logger.warning("WRITING TO JSON: %s", self._entries_path)
-        logger.warning("WRITING TO NPZ: %s", self._npz_path)
+        logger.debug("[PERSIST ENTERED]")
+        logger.debug("WRITING TO JSON: %s", self._entries_path)
+        logger.debug("WRITING TO NPZ: %s", self._npz_path)
         logger.debug("CWD=%s PID=%s", os.getcwd(), os.getpid())
 
         json_dir = os.path.dirname(self._entries_path)
@@ -494,7 +539,7 @@ class EntryWritingRuntime:
             raise  # ONLY JSON failure should crash system
 
         # ------------------------------------------------------------
-        # 2. WRITE NPZ
+        # 2A. WRITE NPZ
         # ------------------------------------------------------------
         logger.debug("Calling np.savez_compressed...")
 
@@ -543,6 +588,25 @@ class EntryWritingRuntime:
             if not committed:
                 raise RuntimeError(f"[Persist] failed to commit NPZ after retries: {last_err}")
 
+            # ============================================================
+            # 2B. CLAUSE-LEVEL NPZ WRITES
+            # ============================================================
+
+            np.savez_compressed(
+                self._clause_embeddings_npz_path,
+                **self._clause_embeddings
+            )
+
+            np.savez_compressed(
+                self._clause_windows_npz_path,
+                **self._clause_windows
+            )
+
+            np.savez_compressed(
+                self._standout_flags_npz_path,
+                **self._standout_flags
+            )
+
             logger.debug("NPZ commit complete -> %s", self._npz_path)
 
         except Exception:
@@ -553,6 +617,8 @@ class EntryWritingRuntime:
             except Exception:
                 pass
             return
+
+        
             
     async def shutdown(self) -> None:
         """
@@ -720,6 +786,9 @@ class EntryWritingRuntime:
             "crisis_flag": target.get("crisis_flag"),
         }
 
+        self._clause_windows.pop(entry_id, None)
+        self._standout_flags.pop(entry_id, None)
+
         index = self._entries.index(target)
 
         self._entries[index] = stripped
@@ -775,3 +844,113 @@ class EntryWritingRuntime:
     
     async def request_flush(self) -> None:
         await self._signal_dirty_queue()
+
+    def _load_clause_embeddings_from_disk(self) -> None:
+        self._clause_embeddings = {}
+
+        if not os.path.exists(self._clause_embeddings_npz_path):
+            logger.warning(
+                "[NPZ LOAD] missing clause embeddings file: %s",
+                self._clause_embeddings_npz_path,
+            )
+            return
+
+        try:
+            with np.load(self._clause_embeddings_npz_path) as data:
+                for k, v in data.items():
+
+                    if not isinstance(v, np.ndarray):
+                        continue
+
+                    if v.ndim != 2:
+                        continue
+
+                    if v.shape[1] != EMBEDDING_DIM:
+                        continue
+
+                    self._clause_embeddings[k] = v
+
+        except Exception as e:
+            logger.exception(
+                "[NPZ LOAD] failed clause embeddings load: %s",
+                e,
+            )
+    
+    def _load_clause_windows_from_disk(self) -> None:
+        self._clause_windows = {}
+
+        if not os.path.exists(self._clause_windows_npz_path):
+            logger.warning(
+                "[NPZ LOAD] missing clause windows file: %s",
+                self._clause_windows_npz_path,
+            )
+            return
+
+        try:
+            with np.load(
+                self._clause_windows_npz_path,
+                allow_pickle=True
+            ) as data:
+
+                for k, v in data.items():
+
+                    if not isinstance(v, np.ndarray):
+                        continue
+
+                    self._clause_windows[k] = v
+
+        except Exception as e:
+            logger.exception(
+                "[NPZ LOAD] failed clause windows load: %s",
+                e,
+            )
+
+    def _load_standout_flags_from_disk(self) -> None:
+        self._standout_flags = {}
+
+        if not os.path.exists(self._standout_flags_npz_path):
+            logger.warning(
+                "[NPZ LOAD] missing standout flags file: %s",
+                self._standout_flags_npz_path,
+            )
+            return
+
+        try:
+            with np.load(self._standout_flags_npz_path) as data:
+
+                for k, v in data.items():
+
+                    if not isinstance(v, np.ndarray):
+                        continue
+
+                    if v.dtype != np.bool_:
+                        continue
+
+                    self._standout_flags[k] = v
+
+        except Exception as e:
+            logger.exception(
+                "[NPZ LOAD] failed standout flags load: %s",
+                e,
+            )
+    
+    async def get_clause_embeddings(
+        self,
+        entry_id: str,
+    ) -> np.ndarray | None:
+
+        return self._clause_embeddings.get(entry_id)
+
+    async def get_clause_windows(
+        self,
+        entry_id: str,
+    ):
+
+        return self._clause_windows.get(entry_id)
+
+    async def get_standout_flags(
+        self,
+        entry_id: str,
+    ):
+
+        return self._standout_flags.get(entry_id)

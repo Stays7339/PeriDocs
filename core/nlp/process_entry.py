@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-04-27T01:51:00-04:00
+# save-state 2026-05-29T12:10:00-04:00
 # ==========================================
 
 
@@ -72,6 +72,56 @@ async def process_entry_async(
 
     # ---------------- GENERATE EMBEDDING ----------------
     clause_embeddings = await get_embedding_async(windows)
+    standout_flags = highlight_standout_clauses(
+        np.asarray(clause_embeddings, dtype=np.float32),
+        threshold=0.65
+    )
+
+    standout_records = []
+
+    for idx, is_standout in enumerate(standout_flags):
+
+        if not is_standout:
+            continue
+
+        standout_records.append({
+            "window_index": idx,
+            "window_text": windows[idx],
+        })
+
+    # -------------------------------------------------
+    # CLAUSE EMBEDDING VALIDATION
+    # -------------------------------------------------
+    if clause_embeddings is None:
+        raise RuntimeError("Clause embeddings returned None")
+
+    clause_embeddings = np.asarray(clause_embeddings, dtype=np.float32)
+
+    if clause_embeddings.ndim != 2:
+        raise RuntimeError(
+            f"Clause embeddings must be rank-2 matrix, got shape={clause_embeddings.shape}"
+        )
+
+    if clause_embeddings.shape[0] == 0:
+        raise RuntimeError("Clause embedding matrix is empty")
+
+    if clause_embeddings.shape[1] != EMBEDDING_DIM:
+        raise RuntimeError(
+            f"Invalid clause embedding dimension: {clause_embeddings.shape}"
+        )
+
+    if np.isnan(clause_embeddings).any():
+        raise RuntimeError("NaN detected in clause embeddings")
+
+    if np.isinf(clause_embeddings).any():
+        raise RuntimeError("Inf detected in clause embeddings")
+
+    zero_rows = np.all(clause_embeddings == 0, axis=1)
+
+    if np.any(zero_rows):
+        raise RuntimeError(
+            f"Zero-vector clause embeddings detected at rows={np.where(zero_rows)[0].tolist()}"
+        )
     
     doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
 
@@ -149,6 +199,9 @@ async def process_entry_async(
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
     if not crisis_msg:
         await entry_runtime.set_embedding(entry_id, doc_embedding)
+        await entry_runtime.set_clause_windows(entry_id, windows)
+        await entry_runtime.set_clause_embeddings(entry_id, clause_embeddings)
+        await entry_runtime.set_standout_flags(entry_id, standout_flags)
 
     report_progress()  # 7 / total_steps
 
@@ -211,12 +264,3 @@ async def process_entry_async(
 
     # ---------------- RETURN ENTRY + TOKEN ---------------------
     return {**entry, "delete_token": delete_token}  # pass token to caller
-
-# ---------------- Sync Wrapper (meaning not asynchronous) ----------------
-def process_entry(text: str, user_ip: str, max_words_in_window_of_clauses: int = 100) -> Dict[str, Any]:
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        # Run async safely if we're already in an event loop
-        return loop.run_until_complete(process_entry_async(text, user_ip, max_words_in_window_of_clauses))
-    else:
-        return asyncio.run(process_entry_async(text, user_ip, max_words_in_window_of_clauses))

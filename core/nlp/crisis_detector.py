@@ -274,7 +274,7 @@ async def check_crisis_phrases_async(
                     continue
                 hits.append(phrase)
                 if DEBUG:
-                    logger.warning(f"[CRISIS DEBUG] Token match '{phrase}' via {window}")
+                    logger.debug(f"[CRISIS DEBUG] Token match '{phrase}' via {window}")
                 break
 
     # CHANNEL 2: compressed-text substring detection
@@ -283,7 +283,7 @@ async def check_crisis_phrases_async(
         if phrase_comp in compressed:
             hits.append(phrase)
             if DEBUG:
-                logger.warning(f"[CRISIS DEBUG] Compressed match '{phrase}' in '{compressed}'")
+                logger.debug(f"[CRISIS DEBUG] Compressed match '{phrase}' in '{compressed}'")
 
     # CHANNEL 3: implicit self-harm anchors
     for i, tok in enumerate(tokens):
@@ -293,7 +293,7 @@ async def check_crisis_phrases_async(
             if self_ref_present and (any(t in TEMPORAL_COMMITMENTS for t in window) or any(t in COGNITIVE_INTENT_VERBS for t in window)):
                 hits.append(f"implicit:{tok}")
                 if DEBUG:
-                    logger.warning(f"[CRISIS DEBUG] Implicit anchor '{tok}' with context {window}")
+                    logger.debug(f"[CRISIS DEBUG] Implicit anchor '{tok}' with context {window}")
 
     # CHANNEL 4: risk-indicator detection (self or others)
     for i, tok in enumerate(tokens):
@@ -309,7 +309,7 @@ async def check_crisis_phrases_async(
             # SAFE bigram → hard ignore
             if tok == "hang" and bigram in SAFE_HANG_BIGRAMS:
                 if DEBUG:
-                    logger.warning(f"[CRISIS DEBUG] Safe hang bigram ignored: {bigram}")
+                    logger.debug(f"[CRISIS DEBUG] Safe hang bigram ignored: {bigram}")
                 continue
 
             # RISK bigram → force elevation
@@ -331,7 +331,7 @@ async def check_crisis_phrases_async(
                 label = "risk:self" if self_ref else "risk:other"
                 hits.append(f"{label}:{tok}")
                 if DEBUG:
-                    logger.warning(
+                    logger.debug(
                         f"[CRISIS DEBUG] Risk indicator '{tok}' ({label}) "
                         f"via {'bigram' if force_risk else 'context'} "
                         f"with window {window}"
@@ -345,19 +345,19 @@ async def check_crisis_phrases_async(
                 self_ref_present = any(t in SELF_REFERENT_ANCHORS for t in tokens[max(0, i-3):i+5])
                 hits.append(f"intent:{target_verb}")
                 if DEBUG:
-                    logger.warning(f"[CRISIS DEBUG] Intent phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
+                    logger.debug(f"[CRISIS DEBUG] Intent phrase detected: '{tok} {tokens[i+1]} {tokens[i+2]}' with self-ref={self_ref_present}")
 
     # CHANNEL 6: chemical and pool ingestion
     if any(t in CHEMICAL_INGESTION for t in tokens) and any(t in SELF_REFERENT_ANCHORS for t in tokens):
         hits.append("risk:self:chemical")
         if DEBUG:
-            logger.warning(f"[CRISIS DEBUG] Chemical ingestion detected with tokens {tokens}")
+            logger.debug(f"[CRISIS DEBUG] Chemical ingestion detected with tokens {tokens}")
 
     if "pool" in tokens or "backyard" in tokens:
         if any(t in SELF_REFERENT_ANCHORS for t in tokens):
             hits.append("risk:self:pool")
             if DEBUG:
-                logger.warning(f"[CRISIS DEBUG] Pool drowning phrase detected with tokens {tokens}")
+                logger.debug(f"[CRISIS DEBUG] Pool drowning phrase detected with tokens {tokens}")
 
     # CHANNEL 7: human-abuse / illegal activity detection
     for i, tok in enumerate(tokens):
@@ -366,7 +366,7 @@ async def check_crisis_phrases_async(
             if any(t in CONTROL_ANCHORS for t in window) and any(t in SELF_REFERENT_ANCHORS for t in window) and not any(t in SAFE_CONTEXT for t in window):
                 hits.append("risk:self:abuse")
                 if DEBUG:
-                    logger.warning(f"[CRISIS DEBUG] Human-abuse phrase detected with window {window}")
+                    logger.debug(f"[CRISIS DEBUG] Human-abuse phrase detected with window {window}")
 
     return list(dict.fromkeys(hits))
 

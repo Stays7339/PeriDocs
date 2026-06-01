@@ -1,8 +1,7 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-05-27T15:25:25-04:00 (ISO 8601)
+# save-state 2026-06-01T00:28:50-04:00 (ISO 8601)
 # ========================================== 
-
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 import asyncio
@@ -55,6 +54,7 @@ logging.getLogger("uvicorn.access").addFilter(FilterStatic())
 
 
 # ********* app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None) is important for not leaving the backend publicly exposed *********
+# for a cautious example, enabling /openapi.json becomes a full system map of all internal routes.
 app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
 logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 
@@ -106,6 +106,8 @@ app.add_middleware(
 )
 
 
+
+
 """
 CSP (Content Security Policy) generally asks:
 “Considering everything across the open internet, what scripts/resources is this page allowed to load and execute at all?”
@@ -124,7 +126,7 @@ CSRF protection is enforced by your backend when accepting sensitive requests.
 It helps protect against mistakenly trusting the API requests, even if the attacker cannot usually read responses.
 
 HttpOnly = “JavaScript cannot read or steal the proof”
-Secure = “The proof is only sent over HTTPS connections”
+Secure = “The proof is only sent over HTTPS connections” Also, this doesn't matter if the force_https_in_production function is not active in the code.
 
 """
 
