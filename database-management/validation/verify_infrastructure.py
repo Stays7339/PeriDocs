@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
 import sys
+import json
+from pathlib import Path
 from dotenv import load_dotenv
 
 # Explicitly pull workspace configuration secrets from .env
@@ -23,6 +25,9 @@ def test_database_infrastructure():
     if not admin_url_string:
         print("FAIL: DATABASE_URL variable missing from verification runtime environment.")
         sys.exit(1)
+
+    # Establish current folder routing to verify local file contracts
+    current_dir = Path(__file__).parent
 
     try:
         # ATOMIC FIX: Safely parse the URL into parameters and isolate target db name
@@ -60,7 +65,29 @@ def test_database_infrastructure():
                 assert not missing_roles, f"FAIL: Defined governance roles missing: {missing_roles}"
                 print("[PASS] Security identity primitives correctly mapped inside pg_catalog.")
 
-        # Check 4: Security Matrix & Access Privilege Leak Check
+                # New Check 4: Domain Table Structural Presence
+                # Map out explicit tables that must exist across our newly written DDL files
+                expected_tables = {
+                    'ADMIN': {'release_information'},
+                    'APP': {'users'},
+                    'CONTENT': {'resources'},
+                    'KB': {'concepts', 'concept_hierarchies', 'migration_reviews'},
+                    'INFERENCE': {'queries'},
+                    'NLP': {'pipeline_logs'},
+                    'SEARCH': {'retrieval_logs'},
+                    'AUDIT': {'governance_evidence_packets'}
+                }
+
+                for schema_name, tables in expected_tables.items():
+                    for table_name in tables:
+                        cur.execute("""
+                            SELECT 1 FROM information_schema.tables 
+                            WHERE table_schema = %s AND table_name = %s;
+                        """, (schema_name, table_name))
+                        assert cur.fetchone(), f"FAIL: Structural table missing: {schema_name}.{table_name}"
+                print("[PASS] Core domain relational tables verified active inside cluster schemas.")
+
+        # Check 5: Security Matrix & Access Privilege Leak Check
         with psycopg.connect(app_db_info) as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -71,6 +98,20 @@ def test_database_infrastructure():
                 assert not app_can_write_audit, "SECURITY EXPLOIT: peri_app user possesses write rights on AUDIT schema!"
                 assert not app_can_write_admin, "SECURITY EXPLOIT: peri_app user possesses write rights on ADMIN schema!"
                 print("[PASS] Privilege isolation boundaries locked. 'peri_app' runtime jailed.")
+
+        # # New Check 6: Data Contract Integrity Assertions
+        # # Programmatically validates the JSON validation blueprints 
+        # contract_files = ['inference_summary.json', 'nlp_metadata.json']
+        # for contract in contract_files:
+        #     contract_path = current_dir / 'contracts' / contract
+        #     assert contract_path.is_file(), f"FAIL: Verification contract missing at: {contract_path}"
+            
+        #     with open(contract_path, 'r') as file_payload:
+        #         try:
+        #             json.load(file_payload)
+        #         except json.JSONDecodeError as json_fault:
+        #             raise AssertionError(f"FAIL: Data contract serialization error in {contract}: {json_fault}")
+        # print("[PASS] Python request ingestion ingestion contracts verified as valid JSON profiles.")
 
         print("\n====================================================================")
         print("  SUCCESS: ALL RELATIONAL INTEGRATION BOUNDARIES VERIFIED COMPLIANT  ")
@@ -83,4 +124,4 @@ def test_database_infrastructure():
 
 
 if __name__ == "__main__":
-    test_database_infrastructure();
+    test_database_infrastructure()

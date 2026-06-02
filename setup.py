@@ -56,7 +56,7 @@ def initialize_peridocs_database():
                 
                 if not exists:
                     print("Catalog 'peridocs_db' absent. Physicalizing base cluster storage...")
-                    apply_sql_blueprint(cur, "database/schemas/00_init_db.sql")
+                    apply_sql_blueprint(cur, "database-management/schemas/00_init_db.sql")
                 else:
                     print("Catalog 'peridocs_db' verified online.")
 
@@ -82,9 +82,12 @@ def initialize_peridocs_database():
         # STEP 4: Build out Multi-Schema and Least Privilege Role Paradigms
         with psycopg.connect(app_db_info, autocommit=True) as conn:
             with conn.cursor() as cur:
-                apply_sql_blueprint(cur, "database/schemas/01_roles_init.sql")
-                apply_sql_blueprint(cur, "database/schemas/02_schemas_init.sql")
-                apply_sql_blueprint(cur, "database/schemas/03_permissions.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/01_roles_init.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/02_schemas_init.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/03_permissions.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/content_tables.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/kb_tables.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/nlp_tables.sql")
                 
     except Exception as e:
         print(f"CRITICAL: Structural provisioning halted.\nDetails: {e}")
@@ -103,7 +106,7 @@ def main():
 
     # Step 3: Trigger your external validation runner file cleanly
     # This separates installation code from pipeline verification rules.
-    run_pipeline_script(os.path.join("database", "validation", "verify_infrastructure.py"))
+    run_pipeline_script(os.path.join("database-management", "validation", "verify_infrastructure.py"))
 
     print("\n====================================================================")
     print("  Success: Workspace synchronized cleanly. Environmental boundaries live.  ")
