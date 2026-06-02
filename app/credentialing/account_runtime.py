@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-05-27T20:20:40-04:00
+# save-state 2026-06-01T23:13-04:00
 # ==========================================
 
 import os
@@ -246,7 +246,8 @@ class AccountRuntime:
                     # =================================================
                     # 3. APPLY MUTATION
                     # =================================================
-                    self._apply_event(event)
+                    user_id = self._apply_event(event)
+                    event["_result_user_id"] = user_id
 
                     # mark dirty
                     self._changes_waiting_to_be_saved += 1
@@ -488,10 +489,16 @@ class AccountRuntime:
 
         self._pending_account_signups.pop(signup_token, None)
 
-        session_token = create_session(username)
+        # wait for queue to process (important)
+        await self._account_operation_queue.join()
+
+        user_id = await self._get_user_id_by_username(username)
+
+        session_token = create_session(user_id)
         csrf_token = generate_cross_site_request_forgery_token()
 
         return {
+            "user_id": user_id,
             "username": username,
             "session_token": session_token,
             "csrf_token": csrf_token,
@@ -504,7 +511,7 @@ class AccountRuntime:
     async def delete_account(
         self,
         *,
-        username: str,
+        user_id: str,
     ):
         """
         Queue account deletion.
@@ -515,7 +522,7 @@ class AccountRuntime:
 
         await self.enqueue_account_operation({
             "type": DELETE_ACCOUNT_EVENT,
-            "username": username,
+            "user_id": user_id,
         })
 
 
@@ -530,8 +537,7 @@ class AccountRuntime:
         plaintext_password: str,
     ) -> bool:
 
-        # snapshot-based read (no lock)
-        user = self._accounts_snapshot.get(username)
+        user = await self._get_user_object_by_username(username)
 
         if not user:
             return False
@@ -540,6 +546,17 @@ class AccountRuntime:
             user["password_hash"],
             plaintext_password
         )
+    async def _get_user_object_by_username(self, username: str):
+        for user in self._accounts_snapshot.values():
+            if user.get("username") == username:
+                return user
+        return None
+
+    async def _get_user_id_by_username(self, username: str):
+        for uid, user in self._accounts_snapshot.items():
+            if user.get("username") == username:
+                return uid
+        return None
 
     async def get_decrypted_totp_secret(
         self,
@@ -553,7 +570,7 @@ class AccountRuntime:
         - decryption only occurs during runtime
         """
 
-        user = self._accounts_snapshot.get(username)
+        user = await self._get_user_object_by_username(username)
 
         if not user:
             return None
@@ -594,7 +611,7 @@ class AccountRuntime:
         username: str
     ) -> Optional[str]:
 
-        user = self._accounts_snapshot.get(username)
+       user = await self._get_user_object_by_username(username)
 
         if not user:
             return None
@@ -603,7 +620,7 @@ class AccountRuntime:
 
     async def get_user_snapshot(
         self,
-        username: str
+        user_id: str
     ) -> Optional[Dict[str, Any]]:
         """
         Returns deep copy of user state.
@@ -611,7 +628,7 @@ class AccountRuntime:
         Internal state MUST NEVER be exposed directly.
         """
 
-        user = self._accounts_snapshot.get(username)
+        user = self._accounts_snapshot.get(user_id)
 
         if not user:
             return None
@@ -863,15 +880,16 @@ class AccountRuntime:
         logger.info(
             "[AccountRuntime] Shutdown complete."
         )
-        
+    
     def _apply_event(
         self,
         event: Dict[str, Any]
-    ) -> None:
+    ) -> str:
 
         event_type = event.get("type")
 
         if event_type == CREATE_ACCOUNT_EVENT:
+            user_id = secrets.token_hex(32)
 
             username = event["username"]
 
@@ -883,8 +901,8 @@ class AccountRuntime:
                 else "ordinary"
             )
 
-            self._accounts_snapshot[username] = {
-                "user_id": secrets.token_hex(32),
+            self._accounts_snapshot[user_id] = {
+                "user_id": user_id,
                 "username": username,
                 "password_hash": event["password_hash"],
                 "totp_secret_encrypted": encrypt_value(
@@ -899,26 +917,30 @@ class AccountRuntime:
                 role,
                 username
             )
+
+            return user_id
         
         elif event_type == DELETE_ACCOUNT_EVENT:
 
-            username = event["username"]
+            user_id = event["user_id"]
 
             deleted_user = self._accounts_snapshot.pop(
-                username,
+                user_id,
                 None
             )
 
             if deleted_user is None:
 
                 raise RuntimeError(
-                    f"Account vanished during deletion: {username}"
+                    f"Account vanished during deletion: {user_id}"
                 )
 
             logger.info(
                 "[AccountRuntime] Deleted account: %s",
-                username
+                user_id
             )
+
+            return user_id
 
         else:
 

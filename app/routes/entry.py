@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-05-26T15:15:05 -04:00
+# save-state 2026-00-01T22:26-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -43,7 +43,7 @@ delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_t
 # ---------------- Active WebSocket connections ----------------
 active_ws_connections: dict[str, WebSocket] = {}
 
-async def process_entry_background(entry_text: str, user_ip: str, entry_id: str):
+async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,  user_id: str | None = None,):
     # ---------------- Wrap progress callback per entry_id ----------------
     def wrapped_progress(fraction: float):
         progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
@@ -117,6 +117,7 @@ async def submit_entry(
     entry_text: str | None = Form(None),
     background_tasks: BackgroundTasks = None
 ):
+    
     # Detect JSON
     if "application/json" in request.headers.get("content-type", ""):
         data = await request.json()

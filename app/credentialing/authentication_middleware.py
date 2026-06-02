@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-26T15:20:10-04:00
+# save-state 2026-06-01T22:35-04:00
 # ==========================================
 
 from fastapi import Request
@@ -22,6 +22,7 @@ async def auth_middleware(request: Request, call_next):
     # AUTH STATE DEFAULTS
     # ----------------------------
     request.state.is_authenticated = False
+    request.state.user_id = None
     request.state.username = None
     request.state.role = None
 
@@ -31,11 +32,11 @@ async def auth_middleware(request: Request, call_next):
         payload = verify_session(session)
 
         if payload:
-            user = await account_runtime.get_user_snapshot(payload["username"])
+            user = await account_runtime.get_user_snapshot(payload["user_id"])
 
             if user:
                 request.state.is_authenticated = True
-                request.state.username = payload["username"]
+                request.state.user_id = payload["user_id"]
                 request.state.role = user.get("role")
 
     # ----------------------------

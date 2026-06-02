@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-25T17:07:25-04:00
+# save-state 2026-06-01T22:53-04:00
 # ==========================================
 
 import io
@@ -185,7 +185,7 @@ async def signin(request: Request, data: SigninRequest):
             "Invalid signin"
         )
 
-    session_token = create_session(user["username"])
+    session_token = create_session(user["user_id"])
 
     csrf_token = (
         generate_cross_site_request_forgery_token()
@@ -298,15 +298,15 @@ async def delete_account(
     if not request.state.is_authenticated:
         raise HTTPException(401, "Unauthorized")
 
-    username = request.state.username
+    user_id = request.state.user_id
 
-    if not username:
+    if not user_id:
         raise HTTPException(401, "Unauthorized")
 
     # ----------------------------
     # Fetch user snapshot
     # ----------------------------
-    user = await account_runtime.get_user_snapshot(username)
+    user = await account_runtime._get_user_object_by_username(data.username)
 
     if not user:
         raise HTTPException(401, "Unauthorized")
@@ -323,7 +323,8 @@ async def delete_account(
     # ----------------------------
     # Perform deletion
     # ----------------------------
-    await account_runtime.delete_account(username=username)
+    user_id = request.state.user_id
+    await account_runtime.delete_account(user_id=user_id)
 
     # ----------------------------
     # Clear auth cookies
