@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-06-01T16:18:00-04:00
+# Save-state: 2026-06-03T11:21-04:00
 # ==========================================
 import asyncio
 import copy
@@ -42,6 +42,21 @@ class EntryWritingRuntime:
     Explicit non-responsibilities:
     - Does not enforce schema beyond existing structure
     - Does not infer or compute centroid data (caller provides it)
+
+    For Embeddings In Particular:
+    process_entry_async computes everything, 
+    and THEN multiple set_*() methods store state within entry_writing_runtime.py (this file).
+
+    All NPZ files share one invariant:
+
+    'key space = entry_id'
+
+    But each file stores a different projection:
+
+    mean embeddings → (1024,)
+    clause embeddings → (N, 1024)
+    windows → (N,) strings
+    flags → (N,) booleans
     """
 
     def __init__(self, ledger):

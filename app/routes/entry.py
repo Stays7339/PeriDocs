@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-00-01T22:26-04:00
+# save-state 2026-06-03T12:06-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -79,6 +79,7 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
 
     # ---------------- Store entry (strip embeddings) ----------------
     entry_for_journal = example_variable.copy()
+    entry_for_journal["user_id"] = user_id
     entry_for_journal.pop("embedding", None)
     entry_for_journal.pop("clause_embeddings", None)
     entry_for_journal.pop("delete_token", None)  # token not persisted
@@ -127,6 +128,8 @@ async def submit_entry(
         return JSONResponse({"status": "error", "message": "No entry provided"}, status_code=400)
 
     client_host = request.client.host if request.client else "127.0.0.1"
+    user_id = request.state.user_id
+    username = request.state.username
 
     # generate temporary entry_id for progress tracking
     temp_entry_id = f"pending_{np.random.randint(1_000_000, 9_999_999)}"
@@ -135,7 +138,7 @@ async def submit_entry(
     # ---------------- Start background processing ----------------
     background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id)
 
-    logger.debug("Submit function triggered for temp_id=%s", temp_entry_id)
+    logger.debug("Submit function triggered for temp_id=%s", temp_entry_id, user_id)
 
     # Immediate response for the user (entry submitted toast)
     return JSONResponse({

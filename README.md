@@ -400,7 +400,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-27T14:21:20-04:00
+## Canonical Project Directory as of 2026-06-03T10:50-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -527,8 +527,11 @@ PeriDocs/                         # Root project folder
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
-│  │   ├─ entries.json
-│  │   └─ entries_mean_embeddings_dump.npz
+│  │   ├─ entries.json # safe text in plaintext with encrypted raw text. Also important metadata is contained here.
+│  │   ├─ entries_clause_embeddings_dump.npz # embedding vectors for thousands of float numbers per every few sentences in each entry.
+│  │   ├─ entries_clause_windows_dump.npz # plain-text-safe-text is stored for how the windows of the entry were specifically partitioned.
+│  │   ├─ entries_mean_embeddings_dump.npz # embedding vectors for thousands of float numbers per every entry overall.
+│  │   └─ entries_standout_flags_dump.npz # true or false as to whether one part of the entry is drastically different from the rest of that same entry
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
@@ -576,6 +579,7 @@ PeriDocs/                         # Root project folder
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
+├─ audit_entries_store.py
 ├─ list_the_table_of_contents_for_this_npz_file.py
 ├─ requirements.txt          # Pinned Python dependencies
 └─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
