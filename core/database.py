@@ -59,3 +59,4 @@ async def get_db() -> AsyncGenerator[psycopg.AsyncConnection, None]:
     async with db_pool.connection() as session:
         async with session.transaction():
             yield session
+            
