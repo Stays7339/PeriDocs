@@ -31,7 +31,7 @@ from app.credentialing.account_runtime import (
 from core.nlp.embeddings import _load_model, get_embedding_async
 from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
-
+from core.database import database_lifespan
 
 
 
@@ -81,6 +81,9 @@ from app.routes import entry
 from app.routes import feedback
 
 # ---------------- Include router-based routes ----------------
+# Inject lifespan parameters
+app.router.lifespan_context = database_lifespan
+
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
 app.include_router(account_routing.router)
