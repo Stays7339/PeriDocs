@@ -10,8 +10,8 @@
 #
 # 1. entries.json
 # 2. entries_mean_embeddings_dump.npz
-# 3. entries_clause_embeddings_dump.npz
-# 4. entries_standout_flags_dump.npz
+# 3. entries_window_embeddings_dump.npz
+# 4. entries_standout_window_flags_dump.npz
 #
 # Checks:
 #
@@ -99,7 +99,7 @@ def validate_mean_embeddings(data):
     return hashes
 
 
-def validate_clause_embeddings(data):
+def validate_window_embeddings(data):
     hashes = set()
     clause_counts = {}
 
@@ -111,7 +111,7 @@ def validate_clause_embeddings(data):
 
         if len(v.shape) != 2:
             fail(
-                f"clause_embeddings: {key} "
+                f"window_embeddings: {key} "
                 f"expected 2D array got {v.shape}"
             )
             continue
@@ -122,21 +122,21 @@ def validate_clause_embeddings(data):
 
         if cols != EMBEDDING_DIM:
             fail(
-                f"clause_embeddings: {key} "
+                f"window_embeddings: {key} "
                 f"expected second dimension "
                 f"{EMBEDDING_DIM}, got {cols}"
             )
 
         if rows == 0:
-            fail(f"clause_embeddings: {key} contains zero clauses")
+            fail(f"window_embeddings: {key} contains zero clauses")
 
         elif np.all(v == 0):
-            fail(f"clause_embeddings: {key} all-zero matrix")
+            fail(f"window_embeddings: {key} all-zero matrix")
 
     return hashes, clause_counts
 
 
-def validate_standout_flags(data):
+def validate_standout_window_flags(data):
     hashes = set()
     flag_counts = {}
 
@@ -148,7 +148,7 @@ def validate_standout_flags(data):
 
         if len(v.shape) != 1:
             fail(
-                f"standout_flags: {key} "
+                f"standout_window_flags: {key} "
                 f"expected 1D array got {v.shape}"
             )
             continue
@@ -156,7 +156,7 @@ def validate_standout_flags(data):
         flag_counts[key] = len(v)
 
         if v.size == 0:
-            fail(f"standout_flags: {key} empty array")
+            fail(f"standout_window_flags: {key} empty array")
 
     return hashes, flag_counts
 
@@ -248,12 +248,12 @@ def main():
 
     clause_path = os.path.join(
         entries_dir,
-        "entries_clause_embeddings_dump.npz",
+        "entries_window_embeddings_dump.npz",
     )
 
     standout_path = os.path.join(
         entries_dir,
-        "entries_standout_flags_dump.npz",
+        "entries_standout_window_flags_dump.npz",
     )
 
     banner("LOADING FILES")
@@ -281,11 +281,11 @@ def main():
     mean_hashes = validate_mean_embeddings(mean_npz)
 
     clause_hashes, clause_counts = (
-        validate_clause_embeddings(clause_npz)
+        validate_window_embeddings(clause_npz)
     )
 
     standout_hashes, flag_counts = (
-        validate_standout_flags(standout_npz)
+        validate_standout_window_flags(standout_npz)
     )
 
     json_hashes = extract_entry_hashes(
@@ -319,13 +319,13 @@ def main():
     )
 
     compare_sets(
-        "clause_embeddings",
+        "window_embeddings",
         reference,
         clause_hashes,
     )
 
     compare_sets(
-        "standout_flags",
+        "standout_window_flags",
         reference,
         standout_hashes,
     )

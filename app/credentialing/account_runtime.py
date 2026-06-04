@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-06-01T23:13-04:00
+# save-state 2026-06-03T12:36-04:00
 # ==========================================
 
 import os
@@ -613,10 +613,10 @@ class AccountRuntime:
 
        user = await self._get_user_object_by_username(username)
 
-        if not user:
-            return None
+       if not user:
+        return None
 
-        return user.get("role")
+       return user.get("role")
 
     async def get_user_snapshot(
         self,
@@ -627,6 +627,8 @@ class AccountRuntime:
 
         Internal state MUST NEVER be exposed directly.
         """
+
+        logger.debug("[get_user_snapshot()] ACCOUNT_RUNTIME_ID=%s", id(account_runtime))
 
         user = self._accounts_snapshot.get(user_id)
 

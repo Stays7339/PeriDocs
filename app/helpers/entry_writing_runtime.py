@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-06-03T11:21-04:00
+# Save-state: 2026-06-03T14:05-04:00
 # ==========================================
 import asyncio
 import copy
@@ -53,10 +53,10 @@ class EntryWritingRuntime:
 
     But each file stores a different projection:
 
-    mean embeddings → (1024,)
-    clause embeddings → (N, 1024)
-    windows → (N,) strings
-    flags → (N,) booleans
+    mean_embeddings → (1024,)
+    window_embeddings → (N, 1024)
+    window_text → (N,) strings
+    standout_window_flags → (N,) booleans
     """
 
     def __init__(self, ledger):
@@ -83,32 +83,32 @@ class EntryWritingRuntime:
 
         self._background_flush_worker = None
         self._shutdown_requested: bool = False
-        self._clause_embeddings: Dict[str, np.ndarray] = {}
-        self._clause_windows: Dict[str, np.ndarray] = {}
-        self._standout_flags: Dict[str, np.ndarray] = {}
+        self._window_embeddings: Dict[str, np.ndarray] = {}
+        self._window_text: Dict[str, np.ndarray] = {}
+        self._standout_window_flags: Dict[str, np.ndarray] = {}
 
-        self._clause_embeddings_npz_path = os.path.join(
+        self._window_embeddings_npz_path = os.path.join(
             DATA_DIR,
             "entries",
-            "entries_clause_embeddings_dump.npz"
+            "entries_window_embeddings_dump.npz"
         )
 
-        self._clause_windows_npz_path = os.path.join(
+        self._window_text_npz_path = os.path.join(
             DATA_DIR,
             "entries",
-            "entries_clause_windows_dump.npz"
+            "entries_window_text_dump.npz"
         )
 
-        self._standout_flags_npz_path = os.path.join(
+        self._standout_window_flags_npz_path = os.path.join(
             DATA_DIR,
             "entries",
-            "entries_standout_flags_dump.npz"
+            "entries_standout_window_flags_dump.npz"
         )
         logger.debug("[INIT EntryRuntime] id=%s", id(self))
 
-        self._load_clause_embeddings_from_disk()
-        self._load_clause_windows_from_disk()
-        self._load_standout_flags_from_disk()
+        self._load_window_embeddings_from_disk()
+        self._load_window_text_from_disk()
+        self._load_standout_window_flags_from_disk()
 
     async def initialize(self) -> None:
         """
@@ -414,9 +414,10 @@ class EntryWritingRuntime:
         self._entries.append(entry)
         self._entry_index[entry_id] = entry
 
-        token_hash = entry.get("hash_from_token_for_deleting_entries")
-        if token_hash:
-            self._index_for_hashed_tokens_for_deleting_entries[token_hash] = entry
+        if entry.get("hash_from_token_for_deleting_entries"):
+            self._index_for_hashed_tokens_for_deleting_entries[
+                entry["hash_from_token_for_deleting_entries"]
+            ] = entry
 
         # ----------------------------
         # dirty tracking
@@ -492,14 +493,14 @@ class EntryWritingRuntime:
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
-    async def set_clause_windows(self, entry_id: str, windows: np.ndarray) -> None:
+    async def set_window_text(self, entry_id: str, windows: np.ndarray) -> None:
         windows = np.asarray(windows, dtype=str)
-        self._clause_windows[entry_id] = windows
+        self._window_text[entry_id] = windows
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
 
-    async def set_clause_embeddings(self, entry_id: str, embeddings: np.ndarray) -> None:
+    async def set_window_embeddings(self, entry_id: str, embeddings: np.ndarray) -> None:
         embeddings = np.asarray(embeddings, dtype=np.float32)
 
         if embeddings.ndim != 2:
@@ -508,14 +509,14 @@ class EntryWritingRuntime:
         if embeddings.shape[1] != EMBEDDING_DIM:
             raise RuntimeError("invalid embedding dim")
 
-        self._clause_embeddings[entry_id] = embeddings
+        self._window_embeddings[entry_id] = embeddings
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
 
-    async def set_standout_flags(self, entry_id: str, flags: np.ndarray) -> None:
+    async def set_standout_window_flags(self, entry_id: str, flags: np.ndarray) -> None:
         flags = np.asarray(flags, dtype=bool)
-        self._standout_flags[entry_id] = flags
+        self._standout_window_flags[entry_id] = flags
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
@@ -535,7 +536,24 @@ class EntryWritingRuntime:
         # 1. JSON WRITE (MUST NEVER BE TIED TO NPZ SUCCESS)
         # ============================================================
         try:
-            snapshot = json_safe(copy.deepcopy(self._entries))
+            PERSISTED_FIELDS = {
+                "entry_id",
+                "entry_nickname",
+                "timestamp",
+                "ip_hash",
+                "user_id",
+                "encrypted_raw_ip",
+                "encrypted_raw_text",
+                "safe_text",
+                "crisis_flag",
+                "hash_from_token_for_deleting_entries",
+                "centroids",
+            }
+
+            def project(entry):
+                return {k: entry.get(k) for k in PERSISTED_FIELDS}
+
+            snapshot = json_safe([project(e) for e in copy.deepcopy(self._entries)])
             json_tmp = f"{self._entries_path}.{os.getpid()}.tmp"
 
             logger.debug("JSON tmp path=%s", json_tmp)
@@ -608,18 +626,18 @@ class EntryWritingRuntime:
             # ============================================================
 
             np.savez_compressed(
-                self._clause_embeddings_npz_path,
-                **self._clause_embeddings
+                self._window_embeddings_npz_path,
+                **self._window_embeddings
             )
 
             np.savez_compressed(
-                self._clause_windows_npz_path,
-                **self._clause_windows
+                self._window_text_npz_path,
+                **self._window_text
             )
 
             np.savez_compressed(
-                self._standout_flags_npz_path,
-                **self._standout_flags
+                self._standout_window_flags_npz_path,
+                **self._standout_window_flags
             )
 
             logger.debug("NPZ commit complete -> %s", self._npz_path)
@@ -801,8 +819,8 @@ class EntryWritingRuntime:
             "crisis_flag": target.get("crisis_flag"),
         }
 
-        self._clause_windows.pop(entry_id, None)
-        self._standout_flags.pop(entry_id, None)
+        self._window_text.pop(entry_id, None)
+        self._standout_window_flags.pop(entry_id, None)
 
         index = self._entries.index(target)
 
@@ -860,18 +878,18 @@ class EntryWritingRuntime:
     async def request_flush(self) -> None:
         await self._signal_dirty_queue()
 
-    def _load_clause_embeddings_from_disk(self) -> None:
-        self._clause_embeddings = {}
+    def _load_window_embeddings_from_disk(self) -> None:
+        self._window_embeddings = {}
 
-        if not os.path.exists(self._clause_embeddings_npz_path):
+        if not os.path.exists(self._window_embeddings_npz_path):
             logger.warning(
                 "[NPZ LOAD] missing clause embeddings file: %s",
-                self._clause_embeddings_npz_path,
+                self._window_embeddings_npz_path,
             )
             return
 
         try:
-            with np.load(self._clause_embeddings_npz_path) as data:
+            with np.load(self._window_embeddings_npz_path) as data:
                 for k, v in data.items():
 
                     if not isinstance(v, np.ndarray):
@@ -883,7 +901,7 @@ class EntryWritingRuntime:
                     if v.shape[1] != EMBEDDING_DIM:
                         continue
 
-                    self._clause_embeddings[k] = v
+                    self._window_embeddings[k] = v
 
         except Exception as e:
             logger.exception(
@@ -891,19 +909,19 @@ class EntryWritingRuntime:
                 e,
             )
     
-    def _load_clause_windows_from_disk(self) -> None:
-        self._clause_windows = {}
+    def _load_window_text_from_disk(self) -> None:
+        self._window_text = {}
 
-        if not os.path.exists(self._clause_windows_npz_path):
+        if not os.path.exists(self._window_text_npz_path):
             logger.warning(
                 "[NPZ LOAD] missing clause windows file: %s",
-                self._clause_windows_npz_path,
+                self._window_text_npz_path,
             )
             return
 
         try:
             with np.load(
-                self._clause_windows_npz_path,
+                self._window_text_npz_path,
                 allow_pickle=True
             ) as data:
 
@@ -912,7 +930,7 @@ class EntryWritingRuntime:
                     if not isinstance(v, np.ndarray):
                         continue
 
-                    self._clause_windows[k] = v
+                    self._window_text[k] = v
 
         except Exception as e:
             logger.exception(
@@ -920,18 +938,18 @@ class EntryWritingRuntime:
                 e,
             )
 
-    def _load_standout_flags_from_disk(self) -> None:
-        self._standout_flags = {}
+    def _load_standout_window_flags_from_disk(self) -> None:
+        self._standout_window_flags = {}
 
-        if not os.path.exists(self._standout_flags_npz_path):
+        if not os.path.exists(self._standout_window_flags_npz_path):
             logger.warning(
                 "[NPZ LOAD] missing standout flags file: %s",
-                self._standout_flags_npz_path,
+                self._standout_window_flags_npz_path,
             )
             return
 
         try:
-            with np.load(self._standout_flags_npz_path) as data:
+            with np.load(self._standout_window_flags_npz_path) as data:
 
                 for k, v in data.items():
 
@@ -941,7 +959,7 @@ class EntryWritingRuntime:
                     if v.dtype != np.bool_:
                         continue
 
-                    self._standout_flags[k] = v
+                    self._standout_window_flags[k] = v
 
         except Exception as e:
             logger.exception(
@@ -949,23 +967,45 @@ class EntryWritingRuntime:
                 e,
             )
     
-    async def get_clause_embeddings(
+    async def get_window_embeddings(
         self,
         entry_id: str,
     ) -> np.ndarray | None:
 
-        return self._clause_embeddings.get(entry_id)
+        return self._window_embeddings.get(entry_id)
 
-    async def get_clause_windows(
+    async def get_window_text(
         self,
         entry_id: str,
     ):
 
-        return self._clause_windows.get(entry_id)
+        return self._window_text.get(entry_id)
 
-    async def get_standout_flags(
+    async def get_standout_window_flags(
         self,
         entry_id: str,
     ):
 
-        return self._standout_flags.get(entry_id)
+        return self._standout_window_flags.get(entry_id)
+
+    async def set_runtime_bundle(
+        self,
+        entry_id: str,
+        *,
+        embedding: np.ndarray | None = None,
+        window_embeddings: np.ndarray | None = None,
+        window_text: np.ndarray | None = None,
+        standout_window_flags: np.ndarray | None = None,
+    ) -> None:
+
+        if embedding is not None:
+            await self.set_embedding(entry_id, embedding)
+
+        if window_embeddings is not None:
+            await self.set_window_embeddings(entry_id, window_embeddings)
+
+        if window_text is not None:
+            await self.set_window_text(entry_id, window_text)
+
+        if standout_window_flags is not None:
+            await self.set_standout_window_flags(entry_id, standout_window_flags)

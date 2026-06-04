@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-05-25T16:03:15-04:00
+# save-state 2026-06-03T20:52-04:00
 # ==========================================
 
 import os
@@ -41,9 +41,9 @@ Session_Time_to_Live_in_Seconds =  86400 # 24 hours
 # SESSION SYSTEM
 # ----------------------------
 
-def create_session(username: str) -> str:
+def create_session(user_id: str) -> str:
     session_payload = {
-        "username": username,
+        "user_id": user_id,
         "expires_at": time.time() + Session_Time_to_Live_in_Seconds,
         "number_used_once": secrets.token_urlsafe(16)
     }
@@ -61,7 +61,7 @@ def create_session(username: str) -> str:
     ).decode()
 
 
-def verify_session(token: str) -> bool:
+def verify_session(token: str) -> dict | None:
     try:
         decoded = base64.urlsafe_b64decode(token.encode()).decode()
         raw, signature = decoded.rsplit(".", 1)
@@ -73,7 +73,7 @@ def verify_session(token: str) -> bool:
         ).hexdigest()
 
         if not hmac.compare_digest(signature, expected):
-            return False
+            return None
 
         payload = json.loads(raw)
 
@@ -83,7 +83,9 @@ def verify_session(token: str) -> bool:
         return payload
 
     except Exception:
-        return False
+        return None # this is set to "none" rather than "false" because:
+        # it helps downstream code avoid treating “anything not null" as “safe session object”
+        # this helps the outcome to be "returns session or return nothing at all"
 
 
 # ----------------------------

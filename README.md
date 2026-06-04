@@ -528,10 +528,10 @@ PeriDocs/                         # Root project folder
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
 │  │   ├─ entries.json # safe text in plaintext with encrypted raw text. Also important metadata is contained here.
-│  │   ├─ entries_clause_embeddings_dump.npz # embedding vectors for thousands of float numbers per every few sentences in each entry.
-│  │   ├─ entries_clause_windows_dump.npz # plain-text-safe-text is stored for how the windows of the entry were specifically partitioned.
+│  │   ├─ entries_window_embeddings_dump.npz # embedding vectors for thousands of float numbers per every few sentences in each entry.
+│  │   ├─ entries_window_text_dump.npz # plain-text-safe-text is stored for how the windows of the entry were specifically partitioned.
 │  │   ├─ entries_mean_embeddings_dump.npz # embedding vectors for thousands of float numbers per every entry overall.
-│  │   └─ entries_standout_flags_dump.npz # true or false as to whether one part of the entry is drastically different from the rest of that same entry
+│  │   └─ entries_standout_window_flags_dump.npz # true or false as to whether one part of the entry is drastically different from the rest of that same entry
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
