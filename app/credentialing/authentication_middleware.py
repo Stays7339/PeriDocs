@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-06-03T22:39-04:00
+# save-state 2026-06-05T19:30-04:00
 # ==========================================
 
 from fastapi import Request
@@ -15,6 +15,10 @@ import uuid
 logger = logging.getLogger(__name__)
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
+CSRF_EXEMPT_PREFIXES = {
+    "/delete",
+}
 
 async def auth_middleware(request: Request, call_next):
 
@@ -48,11 +52,11 @@ async def auth_middleware(request: Request, call_next):
 
     if session:
         payload = verify_session(session)
-        logger.debug("SESSION PAYLOAD: %s", payload)
+        #logger.debug("SESSION PAYLOAD: %s", payload)
 
         if payload:
             user = await account_runtime.get_user_snapshot(payload["user_id"])
-            logger.debug("USER LOOKUP RESULT: %s", user)
+            # logger.debug("USER LOOKUP RESULT: %s", user)
 
             if user:
                 request.state.is_authenticated = True
@@ -77,6 +81,9 @@ async def auth_middleware(request: Request, call_next):
     # CSRF VALIDATION (ONLY FOR NON-SAFE METHODS)
     # ----------------------------
     if request.method not in SAFE_METHODS:
+
+        if any(request.url.path.startswith(p) for p in CSRF_EXEMPT_PREFIXES):
+            return await call_next(request)
 
         csrf_cookie_value = request.cookies.get("csrf_token")
         csrf_header_value = request.headers.get("X-CSRF-Token")

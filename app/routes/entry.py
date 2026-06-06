@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-06-03T22:00-04:00
+# save-state 2026-06-05T19:56-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -58,7 +58,7 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
     def wrapped_progress(fraction: float):
         progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
 
-    example_variable = await process_entry_async(
+    entry, delete_token = await process_entry_async(
         entry_text,
         user_ip=user_ip,
         user_id=user_id,
@@ -67,20 +67,22 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
 
     logger.debug(
         "process_entry_async returned user_id=%r",
-        example_variable.get("user_id")
+        entry.get("user_id")
     )
 
-    await entry_runtime.append_entry(example_variable)
+    await entry_runtime.append_entry(entry)
+
+    
 
     logger.debug(
         "process_entry_async returned: %s",
-        sorted(example_variable.keys())
+        sorted(entry.keys())
     )
 
     logger.debug(
         "Entry runtime contains id after processing? %s",
         entry_runtime.get_entry_by_id(
-            example_variable["entry_id"]
+            entry["entry_id"]
         ) is not None
     )
 
@@ -91,29 +93,29 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
 
     logger.debug(
         "Returned entry_id=%s",
-        example_variable.get("entry_id")
+        entry.get("entry_id")
     )
 
-    real_entry_id = example_variable["entry_id"]
+    real_entry_id = entry["entry_id"]
 
-    if example_variable.get("delete_token"):
-        delete_tokens_memory[real_entry_id] = example_variable["delete_token"]
+    delete_tokens_memory[entry["entry_id"]] = delete_token
+
     # ---------------- Option A: push crisis immediately ----------------
-    if example_variable.get("crisis_flag"):
+    if entry.get("crisis_flag"):
         ws = active_ws_connections.get(entry_id)
         if ws:
             try:
                 await ws.send_json({
                     "type": "crisis",
                     "crisis_flag": True,
-                    "real_id": example_variable["entry_id"]
+                    "real_id": entry["entry_id"]
                 })
             except WebSocketDisconnect:
                 # client already closed, safe to ignore
                 pass
 
     # ---------------- Map temp ID → real entry_id ----------------
-    temp_to_real_entry_id[entry_id] = example_variable["entry_id"]
+    temp_to_real_entry_id[entry_id] = entry["entry_id"]
 
 
     os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
@@ -250,7 +252,19 @@ async def submit_success(request: Request, id: str):
         "submit_success entry=%r",
         entry
     )
-
+    if entry.get("deleted"):
+        return templates.TemplateResponse(
+            "submit-success.html",
+            {
+                "request": request,
+                "entry_nickname": None,
+                "entry_id": entry_id,
+                "safe_text": "",
+                "top_matches": [],
+                "delete_token": None,
+                "reasoning": None,
+            },
+        )
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
@@ -291,12 +305,11 @@ async def submit_success(request: Request, id: str):
 
     
 
-    delete_token = delete_tokens_memory.pop(
-        entry.get("entry_id") or entry.get("id"),
-        None
-    )
+    delete_token = delete_tokens_memory.pop(id, None)
+    # delete_tokens_memory is generally required to keep the raw token separate from the entry-metadata object, 
+    # especially considering background task produces token after HTTP response already happened.
 
-    logger.debug("Submit_success function triggered for id=%s", id)
+    # logger.debug("Submit_success function triggered for id=%s", id)
 
     return templates.TemplateResponse(
         "submit-success.html",
@@ -306,7 +319,8 @@ async def submit_success(request: Request, id: str):
             "entry_id": entry.get("entry_id", entry.get("id")),
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,
-            "delete_token": delete_token
+            "delete_token": delete_token,
+            "reasoning": entry.get("reasoning"),
         },
     )
 

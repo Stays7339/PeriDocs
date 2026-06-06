@@ -1,6 +1,6 @@
 # ==========================================
 # app/helpers/entry_writing_runtime.py
-# Save-state: 2026-06-03T14:05-04:00
+# Save-state: 2026-06-05T20:11-04:00
 # ==========================================
 import asyncio
 import copy
@@ -540,14 +540,19 @@ class EntryWritingRuntime:
                 "entry_id",
                 "entry_nickname",
                 "timestamp",
-                "ip_hash",
                 "user_id",
+
+                "safe_text",
+
+                "centroids",
+
+                "ip_hash",
                 "encrypted_raw_ip",
                 "encrypted_raw_text",
-                "safe_text",
+
                 "crisis_flag",
+
                 "hash_from_token_for_deleting_entries",
-                "centroids",
             }
 
             def project(entry):
@@ -813,10 +818,34 @@ class EntryWritingRuntime:
             logger.warning("[EntryRuntime] Entry not found during strip_entry.")
             return True
 
+        now = datetime.now(timezone.utc).isoformat()
+                
         stripped = {
+            # identity
             "entry_id": target.get("entry_id") or target.get("id"),
-            "embedding_file": target.get("embedding_file"),
-            "crisis_flag": target.get("crisis_flag"),
+            "entry_nickname": None,
+            "timestamp": now,
+            "user_id": target.get("user_id"),
+
+            # core content (neutralized, not removed)
+            "safe_text": "",
+            "embedding_file": None,
+
+            # structure
+            "centroids": [],
+
+            # encryption / security (preserve traceability if needed)
+            "ip_hash": target.get("ip_hash"),
+            "encrypted_raw_ip": None,
+            "encrypted_raw_text": None,
+
+            # flags
+            "crisis_flag": bool(target.get("crisis_flag", False)),
+
+            # deletion state
+            "deleted": True,
+            "deleted_at": now,
+            "hash_from_token_for_deleting_entries": None,
         }
 
         self._window_text.pop(entry_id, None)

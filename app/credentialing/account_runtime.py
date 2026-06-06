@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-06-03T12:36-04:00
+# save-state 2026-06-05T15:52-04:00
 # ==========================================
 
 import os
@@ -235,12 +235,12 @@ class AccountRuntime:
                             )
                     elif event_type == DELETE_ACCOUNT_EVENT:
 
-                        username = event["username"]
+                        user_id = event["user_id"]
 
-                        if username not in self._accounts_snapshot:
+                        if user_id not in self._accounts_snapshot:
 
                             raise RuntimeError(
-                                f"Cannot delete nonexistent account: {username}"
+                                f"Cannot delete nonexistent account: {user_id}"
                             )
 
                     # =================================================
@@ -628,7 +628,7 @@ class AccountRuntime:
         Internal state MUST NEVER be exposed directly.
         """
 
-        logger.debug("[get_user_snapshot()] ACCOUNT_RUNTIME_ID=%s", id(account_runtime))
+        # logger.debug("[get_user_snapshot()] ACCOUNT_RUNTIME_ID=%s", id(account_runtime))
 
         user = self._accounts_snapshot.get(user_id)
 

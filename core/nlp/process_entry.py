@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-06-03T14:44-04:00
+# save-state 2026-06-05T19:45-04:00
 # ==========================================
 
 
@@ -244,14 +244,11 @@ async def process_entry_async(
     report_progress()  # 9 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
-    # generate a random secret component
-    random_secret = secrets.token_hex(16)
-
     # compact timestamp to embed in the token
     timestamp_compact = timestamp.replace(":", "").replace("-", "")
 
-    # construct user-visible deletion token
-    delete_token = f"{entry['entry_id']}.{timestamp}.{random_secret}"  
+    # construct user-visible deletion token with a random sceret included
+    delete_token = f"{entry['entry_id']}.{timestamp}.{secrets.token_hex(16)}"
     # This is a *permutation* not a combination!
     # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
     # In other words, the deletion token that the user copies must be as follows:
@@ -269,10 +266,13 @@ async def process_entry_async(
 
     entry["centroids"] = entry.get("centroids", [])
 
-    return build_persisted_entry(
-        entry=entry,
-        user_id=user_id,
-        centroids=entry.get("centroids", [])
+    return (
+        build_persisted_entry(
+            entry=entry,
+            user_id=user_id,
+            centroids=entry.get("centroids", [])
+        ),
+        delete_token
     )
 
 
@@ -282,22 +282,27 @@ def build_persisted_entry(
     centroids: list[dict] | None
 ) -> dict:
     return {
-        "entry_nickname": entry.get("entry_nickname"),
+        # identity
         "entry_id": entry["entry_id"],
+        "entry_nickname": entry.get("entry_nickname"),
         "timestamp": entry["timestamp"],
-        "ip_hash": entry["ip_hash"],
         "user_id": user_id,
 
+        # core content
+        "safe_text": entry.get("safe_text", ""),
+
+        # structural data
+        "centroids": centroids or [],
+
+        # encryption / security
+        "ip_hash": entry["ip_hash"],
         "encrypted_raw_ip": entry["encrypted_raw_ip"],
         "encrypted_raw_text": entry["encrypted_raw_text"],
 
-        "safe_text": entry.get("safe_text", ""),
-
+        # flags
         "crisis_flag": bool(entry.get("crisis_flag", False)),
 
+        # deletion (hash only, never token)
         "hash_from_token_for_deleting_entries":
             entry.get("hash_from_token_for_deleting_entries"),
-
-        "centroids": centroids or [],
     }
-
