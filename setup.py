@@ -40,12 +40,33 @@ def apply_sql_blueprint(cursor, file_path):
 def initialize_peridocs_database():
     """Establishes connections and applies roles, schemas, and structural bounds."""
     print("\n--> Initializing Relational Storage Frame...")
-    
+
+    # --- DYNAMIC TARGET RESOLUTION ---
+    DATABASE_MODE = os.getenv("DATABASE_MODE", "OFFLINE_MOCK").upper()
+
     # 1. Capture administrative cluster configuration string from .env
-    admin_url_string = os.getenv("DATABASE_URL")
+    if DATABASE_MODE == "PRODUCTION":
+        # If explicitly setting PRODUCTION, target the real Hetzner cluster connection string
+        admin_url_string = os.getenv("DATABASE_URL")
+        print("\n[WARNING] setup.py is targeting the LIVE REMOTE HETZNER PRODUCTION ENVIRONMENT! ⚠️")
+    elif DATABASE_MODE == "LOCAL":
+        # Default to your safe, local loopback database sandbox string
+        admin_url_string = os.getenv("LOCAL_DATABASE_URL")
+        print("\n[LOCAL] setup.py is targeting your LOCAL SANDBOX DATABASE environment.")
+    else:
+        print("\n[OFFLINE_MOCK] bypassing database requirements") 
+        return True   
+
     if not admin_url_string:
-        print("CRITICAL: DATABASE_URL variable missing from environment matrix.")
+        print(f"FAIL: Appropriate database string missing for mode: {DATABASE_MODE}")
         sys.exit(1)
+
+    # Ensure the user has an intentional pause to cancel if they accidentally run production
+    if DATABASE_MODE == "PRODUCTION":
+        confirm = input("Are you absolutely sure you want to run mutations on production? (type 'yes'): ")
+        if confirm.lower() != 'yes':
+            print("Aborting production mutation run.")
+            sys.exit(0)
 
     try:
         # STEP 1: Run physical database check on administrative master catalog
