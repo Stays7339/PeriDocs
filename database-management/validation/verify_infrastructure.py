@@ -42,6 +42,9 @@ def test_database_infrastructure():
     # Establish current folder routing to verify local file contracts
     current_dir = Path(__file__).parent
 
+    # Establish current folder routing to verify local file contracts
+    current_dir = Path(__file__).parent
+
     try:
         # ATOMIC FIX: Safely parse the URL into parameters and isolate target db name
         conn_params = psycopg.conninfo.conninfo_to_dict(admin_url_string)
