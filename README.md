@@ -344,8 +344,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 ---
 
-## The Dynamic Process Workflow (The Opposite)
-
+## The Dynamic Process Workflow
 ```
 [ Raw User Submission ]
           │
@@ -400,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-06-03T10:50-04:00
+## Canonical Project Directory as of 2026-06-09T10:52-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -542,6 +541,22 @@ PeriDocs/                         # Root project folder
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 │
+├─ database-management/ 
+│   ├─ schemas/
+│   │     ├─00_db_init.sql
+│   │     ├─01_roles_init.sql
+│   │     ├─02_schemas_init.sql
+│   │     ├─03_permissions_init.sql
+│   │     └─ tables/
+│   │          ├─ content_tables.sql
+│   │          ├─ kb_tables.sql
+│   │          └─ nlp_tables.sql
+│   └─ validation/ 
+│      ├─ check_schemas.py 
+│      ├─ verify_infrastructure.py 
+│      └─ contracts/
+│          ├─ inference_summary.json
+│          └─ nlp_metadata.json
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives
@@ -582,7 +597,8 @@ PeriDocs/                         # Root project folder
 ├─ audit_entries_store.py
 ├─ list_the_table_of_contents_for_this_npz_file.py
 ├─ requirements.txt          # Pinned Python dependencies
-└─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+└─ setup.py  # setups the database configurations, including specifiying between test sandbox empty dummy vs local actual database vs centralized real production server. Also, runs the setup_roberta.py script mentioned before.
 ```
 </details>
 

@@ -1,12 +1,14 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-05-18T15:41:22-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-06-10T16:31-04:00 (YYYYMMDDhhmm)
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
 import logging
 import asyncio
 import zipfile
+import threading
+import sys
 from typing import Optional
 from pathlib import Path
 from datetime import datetime
@@ -55,9 +57,16 @@ entry_runtime = _entry_runtime
 # ---------------------------------------------------------------------
 
 def is_runtime_ready() -> bool:
+    logger.warning(
+        "READING READY FLAG = %s | time=%s",
+        _runtime_ready,
+        datetime.utcnow().isoformat()
+    )
+    logger.warning("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
     return _runtime_ready
 
 def is_runtime_starting() -> bool:
+    logger.warning("READING READY FLAG = %s", _runtime_ready)
     return _boot_in_progress
 
 async def initialize_runtime(force_reload: bool = False, verify: bool = False) -> None:
@@ -90,16 +99,24 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     _boot_in_progress = True
 
+    logger.warning("MAPPING_RUNTIME FILE LOADED FROM: %s", __file__)
+    logger.warning("INITIALIZE_RUNTIME ENTERED")
+    logger.warning("MAPPING_RUNTIME MODULE ID = %s", id(sys.modules[__name__]))
+
     # Load ledger into memory
+    logger.warning("BOOT START")
     await ledger.load()
+    logger.warning("LEDGER LOADED")
 
     # entries should always load before centroids, since centroids are derived from entries
     await entry_runtime.initialize()
+    logger.warning("ENTRY RUNTIME READY")
     await entry_runtime._verify_integrity_on_startup()
     logger.info("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
     logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
 
     await centroid_system.load_state()
+    logger.warning("CENTROID SYSTEM LOADED")
 
     await ledger.verify_runtime_state(centroid_system)
 
@@ -111,11 +128,15 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     _initialized = True
     _runtime_ready = True
+    logger.warning("RUNTIME READY FLAG SET -> TRUE at %s", datetime.utcnow().isoformat())
     _boot_in_progress = False
     logger.info("Mapping runtime is now READY.")
 
     # Schedule periodic check after initialization
     asyncio.create_task(periodic_integrity_check())
+
+    logger.warning("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
+    logger.warning("initialize_runtime EXIT reached")
 
 
 # Recheck that all the files are in order every once in a while

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-06-01T00:28:50-04:00 (ISO 8601)
+# save-state 2026-06-11T13:04-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -31,7 +31,7 @@ from app.credentialing.account_runtime import (
 from core.nlp.embeddings import _load_model, get_embedding_async
 from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
-from core.database import database_lifespan
+from core.database import initialize_database, close_database
 
 
 
@@ -82,7 +82,7 @@ from app.routes import feedback
 
 # ---------------- Include router-based routes ----------------
 # Inject lifespan parameters
-app.router.lifespan_context = database_lifespan
+# app.router.lifespan_context = database_lifespan
 
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
@@ -145,6 +145,9 @@ app.middleware("http")(security_headers_middleware)
 async def startup_sequence():
     logger.info("Starting application initialization sequence...")
 
+    logger.info("0. Initializing database connectivity layer...")
+    await initialize_database()
+
     logger.info("1. Preloading embedding model...")
     await _load_model()
     logger.info("Embedding model loaded.")
@@ -156,10 +159,14 @@ async def startup_sequence():
     await initialize_account_runtime()
 
     logger.info("Startup sequence complete.")
+    logger.warning("STARTUP EVENT COMPLETE")
 
 @app.on_event("shutdown")
 async def shutdown_sequence():
     logger.info("Starting shutdown sequence...")
+
+    logger.info("Draining database connections...")
+    await close_database()
 
     await shutdown_account_runtime()
     """

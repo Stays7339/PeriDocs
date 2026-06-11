@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-29T02:55:20-04:00
+# Save-state: 2026-06-09T14:38-04:00
 # ==========================================
 
 import os
@@ -10,6 +10,7 @@ import asyncio
 import functools
 import logging
 import re
+import sys
 from datetime import datetime, timezone
 from typing import Dict, List
 import numpy as np
@@ -581,8 +582,20 @@ class CentroidSystem:
         - Enforces SAAJE cannot exist yet
         - Adds default metadata for admin review
         """
-        from core.map.mapping_runtime import is_runtime_ready
-        if not is_runtime_ready():
+        import sys
+        import core.map.mapping_runtime as mr
+
+        logger.warning("RUNTIME STATE CHECK:")
+        logger.warning("_initialized = %s", mr._initialized)
+        logger.warning("_runtime_ready = %s", mr._runtime_ready)
+        logger.warning("_boot_in_progress = %s", mr._boot_in_progress)
+        logger.warning("CENTROID MODULE ID = %s", id(mr))
+        logger.warning("CENTROID READY (mr) = %s", mr.is_runtime_ready())
+        logger.warning("CENTROID READY (local import) = %s", mr.is_runtime_ready())
+        logger.warning("CENTROID sys.modules ID = %s", id(sys.modules["core.map.mapping_runtime"]))
+        
+
+        if not mr.is_runtime_ready():
             raise RuntimeError("CentroidSystem called before runtime is ready")
         logger.debug(f"[CREATE_PRECENTROID] Called with entry_ids={entry_ids}")
         await self._assert_ledger_ready()
