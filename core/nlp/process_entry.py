@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-05-29T12:10:00-04:00
+# save-state 2026-06-05T19:45-04:00
 # ==========================================
 
 
@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 async def process_entry_async(
     text: str,
     user_ip: str,
+    user_id: str | None = None,
     max_words_in_window_of_clauses: int = 66,
     progress_callback: Callable[[float], None] | None = None
 ) -> Dict[str, Any]:
@@ -71,15 +72,15 @@ async def process_entry_async(
     report_progress()  # 2 / total_steps
 
     # ---------------- GENERATE EMBEDDING ----------------
-    clause_embeddings = await get_embedding_async(windows)
-    standout_flags = highlight_standout_clauses(
-        np.asarray(clause_embeddings, dtype=np.float32),
+    window_embeddings = await get_embedding_async(windows)
+    standout_window_flags = highlight_standout_clauses(
+        np.asarray(window_embeddings, dtype=np.float32),
         threshold=0.65
     )
 
     standout_records = []
 
-    for idx, is_standout in enumerate(standout_flags):
+    for idx, is_standout in enumerate(standout_window_flags):
 
         if not is_standout:
             continue
@@ -92,38 +93,38 @@ async def process_entry_async(
     # -------------------------------------------------
     # CLAUSE EMBEDDING VALIDATION
     # -------------------------------------------------
-    if clause_embeddings is None:
+    if window_embeddings is None:
         raise RuntimeError("Clause embeddings returned None")
 
-    clause_embeddings = np.asarray(clause_embeddings, dtype=np.float32)
+    window_embeddings = np.asarray(window_embeddings, dtype=np.float32)
 
-    if clause_embeddings.ndim != 2:
+    if window_embeddings.ndim != 2:
         raise RuntimeError(
-            f"Clause embeddings must be rank-2 matrix, got shape={clause_embeddings.shape}"
+            f"Clause embeddings must be rank-2 matrix, got shape={window_embeddings.shape}"
         )
 
-    if clause_embeddings.shape[0] == 0:
+    if window_embeddings.shape[0] == 0:
         raise RuntimeError("Clause embedding matrix is empty")
 
-    if clause_embeddings.shape[1] != EMBEDDING_DIM:
+    if window_embeddings.shape[1] != EMBEDDING_DIM:
         raise RuntimeError(
-            f"Invalid clause embedding dimension: {clause_embeddings.shape}"
+            f"Invalid clause embedding dimension: {window_embeddings.shape}"
         )
 
-    if np.isnan(clause_embeddings).any():
+    if np.isnan(window_embeddings).any():
         raise RuntimeError("NaN detected in clause embeddings")
 
-    if np.isinf(clause_embeddings).any():
+    if np.isinf(window_embeddings).any():
         raise RuntimeError("Inf detected in clause embeddings")
 
-    zero_rows = np.all(clause_embeddings == 0, axis=1)
+    zero_rows = np.all(window_embeddings == 0, axis=1)
 
     if np.any(zero_rows):
         raise RuntimeError(
             f"Zero-vector clause embeddings detected at rows={np.where(zero_rows)[0].tolist()}"
         )
     
-    doc_embedding = np.mean(clause_embeddings, axis=0).astype(np.float32)
+    doc_embedding = np.mean(window_embeddings, axis=0).astype(np.float32)
 
     # ensure embedding exists
     if doc_embedding is None:
@@ -182,8 +183,7 @@ async def process_entry_async(
         "encrypted_raw_text": encrypted_safe_text,
         "crisis_flag": bool(crisis_msg),
         "safe_text": "" if crisis_msg else safe_text,
-        "embedding_file": None if crisis_msg else entry_runtime.get_current_embedding_file(),
-        "embedding": None if crisis_msg else doc_embedding
+        "embedding": None if crisis_msg else doc_embedding,
     }
 
     # --------------------- CRISIS SHORT-CIRCUIT ---------------------
@@ -198,10 +198,13 @@ async def process_entry_async(
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
     if not crisis_msg:
-        await entry_runtime.set_embedding(entry_id, doc_embedding)
-        await entry_runtime.set_clause_windows(entry_id, windows)
-        await entry_runtime.set_clause_embeddings(entry_id, clause_embeddings)
-        await entry_runtime.set_standout_flags(entry_id, standout_flags)
+        await entry_runtime.set_runtime_bundle(
+            entry["entry_id"],
+            embedding=entry.get("embedding"),
+            window_embeddings=window_embeddings,
+            window_text=np.array(windows, dtype=str),
+            standout_window_flags=np.array(standout_window_flags, dtype=bool),
+        )
 
     report_progress()  # 7 / total_steps
 
@@ -241,14 +244,11 @@ async def process_entry_async(
     report_progress()  # 9 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
-    # generate a random secret component
-    random_secret = secrets.token_hex(16)
-
     # compact timestamp to embed in the token
     timestamp_compact = timestamp.replace(":", "").replace("-", "")
 
-    # construct user-visible deletion token
-    delete_token = f"{entry['entry_id']}.{timestamp}.{random_secret}"  
+    # construct user-visible deletion token with a random sceret included
+    delete_token = f"{entry['entry_id']}.{timestamp}.{secrets.token_hex(16)}"
     # This is a *permutation* not a combination!
     # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
     # In other words, the deletion token that the user copies must be as follows:
@@ -263,4 +263,46 @@ async def process_entry_async(
     report_progress()  # 10 / total_steps
 
     # ---------------- RETURN ENTRY + TOKEN ---------------------
-    return {**entry, "delete_token": delete_token}  # pass token to caller
+
+    entry["centroids"] = entry.get("centroids", [])
+
+    return (
+        build_persisted_entry(
+            entry=entry,
+            user_id=user_id,
+            centroids=entry.get("centroids", [])
+        ),
+        delete_token
+    )
+
+
+def build_persisted_entry(
+    entry: dict,
+    user_id: str | None,
+    centroids: list[dict] | None
+) -> dict:
+    return {
+        # identity
+        "entry_id": entry["entry_id"],
+        "entry_nickname": entry.get("entry_nickname"),
+        "timestamp": entry["timestamp"],
+        "user_id": user_id,
+
+        # core content
+        "safe_text": entry.get("safe_text", ""),
+
+        # structural data
+        "centroids": centroids or [],
+
+        # encryption / security
+        "ip_hash": entry["ip_hash"],
+        "encrypted_raw_ip": entry["encrypted_raw_ip"],
+        "encrypted_raw_text": entry["encrypted_raw_text"],
+
+        # flags
+        "crisis_flag": bool(entry.get("crisis_flag", False)),
+
+        # deletion (hash only, never token)
+        "hash_from_token_for_deleting_entries":
+            entry.get("hash_from_token_for_deleting_entries"),
+    }

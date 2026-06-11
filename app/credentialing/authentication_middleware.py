@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-05-26T15:20:10-04:00
+# save-state 2026-06-05T19:30-04:00
 # ==========================================
 
 from fastapi import Request
@@ -8,11 +8,33 @@ from starlette.responses import JSONResponse
 from app.credentialing.security_fundamentals import verify_session
 from app.credentialing.account_runtime import account_runtime
 
-import secrets  # <-- NEW (used for CSRF token generation)
+import secrets  # (used for CSRF token generation)
+import logging
+import uuid
+
+logger = logging.getLogger(__name__)
 
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
 
+CSRF_EXEMPT_PREFIXES = {
+    "/delete",
+}
+
 async def auth_middleware(request: Request, call_next):
+
+    request_id = uuid.uuid4().hex
+    request.state.request_id = request_id
+
+    # logger.debug("[auth_middware][ENTER] request_id=%s path=%s", request_id, request.url.path)
+
+    # logger.debug("[auth_middware()] ACCOUNT_RUNTIME_ID=%s", id(account_runtime))
+
+    """
+    # according to an LLM conversation on 2026-05-03
+    # multiple requests fire on page load (/, /account, /favicon.ico, etc.)
+    # frontend is doing several fetch calls in parallel
+    # middleware runs per-request (so logging repeats naturally)
+    """
 
     path = request.url.path
 
@@ -22,6 +44,7 @@ async def auth_middleware(request: Request, call_next):
     # AUTH STATE DEFAULTS
     # ----------------------------
     request.state.is_authenticated = False
+    request.state.user_id = None
     request.state.username = None
     request.state.role = None
 
@@ -29,14 +52,17 @@ async def auth_middleware(request: Request, call_next):
 
     if session:
         payload = verify_session(session)
+        #logger.debug("SESSION PAYLOAD: %s", payload)
 
         if payload:
-            user = await account_runtime.get_user_snapshot(payload["username"])
+            user = await account_runtime.get_user_snapshot(payload["user_id"])
+            # logger.debug("USER LOOKUP RESULT: %s", user)
 
             if user:
                 request.state.is_authenticated = True
-                request.state.username = payload["username"]
+                request.state.user_id = payload["user_id"]
                 request.state.role = user.get("role")
+                request.state.username = user.get("username")
 
     # ----------------------------
     # AUTH ENFORCEMENT
@@ -56,6 +82,9 @@ async def auth_middleware(request: Request, call_next):
     # ----------------------------
     if request.method not in SAFE_METHODS:
 
+        if any(request.url.path.startswith(p) for p in CSRF_EXEMPT_PREFIXES):
+            return await call_next(request)
+
         csrf_cookie_value = request.cookies.get("csrf_token")
         csrf_header_value = request.headers.get("X-CSRF-Token")
 
@@ -65,11 +94,11 @@ async def auth_middleware(request: Request, call_next):
         if csrf_cookie_value != csrf_header_value:
             return JSONResponse({"detail": "Invalid CSRF token"}, status_code=403)
 
-    return await call_next(request)
+    response = await call_next(request)
 
+    # logger.debug("[auth_middware][EXIT] request_id=%s path=%s", request_id, request.url.path)
 
-import secrets
-from starlette.responses import JSONResponse
+    return response
 
 
 async def security_headers_middleware(request: Request, call_next):

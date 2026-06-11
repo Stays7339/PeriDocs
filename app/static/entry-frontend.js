@@ -1,5 +1,5 @@
 // entry-frontend.js — isolated entry submission + progress orchestration
-// save-state 2026-05-27T20:20:10-04:00
+// save-state 2026-06-05T17:22:35-04:00
 // ==========================================
 
 document.addEventListener("DOMContentLoaded", () => {

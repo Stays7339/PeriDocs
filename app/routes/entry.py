@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/entry.py
-# save-state 2026-05-26T15:15:05 -04:00
+# save-state 2026-06-05T19:56-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -43,58 +43,95 @@ delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_t
 # ---------------- Active WebSocket connections ----------------
 active_ws_connections: dict[str, WebSocket] = {}
 
-async def process_entry_background(entry_text: str, user_ip: str, entry_id: str):
+async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,  user_id: str | None = None,):
+    logger.debug(
+        "[BACKGROUND] user_id=%r",
+        user_id
+    )
+
+    logger.debug(
+        "[PROCESS_ENTRY_ASYNC] user_id=%r",
+        user_id
+    )
+    
     # ---------------- Wrap progress callback per entry_id ----------------
     def wrapped_progress(fraction: float):
         progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
 
-    example_variable = await process_entry_async(
+    entry, delete_token = await process_entry_async(
         entry_text,
         user_ip=user_ip,
+        user_id=user_id,
         progress_callback=wrapped_progress
     )
 
-    real_entry_id = example_variable["entry_id"]
+    logger.debug(
+        "process_entry_async returned user_id=%r",
+        entry.get("user_id")
+    )
 
-    # Store delete_token in memory if it exists
-    if example_variable.get("delete_token"):
-        delete_tokens_memory[real_entry_id] = example_variable["delete_token"]
+    await entry_runtime.append_entry(entry)
+
+    
+
+    logger.debug(
+        "process_entry_async returned: %s",
+        sorted(entry.keys())
+    )
+
+    logger.debug(
+        "Entry runtime contains id after processing? %s",
+        entry_runtime.get_entry_by_id(
+            entry["entry_id"]
+        ) is not None
+    )
+
+    logger.debug(
+        "Entry count immediately after processing: %d",
+        len(entry_runtime.get_all_entries())
+    )
+
+    logger.debug(
+        "Returned entry_id=%s",
+        entry.get("entry_id")
+    )
+
+    real_entry_id = entry["entry_id"]
+
+    delete_tokens_memory[entry["entry_id"]] = delete_token
 
     # ---------------- Option A: push crisis immediately ----------------
-    if example_variable.get("crisis_flag"):
+    if entry.get("crisis_flag"):
         ws = active_ws_connections.get(entry_id)
         if ws:
             try:
                 await ws.send_json({
                     "type": "crisis",
                     "crisis_flag": True,
-                    "real_id": example_variable["entry_id"]
+                    "real_id": entry["entry_id"]
                 })
             except WebSocketDisconnect:
                 # client already closed, safe to ignore
                 pass
 
     # ---------------- Map temp ID → real entry_id ----------------
-    temp_to_real_entry_id[entry_id] = example_variable["entry_id"]
+    temp_to_real_entry_id[entry_id] = entry["entry_id"]
 
-    # ---------------- Store entry (strip embeddings) ----------------
-    entry_for_journal = example_variable.copy()
-    entry_for_journal.pop("embedding", None)
-    entry_for_journal.pop("clause_embeddings", None)
-    entry_for_journal.pop("delete_token", None)  # token not persisted
-    await entry_runtime.append_entry(entry_for_journal)
 
     os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
     logger.info("Entries in memory: %d", len(entry_runtime.get_all_entries()))
 
-    # ---------------- Update embeddings_index and persist to NPZ ----------------
-    if example_variable.get("embedding") is not None:
-        await entry_runtime.set_embedding(
-            example_variable["entry_id"],
-            example_variable["embedding"]
-        )
+
+    logger.debug(
+        "Entries before flush: %d",
+        len(entry_runtime.get_all_entries())
+    )
+
 
     await entry_runtime.request_flush()
+
+    
+
     # by using request_flush, rather than anything else, 
     # all prior mutations are applied before the flush actualy happens.
     # this is to try to make it so that flushes are always up-to-date when they're completed.
@@ -117,6 +154,7 @@ async def submit_entry(
     entry_text: str | None = Form(None),
     background_tasks: BackgroundTasks = None
 ):
+    
     # Detect JSON
     if "application/json" in request.headers.get("content-type", ""):
         data = await request.json()
@@ -126,15 +164,21 @@ async def submit_entry(
         return JSONResponse({"status": "error", "message": "No entry provided"}, status_code=400)
 
     client_host = request.client.host if request.client else "127.0.0.1"
+    user_id = request.state.user_id
+    username = request.state.username
 
     # generate temporary entry_id for progress tracking
     temp_entry_id = f"pending_{np.random.randint(1_000_000, 9_999_999)}"
     progress_dict[temp_entry_id] = 0.0  # ensure initial progress is 0
 
     # ---------------- Start background processing ----------------
-    background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id)
+    background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id, user_id)
 
-    logger.debug("Submit function triggered for temp_id=%s", temp_entry_id)
+    logger.debug(
+        "Submit function triggered for temp_id=%s user_id=%s",
+        temp_entry_id,
+        user_id
+    )
 
     # Immediate response for the user (entry submitted toast)
     return JSONResponse({
@@ -191,9 +235,6 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
                 except WebSocketDisconnect:
                     break  # exit loop safely if client disconnected
 
-            # Optional: add extra sleep if you want to slow down further
-            await asyncio.sleep(0.2)  # slow down 200ms between messages
-
             if progress >= 1.0:
                 break
     finally:
@@ -204,7 +245,26 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
 async def submit_success(request: Request, id: str):
     # ---------------- Resolve temp ID → real entry_id ----------------
     id = temp_to_real_entry_id.get(id, id)
+        
     entry = entry_runtime.get_entry_by_id(id)
+
+    logger.debug(
+        "submit_success entry=%r",
+        entry
+    )
+    if entry.get("deleted"):
+        return templates.TemplateResponse(
+            "submit-success.html",
+            {
+                "request": request,
+                "entry_nickname": None,
+                "entry_id": entry_id,
+                "safe_text": "",
+                "top_matches": [],
+                "delete_token": None,
+                "reasoning": None,
+            },
+        )
     if not entry:
         return templates.TemplateResponse(
             "submit-success.html", {"request": request, "error": "Entry not found."}
@@ -243,10 +303,13 @@ async def submit_success(request: Request, id: str):
         for e in sorted(scored_entries, key=lambda x: x["score"], reverse=True)[:20]
     ]
 
+    
 
-    delete_token = delete_tokens_memory.pop(entry.get("entry_id", entry.get("id")), None)
+    delete_token = delete_tokens_memory.pop(id, None)
+    # delete_tokens_memory is generally required to keep the raw token separate from the entry-metadata object, 
+    # especially considering background task produces token after HTTP response already happened.
 
-    logger.debug("Submit_success function triggered for id=%s", id)
+    # logger.debug("Submit_success function triggered for id=%s", id)
 
     return templates.TemplateResponse(
         "submit-success.html",
@@ -256,7 +319,8 @@ async def submit_success(request: Request, id: str):
             "entry_id": entry.get("entry_id", entry.get("id")),
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,
-            "delete_token": delete_token
+            "delete_token": delete_token,
+            "reasoning": entry.get("reasoning"),
         },
     )
 

@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# ==========================================
+# PeriDocs/core/database.py
+# save-state 2026-06-11T13:02-04:00
+# ==========================================
 import os
 import contextlib
 from typing import AsyncGenerator
@@ -12,32 +16,35 @@ load_dotenv()
 # Explicitly read our structural environment gatekeeper
 DATABASE_MODE = os.getenv("DATABASE_MODE", "OFFLINE_MOCK").upper()
 
-# ============================================================================
-#                           REMOTE PRODUCTION HOOKS
-# ============================================================================
-if DATABASE_MODE == "PRODUCTION":
-    from psycopg_pool import AsyncConnectionPool
-    from psycopg.rows import dict_row
+db_pool = None
+ASYNC_CONN_INFO = None
+
+# Guarded configuration setup to protect OFFLINE_MOCK mode from missing dependencies
+if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
     import psycopg
 
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    if not DATABASE_URL:
-        raise RuntimeError("CRITICAL: DATABASE_MODE set to PRODUCTION but DATABASE_URL is missing.")
-
+    env_var = "DATABASE_URL" if DATABASE_MODE == "PRODUCTION" else "LOCAL_DATABASE_URL"
+    raw_url = os.getenv(env_var)
+    if not raw_url:
+        raise RuntimeError(f"CRITICAL: DATABASE_MODE set to {DATABASE_MODE} but {env_var} is missing.")
     try:
-        conn_params = psycopg.conninfo.conninfo_to_dict(DATABASE_URL)
+        conn_params = psycopg.conninfo.conninfo_to_dict(raw_url)
         conn_params["dbname"] = "peridocs_db"
         conn_params["target_session_attrs"] = "read-write"
         ASYNC_CONN_INFO = psycopg.conninfo.make_conninfo(**conn_params)
     except Exception as e:
-        raise RuntimeError(f"Failed to parse production connection parameters: {e}")
+        raise RuntimeError(f"Failed to parse database connection parameters: {e}")
 
-    db_pool: AsyncConnectionPool | None = None
 
-    @contextlib.asynccontextmanager
-    async def database_lifespan(app: FastAPI):
-        global db_pool
-        print("[STARTUP] [PRODUCTION] Connecting async pool to Hetzner cloud cluster...")
+async def initialize_database():
+    """Explicitly called during the app's startup sequence."""
+    global db_pool
+    
+    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+        from psycopg_pool import AsyncConnectionPool
+        from psycopg.rows import dict_row
+
+        print(f"[STARTUP] [{DATABASE_MODE}] Connecting async pool to cluster...")
         db_pool = AsyncConnectionPool(
             conninfo=ASYNC_CONN_INFO,
             min_size=2,
@@ -46,82 +53,33 @@ if DATABASE_MODE == "PRODUCTION":
             open=False
         )
         await db_pool.open()
-        print("[STARTUP] [PRODUCTION] Remote database pipeline successfully bound.")
-        yield
-        print("[SHUTDOWN] [PRODUCTION] Draining connection pool...")
-        if db_pool:
-            await db_pool.close()
-
-    async def get_db() -> AsyncGenerator[psycopg.AsyncConnection, None]:
-        global db_pool
-        if db_pool is None:
-            raise RuntimeError("Database pool is offline.")
-        async with db_pool.connection() as session:
-            async with session.transaction():
-                yield session
-
-elif DATABASE_MODE == "LOCAL":
-    from psycopg_pool import AsyncConnectionPool
-    from psycopg.rows import dict_row
-    import psycopg
-
-    DATABASE_URL = os.getenv("LOCAL_DATABASE_URL")
-    if not DATABASE_URL:
-        raise RuntimeError("CRITICAL: DATABASE_MODE set to LOCAL but LOCAL_DATABASE_URL is missing.")
-
-    try:
-        conn_params = psycopg.conninfo.conninfo_to_dict(DATABASE_URL)
-        conn_params["dbname"] = "peridocs_db"
-        conn_params["target_session_attrs"] = "read-write"
-        ASYNC_CONN_INFO = psycopg.conninfo.make_conninfo(**conn_params)
-    except Exception as e:
-        raise RuntimeError(f"Failed to parse production connection parameters: {e}")
-
-    db_pool: AsyncConnectionPool | None = None
-
-    @contextlib.asynccontextmanager
-    async def database_lifespan(app: FastAPI):
-        global db_pool
-        print("[STARTUP] [LOCAL] Connecting async pool to local cluster...")
-        db_pool = AsyncConnectionPool(
-            conninfo=ASYNC_CONN_INFO,
-            min_size=2,
-            max_size=10,
-            kwargs={"autocommit": False, "row_factory": dict_row},
-            open=False
-        )
-        await db_pool.open()
-        print("[STARTUP] [LOCAL] Local database pipeline successfully bound.")
-        yield
-        print("[SHUTDOWN] [LOCAL] Draining connection pool...")
-        if db_pool:
-            await db_pool.close()
-
-    async def get_db() -> AsyncGenerator[psycopg.AsyncConnection, None]:
-        global db_pool
-        if db_pool is None:
-            raise RuntimeError("Database pool is offline.")
-        async with db_pool.connection() as session:
-            async with session.transaction():
-                yield session
-
-# ============================================================================
-#                              LOCAL OR OFFLINE MODE 
-# ============================================================================
-else:    
-    @contextlib.asynccontextmanager
-    async def database_lifespan(app: FastAPI):
+        print(f"[STARTUP] [{DATABASE_MODE}] Database pipeline successfully bound.")
+    else:
         print("\n====================================================================")
         print(" [WARNING] APPLICATION INITIALIZING IN LOCAL OFFLINE MOCK MODE      ")
         print("====================================================================\n")
-        yield
+
+
+async def close_database():
+    """Explicitly called during the app's shutdown sequence."""
+    global db_pool
+    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+        print(f"[SHUTDOWN] [{DATABASE_MODE}] Draining connection pool...")
+        if db_pool:
+            await db_pool.close()
+    else:
         print("[SHUTDOWN] Local mock database lifecycle concluded.")
 
-    async def get_db() -> AsyncGenerator[any, None]:
-        """
-        Yields a dynamic adapter object so Ember's local route endpoints
-        can safely call 'await db.execute()' without throwing Python exceptions.
-        """
+
+async def get_db() -> AsyncGenerator:
+    global db_pool
+    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+        if db_pool is None:
+            raise RuntimeError("Database pool is offline.")
+        async with db_pool.connection() as session:
+            async with session.transaction():
+                yield session
+    else:
         class LocalMockConnection:
             async def execute(self, query: str, params: tuple = None):
                 print(f"[LOCAL MOCK SQL] Executing statement context: {query}")

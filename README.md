@@ -344,8 +344,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 ---
 
-## The Dynamic Process Workflow (The Opposite)
-
+## The Dynamic Process Workflow
 ```
 [ Raw User Submission ]
           │
@@ -400,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-05-27T14:21:20-04:00
+## Canonical Project Directory as of 2026-06-09T10:52-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -527,8 +526,11 @@ PeriDocs/                         # Root project folder
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
-│  │   ├─ entries.json
-│  │   └─ entries_mean_embeddings_dump.npz
+│  │   ├─ entries.json # safe text in plaintext with encrypted raw text. Also important metadata is contained here.
+│  │   ├─ entries_window_embeddings_dump.npz # embedding vectors for thousands of float numbers per every few sentences in each entry.
+│  │   ├─ entries_window_text_dump.npz # plain-text-safe-text is stored for how the windows of the entry were specifically partitioned.
+│  │   ├─ entries_mean_embeddings_dump.npz # embedding vectors for thousands of float numbers per every entry overall.
+│  │   └─ entries_standout_window_flags_dump.npz # true or false as to whether one part of the entry is drastically different from the rest of that same entry
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
@@ -539,6 +541,22 @@ PeriDocs/                         # Root project folder
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 │
+├─ database-management/ 
+│   ├─ schemas/
+│   │     ├─00_db_init.sql
+│   │     ├─01_roles_init.sql
+│   │     ├─02_schemas_init.sql
+│   │     ├─03_permissions_init.sql
+│   │     └─ tables/
+│   │          ├─ content_tables.sql
+│   │          ├─ kb_tables.sql
+│   │          └─ nlp_tables.sql
+│   └─ validation/ 
+│      ├─ check_schemas.py 
+│      ├─ verify_infrastructure.py 
+│      └─ contracts/
+│          ├─ inference_summary.json
+│          └─ nlp_metadata.json
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives
@@ -576,9 +594,11 @@ PeriDocs/                         # Root project folder
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
 ├─ README.md                 # Project overview, setup, and usage
+├─ audit_entries_store.py
 ├─ list_the_table_of_contents_for_this_npz_file.py
 ├─ requirements.txt          # Pinned Python dependencies
-└─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+└─ setup.py  # setups the database configurations, including specifiying between test sandbox empty dummy vs local actual database vs centralized real production server. Also, runs the setup_roberta.py script mentioned before.
 ```
 </details>
 

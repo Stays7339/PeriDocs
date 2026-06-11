@@ -1,10 +1,11 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-05-25T17:07:25-04:00
+# save-state 2026-06-03T22:32-04:00
 # ==========================================
 
 import io
 import qrcode
+import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from fastapi.responses import JSONResponse, StreamingResponse, RedirectResponse
@@ -25,6 +26,10 @@ from app.credentialing.security_fundamentals import (
 )
 
 from app.credentialing.account_runtime import account_runtime
+
+logger = logging.getLogger(__name__)
+
+
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -147,11 +152,18 @@ async def signin_page(request: Request):
 
 @router.post("/signin")
 async def signin(request: Request, data: SigninRequest):
+    logger.debug(
+        "[signin] username=%s",
+        data.username
+    )
 
-    user = await (
-        account_runtime.get_user_snapshot(
-            data.username
-        )
+    user = await account_runtime._get_user_object_by_username(
+        data.username
+    )
+
+    logger.debug(
+        "[signin] lookup_result=%r",
+        user
     )
 
     if not user:
@@ -160,6 +172,11 @@ async def signin(request: Request, data: SigninRequest):
             401,
             "Invalid signin"
         )
+
+    logger.debug(
+        "[signin] user=%r",
+        user
+    )
 
     if not verify_password(
         user["password_hash"],
@@ -170,6 +187,7 @@ async def signin(request: Request, data: SigninRequest):
             401,
             "Invalid signin"
         )
+
 
     totp_secret = decrypt_value(
         user["totp_secret_encrypted"]
@@ -185,7 +203,7 @@ async def signin(request: Request, data: SigninRequest):
             "Invalid signin"
         )
 
-    session_token = create_session(user["username"])
+    session_token = create_session(user["user_id"])
 
     csrf_token = (
         generate_cross_site_request_forgery_token()
@@ -298,18 +316,22 @@ async def delete_account(
     if not request.state.is_authenticated:
         raise HTTPException(401, "Unauthorized")
 
-    username = request.state.username
+    user_id = request.state.user_id
 
-    if not username:
+    if not user_id:
         raise HTTPException(401, "Unauthorized")
 
     # ----------------------------
     # Fetch user snapshot
     # ----------------------------
-    user = await account_runtime.get_user_snapshot(username)
+    user = await account_runtime.get_user_snapshot(user_id)
+
 
     if not user:
         raise HTTPException(401, "Unauthorized")
+
+    logger.debug("[delete] raw body=%r", await request.body())
+    logger.debug("[delete] parsed password=%r", data.password)
 
     # ----------------------------
     # Password verification
@@ -323,7 +345,8 @@ async def delete_account(
     # ----------------------------
     # Perform deletion
     # ----------------------------
-    await account_runtime.delete_account(username=username)
+    user_id = request.state.user_id
+    await account_runtime.delete_account(user_id=user_id)
 
     # ----------------------------
     # Clear auth cookies

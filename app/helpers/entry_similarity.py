@@ -58,24 +58,24 @@ async def safe_load_embedding(entry_id: str, entry_runtime) -> np.ndarray:
 
     return np.asarray(emb, dtype=np.float32)
 
-def highlight_standout_clauses(clause_embeddings: np.ndarray, threshold: float = 0.7) -> list[bool]:
+def highlight_standout_clauses(window_embeddings: np.ndarray, threshold: float = 0.7) -> list[bool]:
     """
     Identify clauses that are 'standout' relative to other clauses in the same entry.
 
     Each clause is compared to the mean of all other clauses via cosine similarity.
     If similarity < threshold, it is considered standout.
 
-    Returns a list of booleans aligned with clause_embeddings.
+    Returns a list of booleans aligned with window_embeddings.
     """
-    n = len(clause_embeddings)
+    n = len(window_embeddings)
     if n == 0:
         return []
 
-    standout_flags = []
+    standout_window_flags = []
     for i in range(n):
-        other_embeddings = np.delete(clause_embeddings, i, axis=0)
-        mean_other = clause_embeddings[i] if other_embeddings.size == 0 else other_embeddings.mean(axis=0)
-        sim = cosine_similarity(clause_embeddings[i], mean_other)
-        standout_flags.append(sim < threshold)
+        other_embeddings = np.delete(window_embeddings, i, axis=0)
+        mean_other = window_embeddings[i] if other_embeddings.size == 0 else other_embeddings.mean(axis=0)
+        sim = cosine_similarity(window_embeddings[i], mean_other)
+        standout_window_flags.append(sim < threshold)
 
-    return standout_flags
+    return standout_window_flags
