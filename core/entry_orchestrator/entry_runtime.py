@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-06-05T20:11-04:00
+# Save-state: 2026-06-11T16:37-04:00
 # ==========================================
 import asyncio
 import copy
@@ -536,7 +536,7 @@ class EntryWritingRuntime:
         # 1. JSON WRITE (MUST NEVER BE TIED TO NPZ SUCCESS)
         # ============================================================
         try:
-            PERSISTED_FIELDS = {
+            PERSISTED_FIELDS = (
                 "entry_id",
                 "entry_nickname",
                 "timestamp",
@@ -553,7 +553,7 @@ class EntryWritingRuntime:
                 "crisis_flag",
 
                 "hash_from_token_for_deleting_entries",
-            }
+            )
 
             def project(entry):
                 return {k: entry.get(k) for k in PERSISTED_FIELDS}
@@ -825,7 +825,7 @@ class EntryWritingRuntime:
             "entry_id": target.get("entry_id") or target.get("id"),
             "entry_nickname": None,
             "timestamp": now,
-            "user_id": target.get("user_id"),
+            "user_id": None,
 
             # core content (neutralized, not removed)
             "safe_text": "",

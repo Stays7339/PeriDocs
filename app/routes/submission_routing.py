@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/submission_routing.py
-# save-state 2026-06-11T15:36-04:00
+# save-state 2026-06-11T16:19-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -74,10 +74,7 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
 
     
 
-    logger.debug(
-        "process_entry_async returned: %s",
-        sorted(entry.keys())
-    )
+    logger.debug(f"process_entry_async returned raw order: {list(entry.keys())}")
 
     logger.debug(
         "Entry runtime contains id after processing? %s",

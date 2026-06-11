@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-25T19:07:10-04:00
+save-state 2026-06-11T17:01-04:00
 */
 
 /* =========================
@@ -841,6 +841,38 @@ The next mention is to control the width as button are added and removed from th
 }
 .consent-toggle[data-state="on"] .toggle-knob { transform: translateX(var(--toggle-knob-transform-on)); }
 .consent-toggle[data-state="on"] { background: var(--accent); color: var(--white); }
+
+/* Buttons & toggles */
+
+:root {
+  --button-height: 48px;
+  --toggle-width: 250px;
+  --toggle-height: 36px;
+  --toggle-knob-size: 28px;
+  --toggle-knob-margin: 4px;
+  --toggle-knob-transform-on: 214px;
+  --accent-hover: #6B708F;
+}
+
+  /* =========================
+   Consent Toggle
+========================= */
+.consent-toggle {
+  position: relative; width: var(--toggle-width); height: var(--toggle-height);
+  border-radius:999px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  background: rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);
+}
+.consent-toggle .toggle-knob {
+  position:absolute; width: var(--toggle-knob-size); height: var(--toggle-knob-size);
+  border-radius:50%; background: linear-gradient(145deg,#fff,#f2f2f2);
+  left: var(--toggle-knob-margin); top: var(--toggle-knob-margin); z-index:2;
+  transition: transform 0.3s ease;
+}
+.consent-toggle[data-state="on"] .toggle-knob { transform: translateX(var(--toggle-knob-transform-on)); }
+.consent-toggle[data-state="on"] { background: var(--brandmuted-periwinklemuted-periwinkle-004); color: var(--white); }
+
+.consent-toggle:hover { background: var(--brandmuted-periwinklemuted-periwinkle-004); transform: translateY(-1px); }
+
 
 /* =========================
    FONTS
