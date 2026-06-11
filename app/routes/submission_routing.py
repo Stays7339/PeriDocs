@@ -1,6 +1,6 @@
 # ==========================================
-# app/routes/entry.py
-# save-state 2026-06-05T19:56-04:00
+# app/routes/submission_routing.py
+# save-state 2026-06-11T15:36-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -15,7 +15,7 @@ import os
 import logging
 
 from app.routes import app
-from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
+from core.entry_orchestrator.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 from core.map.deletion import DeletionManager

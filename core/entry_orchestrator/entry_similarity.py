@@ -1,6 +1,6 @@
 
 # ==========================================
-# app/helpers/entry_similarity.py
+# core/entry_orchestrator/entry_similarity.py
 # Save-state: 2026-05-19T14:14:10-04:00
 # Can handle loading embeddings from disk, raw similarity computations for embeddings, 
 # and deterministic mean. Other files may still use their own internal helpers rather than calling this file.

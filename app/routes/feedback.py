@@ -1,6 +1,6 @@
 # ==========================================
 # PeriDocs-code/app/routes/feedback.py
-# save-state 202512241710
+# save-state 2026-06-11T15:43-04:00 
 # ==========================================
 
 from fastapi import Request
@@ -44,7 +44,7 @@ async def submit_feedback_json(payload: FeedbackPayload, request: Request):
     client_host = request.client.host if request.client else "unknown"
     ip_hash = hashlib.sha256(client_host.encode("utf-8")).hexdigest()
 
-    entry = {
+    entry_for_feedback = {
         "type": payload.type,
         "text": payload.feedback_text,
         "timestamp": datetime.utcnow().isoformat(),
@@ -60,7 +60,7 @@ async def submit_feedback_json(payload: FeedbackPayload, request: Request):
         data = []
 
     # Append new entry
-    data.append(entry)
+    data.append(entry_for_feedback)
 
     # --- Async atomic save with unique tmp ---
     tmp_file_path = f"{feedback_file}.{uuid.uuid4().hex}.tmp"
@@ -69,4 +69,4 @@ async def submit_feedback_json(payload: FeedbackPayload, request: Request):
 
     await aiofiles.os.replace(tmp_file_path, feedback_file)
 
-    return JSONResponse({"status": "ok", "entry": json_safe(entry)})
+    return JSONResponse({"status": "ok", "entry": json_safe(entry_for_feedback)})

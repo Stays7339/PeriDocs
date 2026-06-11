@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-06-11T13:04-04:00 (ISO 8601)
+# save-state 2026-06-11T15:33-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -77,12 +77,10 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # ---------------- Import app-bound routes (side effects only) ----------------
 from app.routes import info_navigation
-from app.routes import entry
+from app.routes import submission_routing
 from app.routes import feedback
 
 # ---------------- Include router-based routes ----------------
-# Inject lifespan parameters
-# app.router.lifespan_context = database_lifespan
 
 from app.routes import admin_routing
 app.include_router(admin_routing.router)

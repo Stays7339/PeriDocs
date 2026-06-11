@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-06-10T16:31-04:00 (YYYYMMDDhhmm)
+# Save-state: 2026-06-11T15:27-04:00
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
@@ -15,7 +15,7 @@ from datetime import datetime
 
 from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
-from app.helpers.entry_writing_runtime import EntryWritingRuntime
+from core.entry_orchestrator.entry_runtime import EntryWritingRuntime
 
 logger = logging.getLogger(__name__)
 

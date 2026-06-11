@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-05-27T23:38:00-04:00
+# Save-state: 2026-06-11T15:22-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -19,7 +19,7 @@ from typing import Dict, List, Tuple
 import logging
 from datetime import datetime, timezone
 
-from app.helpers.entry_similarity import (
+from core.entry_orchestrator.entry_similarity import (
     cosine_similarity, 
     deterministic_mean, 
     safe_load_embedding,

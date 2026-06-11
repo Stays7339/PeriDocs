@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-06-05T19:45-04:00
+# save-state 2026-06-11T15:22-04:00
 # ==========================================
 
 
@@ -28,7 +28,7 @@ from .clause_utils import split_into_clauses, sliding_window_clauses
 from core.map.mapping_runtime import centroid_system, entry_runtime
 from core.map import entry_membership_sequencer
 
-from app.helpers.entry_similarity import highlight_standout_clauses
+from core.entry_orchestrator.entry_similarity import highlight_standout_clauses
 from core.reasoning.reasoning_runtime import run_reasoning
 
 

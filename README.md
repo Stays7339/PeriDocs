@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-06-09T10:52-04:00
+## Canonical Project Directory as of 2026-06-11T15:34-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -415,11 +415,8 @@ PeriDocs/                         # Root project folder
 │  │  └─ __pycache__/  
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
-│  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
-│  │  ├─ entry_writing_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
 │  │  ├─ file_ops.py                  # Thin script to persist short plaintext strings of feedback to the backend in an isolated dumb json file.
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │  └─ __pycache__/  
 │  │
 │  │
@@ -427,9 +424,9 @@ PeriDocs/                         # Root project folder
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ admin_routing.py              # "/admin*"
 │  │  ├─ donation.py                   # Provides routing to Stripe Checkout page for the amount and frequency that user opts-in to.
-│  │  ├─ entry.py                      # "/submit", "/submit-success"
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  ├─ submission_routing.py                      # "/submit", "/submit-success"
 │  │  └─ __pycache__/                
 │  │
 │  ├─ static/                            # raw files served directly to browser unchanged
@@ -485,6 +482,13 @@ PeriDocs/                         # Root project folder
 │
 │
 ├─ core/
+│   ├─ entry-orchestrator/                      
+│   │   ├─ __init__.py              # Exposes EntryRuntime
+│   │   ├─ entry_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
+│   │   ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│   │   └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│   │
+│   │
 │   ├─ map/
 │   │   ├─ __init__.py                    # to avoid having to redfine the same value everywhere, this is being used as a config file for this specific package
 │   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced common theme and some (but not all) SAAJE affiliations.
@@ -551,6 +555,13 @@ PeriDocs/                         # Root project folder
 │   │          ├─ content_tables.sql
 │   │          ├─ kb_tables.sql
 │   │          └─ nlp_tables.sql
+│   │
+│   ├─ storage_engines/             <-- THE UNIFIED DATA CASTLE
+│   │     ├─ __init__.py            # Exposes the factory/bootloader
+│   │     ├─ base_provider.py       # Abstract Base Classes (The Storage Contracts)
+│   │     ├─ flat_file_engine.py    # Your existing compressed NPZ + JSON mechanics
+│   │     └─ postgres_engine.py     # Your partner's secure psycopg table targets
+│   │
 │   └─ validation/ 
 │      ├─ check_schemas.py 
 │      ├─ verify_infrastructure.py 

@@ -1,5 +1,5 @@
 # ==========================================
-# app/helpers/entry_writing_runtime.py
+# core/entry_orchestrator/entry_runtime.py
 # Save-state: 2026-06-05T20:11-04:00
 # ==========================================
 import asyncio
@@ -45,7 +45,7 @@ class EntryWritingRuntime:
 
     For Embeddings In Particular:
     process_entry_async computes everything, 
-    and THEN multiple set_*() methods store state within entry_writing_runtime.py (this file).
+    and THEN multiple set_*() methods store state within entry_runtime.py (this file).
 
     All NPZ files share one invariant:
 

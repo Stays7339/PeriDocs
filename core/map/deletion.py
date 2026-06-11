@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-05-19T17:07:50-04:00
+# Save-state: 2026-06-11T15:27-04:00
 # ==========================================
 
 """
@@ -21,13 +21,13 @@ import asyncio
 import logging
 from typing import Dict, List, Optional
 import numpy as np
-from app.helpers.entry_similarity import (
+from core.entry_orchestrator.entry_similarity import (
     deterministic_mean,
     safe_load_embedding,
 )
 from core.map.ledger import IdentifierLedger
 from core.map.centroids import CentroidSystem
-from app.helpers.entry_writing_runtime import EntryWritingRuntime
+from core.entry_orchestrator.entry_runtime import EntryWritingRuntime
 # importing class definitions, rather than the injection itself; both are necessary; injections are further on.
 # if importing is considered using vocabulary, in this case, then injections are like using an exact physical object.
 
