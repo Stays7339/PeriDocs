@@ -1,5 +1,8 @@
 #!/usr/bin/env sys executable
+# ==========================================
+# save-state 2026-06-14T17:02-04:00
 # setup.py
+# ==========================================
 import os
 import subprocess
 import sys
@@ -108,6 +111,7 @@ def initialize_peridocs_database():
                 apply_sql_blueprint(cur, "database-management/schemas/03_permissions.sql")
                 apply_sql_blueprint(cur, "database-management/schemas/tables/content_tables.sql")
                 apply_sql_blueprint(cur, "database-management/schemas/tables/kb_tables.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/ledger_tables.sql")
                 apply_sql_blueprint(cur, "database-management/schemas/tables/nlp_tables.sql")
                 
     except Exception as e:

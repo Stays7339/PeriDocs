@@ -1,6 +1,6 @@
 # ==========================================
 # core/mode_lock.py
-# Save-state: 2026-06-14T14:35-04:00
+# Save-state: 2026-06-14T16:35-04:00
 # ==========================================
 
 import os
@@ -21,6 +21,14 @@ class SystemModeLock:
     _resolved_mode: str | None = None
 
     @classmethod
+    def is_lock_file_present_on_disk(cls) -> bool:
+        """
+        Returns True if the sticky system lock file physically exists on disk.
+        Used as a veto safety net to prevent split-brain file system drift.
+        """
+        return MODE_LOCK_PATH.exists()
+
+    @classmethod
     def resolve_operational_mode(cls) -> str:
         """
         Called EXACTLY ONCE during application startup initialization.
@@ -29,7 +37,7 @@ class SystemModeLock:
             return cls._resolved_mode
 
         # 1. Check if a sticky lock file already exists from a previous lifecycle
-        if MODE_LOCK_PATH.exists():
+        if cls.is_lock_file_present_on_disk():
             try:
                 locked_mode = MODE_LOCK_PATH.read_text(encoding="utf-8").strip()
                 if locked_mode in ("DATABASE", "LOCAL"):
@@ -56,7 +64,7 @@ class SystemModeLock:
         Burns the fuse. Called immediately after the first successful 
         persistence routine of any module completes.
         """
-        if MODE_LOCK_PATH.exists():
+        if cls.is_lock_file_present_on_disk():
             return # Already locked on disk
 
         current_mode = cls._resolved_mode or "LOCAL"
