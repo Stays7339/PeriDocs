@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-06-09T14:38-04:00
+# Save-state: 2026-06-14T14:47-04:00
 # ==========================================
 
 import os
@@ -418,6 +418,52 @@ class CentroidSystem:
         if not hasattr(self, "entry_runtime") or self.entry_runtime is None:
             raise RuntimeError("CentroidSystem missing entry_runtime dependency during load_state")
         await self._assert_ledger_ready()
+
+        # ============================================================
+        # INTERCEPTION BOUNDARY: Online Cluster Rehydration
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            try:
+                from core.database import db_engine
+                raw_centroids = await db_engine.load_centroids_bundle()
+                
+                async with self._lock:
+                    self._centroids.clear()
+                    
+                    for cid, c_data in raw_centroids.items():
+                        c = Centroid(c_data["centroid_id"])
+                        await self._check_if_identifier_is_consistent_with_ledger(c.centroid_id)
+                        c.title_from_human_moderator = c_data["title_from_human_moderator"]
+                        c.description_from_human_moderator = c_data["description_from_human_moderator"]
+                        
+                        # Reconstruct chronological state history array objects
+                        for ev_idx in sorted(c_data["states"].keys()):
+                            s_data = c_data["states"][ev_idx]
+                            
+                            # Enforce event index sequence order
+                            self._assert_event_order(c, s_data["event_index"])
+                            
+                            centroid_state = CentroidState(
+                                event_index=s_data["event_index"],
+                                entry_ids=s_data["entry_ids"],
+                                vector=s_data["vector"],
+                                metadata=s_data["metadata"]
+                            )
+                            c.states.append(centroid_state)
+                            
+                        self._centroids[c.centroid_id] = c
+                        logger.info("[load_state] Loaded centroid %s from DB with %d states", c.centroid_id, len(c.states))
+                
+                logger.info("[CentroidSystem] Online knowledge base rehydration complete.")
+                return # Exit early, avoiding disk file parsing loop
+                
+            except Exception as db_err:
+                logger.error("[CentroidSystem] Database cluster bootstrap failed: %s", db_err)
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    raise db_err
+                logger.warning("[CentroidSystem] Falling back to scanning local centroid directories.")
+                
         async with self._lock:
             self._centroids.clear()
             if not os.path.isdir(STATE_DIR):
@@ -531,6 +577,50 @@ class CentroidSystem:
         json_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}_summary.json")
         tmp_npz = npz_path.replace(".npz", ".tmp.npz")
         tmp_json = json_path + ".tmp"
+
+        # ============================================================
+        # STEP 1: RESOLVE THE OPERATIONAL MODE
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        operational_mode = SystemModeLock.resolve_operational_mode()
+
+        if operational_mode == "DATABASE":
+            try:
+                logger.debug("[CENTROID PERSIST] Routing centroid %s to database engine...", centroid.centroid_id)
+                
+                # Extract payloads using your existing validation logic
+                summary_payload = centroid.serialize()
+                npz_dump = {}
+                for state_idx, state in enumerate(centroid.states):
+                    if state.vector is None or not isinstance(state.vector, np.ndarray):
+                        raise RuntimeError(f"State {state_idx} in {centroid.centroid_id} has invalid vector")
+                    npz_dump[f"{centroid.centroid_id}_state{state_idx}"] = state.vector
+
+                # --------------------------------------------------------
+                # INTERFACE BOUNDARY: The Centroid Database Handshake (ACTIVE)
+                # --------------------------------------------------------
+                from core.database import db_engine
+                
+                await db_engine.save_centroid_bundle(
+                    centroid_id=centroid.centroid_id,
+                    summary_payload=summary_payload,
+                    npz_dump=npz_dump
+                )
+                # --------------------------------------------------------
+                
+                SystemModeLock.lock_mode_permanently() # Safe, idempotent fuse burn
+                logger.debug("[CENTROID PERSIST] Centroid %s successfully committed to database.", centroid.centroid_id)
+                return # Exit early, avoiding creation of local .json and .npz files
+
+            except Exception as db_err:
+                logger.error("[CENTROID PERSIST] Failed to save centroid %s to DB: %s", centroid.centroid_id, db_err)
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    raise db_err # Refuse to write to local disk if we are a confirmed database app
+                logger.warning("[CENTROID PERSIST] Falling back to generating local files for centroid %s", centroid.centroid_id)
+
+        # ============================================================
+        # STEP 2: ORIGINAL LOCAL STORAGE PIPELINE (100% UNCHANGED)
+        # ============================================================
 
         # Only store one vector per state (mean/cached)
         npz_dump = {}

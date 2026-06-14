@@ -77,7 +77,7 @@ def initialize_peridocs_database():
                 
                 if not exists:
                     print("Catalog 'peridocs_db' absent. Physicalizing base cluster storage...")
-                    apply_sql_blueprint(cur, "database-management/schemas/00_init_db.sql")
+                    apply_sql_blueprint(cur, "database-management/schemas/00_db_init.sql")
                 else:
                     print("Catalog 'peridocs_db' verified online.")
 

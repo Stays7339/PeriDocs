@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-06-11T15:33-04:00 (ISO 8601)
+# save-state 2026-06-14T15:27-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -163,9 +163,6 @@ async def startup_sequence():
 async def shutdown_sequence():
     logger.info("Starting shutdown sequence...")
 
-    logger.info("Draining database connections...")
-    await close_database()
-
     await shutdown_account_runtime()
     """
     Keep only the most recent backup, delete all others.
@@ -174,6 +171,9 @@ async def shutdown_sequence():
     backup_dir = Path.cwd() / "backups-for-the-main-data-folder"
     if not backup_dir.exists():
         return
+
+    logger.info("Draining database connections...")
+    await close_database()
 
     backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
     # Keep the most recent

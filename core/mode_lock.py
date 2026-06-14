@@ -1,0 +1,74 @@
+# ==========================================
+# core/mode_lock.py
+# Save-state: 2026-06-14T14:35-04:00
+# ==========================================
+
+import os
+import logging
+from pathlib import Path
+
+logger = logging.getLogger(__name__)
+
+DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
+MODE_LOCK_PATH = DATA_DIR / ".system_mode_lock"
+TMP_LOCK_PATH = DATA_DIR / ".system_mode_lock.tmp"
+
+class SystemModeLock:
+    """
+    Guarantees the system permanently binds to either DATABASE or LOCAL storage
+    after the initial successful write, preventing mid-lifecycle drift.
+    """
+    _resolved_mode: str | None = None
+
+    @classmethod
+    def resolve_operational_mode(cls) -> str:
+        """
+        Called EXACTLY ONCE during application startup initialization.
+        """
+        if cls._resolved_mode is not None:
+            return cls._resolved_mode
+
+        # 1. Check if a sticky lock file already exists from a previous lifecycle
+        if MODE_LOCK_PATH.exists():
+            try:
+                locked_mode = MODE_LOCK_PATH.read_text(encoding="utf-8").strip()
+                if locked_mode in ("DATABASE", "LOCAL"):
+                    logger.info("[MODE LOCK] Sticky lock active. System anchored to: %s", locked_mode)
+                    cls._resolved_mode = locked_mode
+                    return cls._resolved_mode
+            except Exception as e:
+                logger.error("[MODE LOCK] Failed reading lock file: %s. Reverting to environment.", e)
+
+        # 2. Fallback to .env inspection if no lock file exists yet
+        env_mode = os.getenv("DATABASE_MODE", "").strip()
+        if env_mode in ("PRODUCTION", "LOCAL"):
+            logger.info("[MODE LOCK] No active lock file. .env requests online engine.")
+            cls._resolved_mode = "DATABASE"
+        else:
+            logger.info("[MODE LOCK] No active lock file. Defaulting to local file engine.")
+            cls._resolved_mode = "LOCAL"
+
+        return cls._resolved_mode
+
+    @classmethod
+    def lock_mode_permanently(cls) -> None:
+        """
+        Burns the fuse. Called immediately after the first successful 
+        persistence routine of any module completes.
+        """
+        if MODE_LOCK_PATH.exists():
+            return # Already locked on disk
+
+        current_mode = cls._resolved_mode or "LOCAL"
+        
+        try:
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Atomic write utilizing your verified .tmp swap protocol
+            with open(TMP_LOCK_PATH, "w", encoding="utf-8") as f:
+                f.write(current_mode)
+                
+            os.replace(TMP_LOCK_PATH, MODE_LOCK_PATH)
+            logger.warning("[MODE LOCK] FUSE BURNED. System permanently locked to %s mode.", current_mode)
+        except Exception as e:
+            logger.critical("[MODE LOCK] Catastrophic failure writing sticky mode lock: %s", e)

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-05-27T20:31:27-04:00
+# Save-state: 2026-06-14T15:30-04:00
 # ==========================================
 
 """
@@ -42,16 +42,31 @@ def _initial_ledger() -> Dict[str, Any]:
 
 async def _load() -> Dict[str, Any]:
     """
-    Load ledger.json from disk.
-    If missing:
-        - Prompt human if centroids exist in STATE_DIR.
-        - If user agrees, create initial ledger.
-        - If user declines, raise RuntimeError.
+    Load ledger data from the database or fall back to ledger.json from disk.
     """
     global _ledger_cache
     if _ledger_cache is not None:
         return _ledger_cache
 
+    # --------------------------------------------------------
+    # ONLINE MODE INTERCEPTION
+    # --------------------------------------------------------
+    from core.mode_lock import SystemModeLock
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        try:
+            from core.database import db_engine
+            _ledger_cache = await db_engine.load_ledger_bundle()
+            logger.info("[ledger_init] Authoritative database ledger rehydrated into cache.")
+            return _ledger_cache
+        except Exception as db_err:
+            logger.error("[ledger_init] Database rehydration crashed: %s", db_err)
+            if SystemModeLock.is_lock_file_present_on_disk():
+                raise db_err # Refuse file system corruption if database execution is mandatory
+            logger.warning("[ledger_init] System unburned. Falling back to parsing ledger.json on disk.")
+
+    # --------------------------------------------------------
+    # ORIGINAL LOCAL STORAGE FALLBACK PIPELINE (Unchanged)
+    # --------------------------------------------------------
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.path.exists(LEDGER_PATH):
@@ -73,6 +88,21 @@ async def _load() -> Dict[str, Any]:
 
 
 async def _save(state: Dict[str, Any]) -> None:
+    """
+    Saves the state payload back to the current active storage engine layer.
+    """
+    # --------------------------------------------------------
+    # ONLINE MODE INTERCEPTION
+    # --------------------------------------------------------
+    from core.mode_lock import SystemModeLock
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        from core.database import db_engine
+        await db_engine.save_ledger_bundle(state)
+        return
+
+    # --------------------------------------------------------
+    # ORIGINAL LOCAL STORAGE FALLBACK PIPELINE (Unchanged)
+    # --------------------------------------------------------
     tmp = LEDGER_PATH.with_suffix(LEDGER_PATH.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)

@@ -54,3 +54,42 @@ CREATE TABLE IF NOT EXISTS "CONTENT".resources (
 CREATE INDEX IF NOT EXISTS idx_resources_creator ON "CONTENT".resources(created_by);
 
 COMMIT;
+
+
+
+-- ============================================================
+-- 04. ENTRIES TABLE
+-- Target File: content_tables.sql
+-- Description: Mirrors the exact structured JSON keys for platform input.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.entries (
+    entry_id                             VARCHAR(64) PRIMARY KEY,
+    entry_nickname                       VARCHAR(255),
+    timestamp                            TIMESTAMPTZ NOT NULL,
+    user_id                              VARCHAR(64) NOT NULL,
+    
+    -- The core readable and processed content
+    safe_text                            TEXT,
+    
+    -- Backward-compatible array snapshot of original centroid associations
+    centroids                            JSONB DEFAULT '[]'::jsonb,
+    
+    -- Security & Forensic boundaries
+    ip_hash                              VARCHAR(128),
+    encrypted_raw_ip                     TEXT,
+    encrypted_raw_text                   TEXT,
+    
+    -- Platform telemetry & deletion token checks
+    crisis_flag                          BOOLEAN DEFAULT FALSE,
+    hash_from_token_for_deleting_entries TEXT,
+    
+    -- Database lifecycle tracking
+    created_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    updated_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Optimization indexes for rehydration, user audit history, and fast queries
+CREATE INDEX IF NOT EXISTS idx_entries_user_id ON public.entries(user_id);
+CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON public.entries(timestamp DESC);
+CREATE INDEX IF NOT EXISTS idx_entries_crisis_flag ON public.entries(crisis_flag) WHERE crisis_flag = TRUE;

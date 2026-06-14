@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-06-11T15:34-04:00
+## Canonical Project Directory as of 2026-06-14T15:34-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -445,8 +445,8 @@ PeriDocs/                         # Root project folder
 │  │  ├─ globals.css                      # webpage styling that should be applied everywhere
 │  │  ├─ info-card-border.png             # decorative framing for landing page content
 │  │  ├─ modal-ui.js                      # Controls the behavior of modals (i.e., site-official popups)
-│  │  ├─ museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png
 │  │  ├─ myers-reset-2.0.css              # public domain boilerplate code that helps to keep css styling consistent across different web browsers
+│  │  ├─ [... some images from the public domain just for style ...]
 │  │  ├─ peridocs-logo-icon-2026-05-05.svg
 │  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
 │  │  ├─ peridocs-logo-workmark-2026-05-05.svg
@@ -454,18 +454,21 @@ PeriDocs/                         # Root project folder
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
+│  │  ├─ toast-ui.js 
+│  │  ├─ user-icon.png
+│  │  ├─ user-icon.svg
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
 │  └─ templates/                          # server-rendered files processed by Jinja
 │   ├─ about.html                         # About page template
-│   ├─ account-signin.html                # includes in-line javascript
-│   ├─ account-signup.html                # includes in-line javascript
+│   ├─ account-signin.html                
+│   ├─ account-signup.html                
+│   ├─ account.html                       
 │   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an common theme populated by user entries.
 │   ├─ base.html                       # The new new more polished looking base (floating header + background)
 │   ├─ create-entry.html 
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
-│   ├─ create-entry.html # the only page where entries are typed and submitted for ingestion
 │   ├─ index.html                     # Landing page template
 │   ├─ privacy.html                   # Privacy policy page template
 │   ├─ submit-success.html            # Submission success page template
@@ -482,6 +485,10 @@ PeriDocs/                         # Root project folder
 │
 │
 ├─ core/
+│   ├─ database.py 
+│   ├─ mode_lock.py 
+│   │
+│   │
 │   ├─ entry-orchestrator/                      
 │   │   ├─ __init__.py              # Exposes EntryRuntime
 │   │   ├─ entry_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
@@ -526,6 +533,10 @@ PeriDocs/                         # Root project folder
 │           
 │
 ├─ data/                                  # Local data storage
+│  ├─ accounts/
+│  │   └─accounts.encrypted.json
+│  │
+│  │
 │  ├─ centroids/
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
@@ -554,9 +565,10 @@ PeriDocs/                         # Root project folder
 │   │     └─ tables/
 │   │          ├─ content_tables.sql
 │   │          ├─ kb_tables.sql
+│   │          ├─ ledger_tables.sql
 │   │          └─ nlp_tables.sql
 │   │
-│   ├─ storage_engines/             <-- THE UNIFIED DATA CASTLE
+│   ├─ storage_engines/
 │   │     ├─ __init__.py            # Exposes the factory/bootloader
 │   │     ├─ base_provider.py       # Abstract Base Classes (The Storage Contracts)
 │   │     ├─ flat_file_engine.py    # Your existing compressed NPZ + JSON mechanics

@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-06-11T16:37-04:00
+# Save-state: 2026-06-14T15:14-04:00
 # ==========================================
 import asyncio
 import copy
@@ -121,6 +121,41 @@ class EntryWritingRuntime:
 
         if self._initialized:
             return
+        
+
+        # ============================================================
+        # INTERCEPTION BOUNDARY: Online Rehydration
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            try:
+                from core.database import db_engine
+                
+                # Fetch all configurations in a single unified database trip
+                db_bundle = await db_engine.load_entries_bundle()
+                
+                self._entries = db_bundle["entries"]
+                self._embeddings = db_bundle["embeddings"]
+                self._window_embeddings = db_bundle["window_embeddings"]
+                self._window_text = db_bundle["window_text"]
+                self._standout_window_flags = db_bundle["window_flags"]
+                
+                # Build index maps natively from database state
+                self._rebuild_entry_index()
+                
+                # Validate consistency across modules (Ledger vs RAM)
+                await self._verify_integrity_on_startup()
+                
+                self._background_flush_worker = asyncio.create_task(self._flush_worker())
+                self._initialized = True
+                logger.info("[EntryWritingRuntime] Online database initialization complete.")
+                return # Exit early, preventing file lookups
+                
+            except Exception as db_err:
+                logger.error("[EntryWritingRuntime] Failed database bootstrap: %s", db_err)
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    raise db_err # Refuse file system fallback if the app is officially locked to DB mode
+                logger.warning("[EntryWritingRuntime] Lock unburned. Retrying fallback to local storage files.")
 
         self._entries = self._load_entries_json_from_disk()
         self._rebuild_entry_index()
@@ -533,7 +568,58 @@ class EntryWritingRuntime:
         os.makedirs(npz_dir, exist_ok=True)
 
         # ============================================================
-        # 1. JSON WRITE (MUST NEVER BE TIED TO NPZ SUCCESS)
+        # STEP 1: RESOLVE THE OPERATIONAL MODE
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        operational_mode = SystemModeLock.resolve_operational_mode()
+
+        if operational_mode == "DATABASE":
+            try:
+                logger.debug("[PERSIST] System is locked to DATABASE. Extracting payloads...")
+                
+                # Extract the JSON snapshot using your existing logic
+                PERSISTED_FIELDS = ("entry_id", "entry_nickname", "timestamp", "user_id", "safe_text", "centroids", "ip_hash", "encrypted_raw_ip", "encrypted_raw_text", "crisis_flag", "hash_from_token_for_deleting_entries")
+                def project(entry): return {k: entry.get(k) for k in PERSISTED_FIELDS}
+                snapshot = json_safe([project(e) for e in copy.deepcopy(self._entries)])
+                
+                # Extract your current NPZ snapshots
+                embedding_snapshot = copy.deepcopy(self._embeddings)
+                
+                # --------------------------------------------------------
+                # INTERFACE BOUNDARY: The Database Handshake (ACTIVE)
+                # --------------------------------------------------------
+                from core.database import db_engine  # Assumes db_engine exports initialized PostgresStorageEngine
+                
+                await db_engine.save_entries_bundle(
+                    snapshot=snapshot,
+                    embedding_snapshot=embedding_snapshot,
+                    window_embeddings=self._window_embeddings,
+                    window_text=self._window_text,
+                    standout_flags=self._standout_window_flags
+                )
+                # --------------------------------------------------------
+                
+                # SUCCESS: If the database transaction committed cleanly, lock it in!
+                SystemModeLock.lock_mode_permanently() # Burns the fuse on first success
+                logger.info("[PERSIST] Central database flush completed. Bypassing disk I/O.")
+                return # Exit early! Your hard drive never has to spin up.
+
+            except Exception as db_err:
+                logger.error("[PERSIST] Database transaction failed: %s", db_err)
+                
+                # The Veto Safety Net:
+                # If the lock file ALREADY exists on disk, the database is our ONLY true source of truth.
+                # Falling back to stale local files now would corrupt your emergent clusters.
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    logger.critical("[PERSIST] CATASTROPHIC: System is legally locked to DATABASE, but Germany is unreachable. Halting to prevent split-brain cluster corruption.")
+                    raise db_err
+                
+                # If the lock file DOES NOT exist yet, this was just an initial test boot that failed.
+                # We can safely drop down into your original file system code.
+                logger.warning("[PERSIST] Lock file not burned yet. Falling back to local emergency files.")
+
+        # ============================================================
+        # STEP 2a: ORIGINAL LOCAL STORAGE PIPELINE (100% UNCHANGED)
         # ============================================================
         try:
             PERSISTED_FIELDS = (
@@ -577,7 +663,7 @@ class EntryWritingRuntime:
             raise  # ONLY JSON failure should crash system
 
         # ------------------------------------------------------------
-        # 2A. WRITE NPZ
+        # 2B. WRITE NPZ
         # ------------------------------------------------------------
         logger.debug("Calling np.savez_compressed...")
 
@@ -627,7 +713,7 @@ class EntryWritingRuntime:
                 raise RuntimeError(f"[Persist] failed to commit NPZ after retries: {last_err}")
 
             # ============================================================
-            # 2B. CLAUSE-LEVEL NPZ WRITES
+            # 2C. CLAUSE-LEVEL NPZ WRITES
             # ============================================================
 
             np.savez_compressed(
