@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==========================================
 # PeriDocs/core/database.py
-# save-state 2026-06-11T13:02-04:00
+# save-state 2026-06-15T13:34-04:00
 # ==========================================
 import os
 import contextlib
@@ -18,6 +18,9 @@ DATABASE_MODE = os.getenv("DATABASE_MODE", "OFFLINE_MOCK").upper()
 
 db_pool = None
 ASYNC_CONN_INFO = None
+
+# --- NEW ADDITION: EXPOSE THE COHESIVE ENGINE FACADE FOR THE DOMAIN ---
+db_engine = None
 
 # Guarded configuration setup to protect OFFLINE_MOCK mode from missing dependencies
 if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
@@ -38,7 +41,8 @@ if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
 
 async def initialize_database():
     """Explicitly called during the app's startup sequence."""
-    global db_pool
+    # Added db_engine to the global namespace allocation block
+    global db_pool, db_engine
     
     if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
         from psycopg_pool import AsyncConnectionPool
@@ -54,10 +58,30 @@ async def initialize_database():
         )
         await db_pool.open()
         print(f"[STARTUP] [{DATABASE_MODE}] Database pipeline successfully bound.")
+        
+        # --- NEW ADDITION: BIND THE LIVE RELATIONAL STORAGE ENGINE ---
+        try:
+            from database_management.storage_engines import StorageEngineFactory
+            db_engine = StorageEngineFactory.get_engine(
+                engine_type="POSTGRES", 
+                connection_pool=db_pool
+            )
+            print(f"[STARTUP] [{DATABASE_MODE}] Storage engine facade safely bound to pool.")
+        except ImportError:
+            print("[WARNING] Could not import StorageEngineFactory. Verify python path mappings.")
+            raise
     else:
         print("\n====================================================================")
         print(" [WARNING] APPLICATION INITIALIZING IN LOCAL OFFLINE MOCK MODE      ")
         print("====================================================================\n")
+        
+        # --- NEW ADDITION: BIND FLAT FILE STORAGE IMPLEMENTATION FOR OFFLINE COMPLIANCE ---
+        try:
+            from database_management.storage_engines import StorageEngineFactory
+            db_engine = StorageEngineFactory.get_engine(engine_type="FLAT_FILE")
+            print("[STARTUP] Flat File local storage engine provider bound for OFFLINE_MOCK.")
+        except ImportError:
+            print("[WARNING] StorageEngineFactory unavailable. Core ledger tracking will use internal fallbacks.")
 
 
 async def close_database():
