@@ -113,6 +113,8 @@ def initialize_peridocs_database():
                 apply_sql_blueprint(cur, "database-management/schemas/tables/kb_tables.sql")
                 apply_sql_blueprint(cur, "database-management/schemas/tables/ledger_tables.sql")
                 apply_sql_blueprint(cur, "database-management/schemas/tables/nlp_tables.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/app_tables.sql")
+                apply_sql_blueprint(cur, "database-management/schemas/tables/search_tables.sql")
                 
     except Exception as e:
         print(f"CRITICAL: Structural provisioning halted.\nDetails: {e}")
