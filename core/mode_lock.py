@@ -1,6 +1,6 @@
 # ==========================================
 # core/mode_lock.py
-# Save-state: 2026-06-14T16:35-04:00
+# Save-state: 2026-06-17T14:58-04:00
 # ==========================================
 
 import os
@@ -55,6 +55,9 @@ class SystemModeLock:
         else:
             logger.info("[MODE LOCK] No active lock file. Defaulting to local file engine.")
             cls._resolved_mode = "LOCAL"
+
+        # A3. UTOMATICALLY BURN FUSE HERE INDEPENDENTLY OF THE RUNTIMES
+        cls.lock_mode_permanently()
 
         return cls._resolved_mode
 

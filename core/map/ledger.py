@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-06-14T15:30-04:00
+# Save-state: 2026-06-17T14:54-04:00
 # ==========================================
 
 """
@@ -21,6 +21,9 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from pathlib import Path
+
+from core.database import DATABASE_MODE, db_pool
+from database_management.storage_engines.postgres_engine import PostgresStorageEngine
 
 
 DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
@@ -54,8 +57,10 @@ async def _load() -> Dict[str, Any]:
     from core.mode_lock import SystemModeLock
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         try:
-            from core.database import db_engine
-            _ledger_cache = await db_engine.load_ledger_bundle()
+            from core.database import db_pool
+            from database_management.storage_engines.postgres_engine import PostgresStorageEngine
+            engine = PostgresStorageEngine(db_pool)
+            _ledger_cache = await engine.load_ledger_bundle()
             logger.info("[ledger_init] Authoritative database ledger rehydrated into cache.")
             return _ledger_cache
         except Exception as db_err:
@@ -97,7 +102,10 @@ async def _save(state: Dict[str, Any]) -> None:
     from core.mode_lock import SystemModeLock
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         from core.database import db_engine
-        await db_engine.save_ledger_bundle(state)
+        from database_management.storage_engines.postgres_engine import PostgresStorageEngine
+        
+        engine = PostgresStorageEngine(db_pool)
+        await engine.save_ledger_bundle(state)
         return
 
     # --------------------------------------------------------
@@ -107,6 +115,7 @@ async def _save(state: Dict[str, Any]) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)
     os.replace(tmp, LEDGER_PATH)
+
 
 
 class IdentifierLedger:

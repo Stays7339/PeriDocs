@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-06-15T12:50-04:00
+## Canonical Project Directory as of 2026-06-17T14:24-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -572,9 +572,7 @@ PeriDocs/                         # Root project folder
 │   │
 │   ├─ storage_engines/
 │   │     ├─ __init__.py            # Exposes the factory/bootloader
-│   │     ├─ base_provider.py       # Abstract Base Classes (The Storage Contracts)
-│   │     ├─ flat_file_engine.py    # Your existing compressed NPZ + JSON mechanics
-│   │     └─ postgres_engine.py     # Your partner's secure psycopg table targets
+│   │     └─ postgres_engine.py    
 │   │
 │   └─ validation/ 
 │      ├─ check_schemas.py 

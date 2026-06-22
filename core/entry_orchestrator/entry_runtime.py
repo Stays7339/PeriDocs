@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-06-14T15:14-04:00
+# Save-state: 2026-06-17T16:48-04:00
 # ==========================================
 import asyncio
 import copy
@@ -17,13 +17,6 @@ from app.helpers.json_safe import json_safe
 logger = logging.getLogger(__name__)
 
 
-
-def get_npz_window_path(base_name: str) -> str:
-    now = datetime.now(timezone.utc)
-    window = now.hour // 6
-    timestamp = now.strftime("%Y%m%d") + f"_{window}"
-
-    return f"data/entries/{base_name}_dump_{timestamp}.npz"
 
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 EMBEDDING_DIM = 1024
