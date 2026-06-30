@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-06-30T10:55-04:00
+# Save-state: 2026-06-30T14:36-04:00
 # ============================================================================
 import json
 import logging
@@ -41,10 +41,19 @@ class PostgresStorageEngine:
                 )
                 row = await cur.fetchone()
                 if row:
-                    state["next_centroid_id"] = row[0]
-                    state["next_event_index"] = row[1]
+                    # High-Level Protection: Handle both dictionary and tuple row formats safely
+                    if isinstance(row, dict):
+                        state["next_centroid_id"] = row.get("next_centroid_id", 1)
+                        state["next_event_index"] = row.get("next_event_index", 1)
+                        suffixes_raw = row.get("issued_suffixes")
+                    else:
+                        state["next_centroid_id"] = row[0]
+                        state["next_event_index"] = row[1]
+                        suffixes_raw = row[2]
+
                     state["issued_suffixes"] = (
-                        row[2] if isinstance(row[2], dict) else json.loads(row[2] or "{}")
+                        suffixes_raw if isinstance(suffixes_raw, dict) 
+                        else json.loads(suffixes_raw or "{}")
                     )
 
                 # 2. Fetch all sequence records from the append-only event spine
@@ -57,7 +66,8 @@ class PostgresStorageEngine:
                 )
                 event_rows = await cur.fetchall()
                 for r in event_rows:
-                    evt = r[0]
+                    # Safe extraction whether 'r' is a dict entry or a tuple element
+                    evt = r.get("payload") if isinstance(r, dict) else r[0]
                     if isinstance(evt, str):
                         evt = json.loads(evt)
                     state["events"].append(evt)
@@ -131,25 +141,44 @@ class PostgresStorageEngine:
                     """
                 )
                 for row in await cur.fetchall():
-                    eid = row[0]
-                    entries_list.append({
-                        "entry_id": eid,
-                        "entry_nickname": row[1],
-                        "timestamp": row[2].isoformat() if row[2] else None,
-                        "user_id": row[3],
-                        "safe_text": row[4],
-                        "centroids": row[5] if isinstance(row[5], list) else json.loads(row[5] or "[]"),
-                        "ip_hash": row[6],
-                        "encrypted_raw_ip": row[7],
-                        "encrypted_raw_text": row[8],
-                        "crisis_flag": row[9],
-                        "hash_from_token_for_deleting_entries": row[10],
-                    })
+                    if isinstance(row, dict):
+                        eid = row.get("entry_id")
+                        entries_list.append({
+                            "entry_id": eid,
+                            "entry_nickname": row.get("entry_nickname"),
+                            "timestamp": row.get("timestamp").isoformat() if row.get("timestamp") else None,
+                            "user_id": row.get("user_id"),
+                            "safe_text": row.get("safe_text"),
+                            "centroids": row.get("centroids") if isinstance(row.get("centroids"), list) else json.loads(row.get("centroids") or "[]"),
+                            "ip_hash": row.get("ip_hash"),
+                            "encrypted_raw_ip": row.get("encrypted_raw_ip"),
+                            "encrypted_raw_text": row.get("encrypted_raw_text"),
+                            "crisis_flag": row.get("crisis_flag"),
+                            "hash_from_token_for_deleting_entries": row.get("hash_from_token_for_deleting_entries"),
+                        })
+                    else:
+                        eid = row[0]
+                        entries_list.append({
+                            "entry_id": eid,
+                            "entry_nickname": row[1],
+                            "timestamp": row[2].isoformat() if row[2] else None,
+                            "user_id": row[3],
+                            "safe_text": row[4],
+                            "centroids": row[5] if isinstance(row[5], list) else json.loads(row[5] or "[]"),
+                            "ip_hash": row[6],
+                            "encrypted_raw_ip": row[7],
+                            "encrypted_raw_text": row[8],
+                            "crisis_flag": row[9],
+                            "hash_from_token_for_deleting_entries": row[10],
+                        })
 
                 # 2. Fetch 1D mean embeddings
                 await cur.execute("SELECT entry_id, mean_embedding FROM public.entry_mean_embeddings;")
                 for row in await cur.fetchall():
-                    mean_embeddings[row[0]] = np.array(row[1], dtype=np.float32)
+                    if isinstance(row, dict):
+                        mean_embeddings[row["entry_id"]] = np.array(row["mean_embedding"], dtype=np.float32)
+                    else:
+                        mean_embeddings[row[0]] = np.array(row[1], dtype=np.float32)
 
                 # 3. Fetch sequential window matrices reconstructed chronologically
                 await cur.execute(
@@ -160,7 +189,14 @@ class PostgresStorageEngine:
                     """
                 )
                 for row in await cur.fetchall():
-                    eid, w_embed, t_val, f_val = row
+                    if isinstance(row, dict):
+                        eid = row["entry_id"]
+                        w_embed = row["window_embedding"]
+                        t_val = row["window_text"]
+                        f_val = row["standout_flag"]
+                    else:
+                        eid, w_embed, t_val, f_val = row
+                        
                     if eid not in raw_window_embeddings:
                         raw_window_embeddings[eid] = []
                         raw_window_text[eid] = []
@@ -209,7 +245,7 @@ class PostgresStorageEngine:
     ) -> None:
         """
         Flushes entry registries and vector arrays out to relational tables atomically.
-        Accepts the exact keyword payloads generated by the legacy _persist loop.
+        Guards referential integrity constraints defensively against async partial state flushes.
         """
         async with self.pool.connection() as conn:
             async with conn.transaction():
@@ -219,11 +255,16 @@ class PostgresStorageEngine:
                     await cur.execute("TRUNCATE TABLE public.entry_mean_embeddings CASCADE;")
                     await cur.execute("TRUNCATE TABLE content.entries CASCADE;")
 
+                    # Track entry IDs actively written during this specific transaction pass
+                    valid_entry_ids = set()
+
                     # 1. Flush entries master metadata list
                     for entry in snapshot:
                         eid = entry.get("entry_id") or entry.get("id")
                         if not eid:
                             continue
+                        
+                        valid_entry_ids.add(eid)
                         await cur.execute(
                             """
                             INSERT INTO content.entries (
@@ -240,8 +281,12 @@ class PostgresStorageEngine:
                             )
                         )
 
-                    # 2. Flush Mean Embeddings (convert NumPy arrays back to python lists for PG storage)
+                    # 2. Flush Mean Embeddings (Guarded against ForeignKeyViolation)
                     for eid, arr in embedding_snapshot.items():
+                        if eid not in valid_entry_ids:
+                            logger.debug("[Engine] Skipping detached embedding vector until master row is appended: %s", eid)
+                            continue
+                            
                         if isinstance(arr, np.ndarray) and arr.size > 0:
                             await cur.execute(
                                 """
@@ -251,8 +296,11 @@ class PostgresStorageEngine:
                                 (eid, arr.tolist())
                             )
 
-                    # 3. Flush Zipped Sliding Windows
+                    # 3. Flush Zipped Sliding Windows (Guarded against ForeignKeyViolation)
                     for eid in window_embeddings:
+                        if eid not in valid_entry_ids:
+                            continue
+                            
                         embed_matrix = window_embeddings[eid]
                         text_vector = window_text.get(eid, [])
                         flag_vector = standout_flags.get(eid, [])
@@ -294,11 +342,19 @@ class PostgresStorageEngine:
                     """
                 )
                 for row in await cur.fetchall():
-                    cid = row[0]
+                    if isinstance(row, dict):
+                        cid = row["centroid_id"]
+                        title = row["title_from_human_moderator"]
+                        desc = row["description_from_human_moderator"]
+                    else:
+                        cid = row[0]
+                        title = row[1]
+                        desc = row[2]
+                        
                     centroids_map[cid] = {
                         "centroid_id": cid,
-                        "title_from_human_moderator": row[1],
-                        "description_from_human_moderator": row[2],
+                        "title_from_human_moderator": title,
+                        "description_from_human_moderator": desc,
                         "states": {}  # Legacyside expects a lookup dictionary keyed by event_index
                     }
 
@@ -311,7 +367,14 @@ class PostgresStorageEngine:
                     """
                 )
                 for row in await cur.fetchall():
-                    cid, ev_idx, entry_ids, vector, metadata = row
+                    if isinstance(row, dict):
+                        cid = row["centroid_id"]
+                        ev_idx = row["event_index"]
+                        entry_ids = row["entry_ids"]
+                        vector = row["vector"]
+                        metadata = row["metadata"]
+                    else:
+                        cid, ev_idx, entry_ids, vector, metadata = row
                     
                     if cid in centroids_map:
                         # Rehydrate the vector array back to a proper NumPy structure

@@ -1,7 +1,7 @@
 #!/usr/bin/env sys executable
 # ==========================================
-# save-state 2026-06-14T17:02-04:00
-# setup.py
+# PeriDocs/setup.py
+# save-state 2026-06-30T13:29-04:00
 # ==========================================
 import os
 import subprocess
@@ -77,10 +77,29 @@ def initialize_peridocs_database():
             with conn.cursor() as cur:
                 cur.execute("SELECT 1 FROM pg_database WHERE datname='peridocs_db'")
                 exists = cur.fetchone()
+
+                # ---------------------------------------------------------
+                # NEW: SANDBOX TEARDOWN GUARD FOR TRULY FORKABLE SLATES
+                # ---------------------------------------------------------
+                if DATABASE_MODE == "LOCAL":
+                    print("\n[CLEAN SLATE] Terminating lingering processes and dropping local sandbox...")
+                    # Terminate any zombie server connections blocking a database drop
+                    cur.execute("""
+                        SELECT pg_terminate_backend(pg_stat_activity.pid)
+                        FROM pg_stat_activity
+                        WHERE pg_stat_activity.datname = 'peridocs_db'
+                          AND pid <> pg_backend_pid();
+                    """)
+                    cur.execute("DROP DATABASE IF EXISTS peridocs_db;")
+                    print("[CLEAN SLATE] Old local database dropped successfully.")
+                # ---------------------------------------------------------
+
+                cur.execute("SELECT 1 FROM pg_database WHERE datname='peridocs_db'")
+                exists = cur.fetchone()
                 
                 if not exists:
                     print("Catalog 'peridocs_db' absent. Physicalizing base cluster storage...")
-                    apply_sql_blueprint(cur, "database-management/schemas/00_db_init.sql")
+                    apply_sql_blueprint(cur, "database_management/schemas/00_db_init.sql")
                 else:
                     print("Catalog 'peridocs_db' verified online.")
 
@@ -106,15 +125,23 @@ def initialize_peridocs_database():
         # STEP 4: Build out Multi-Schema and Least Privilege Role Paradigms
         with psycopg.connect(app_db_info, autocommit=True) as conn:
             with conn.cursor() as cur:
-                apply_sql_blueprint(cur, "database-management/schemas/01_roles_init.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/02_schemas_init.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/03_permissions.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/content_tables.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/kb_tables.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/ledger_tables.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/nlp_tables.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/app_tables.sql")
-                apply_sql_blueprint(cur, "database-management/schemas/tables/search_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/01_roles_init.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/02_schemas_init.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/03_permissions_init.sql")
+                
+                # Core operational content layout
+                apply_sql_blueprint(cur, "database_management/schemas/tables/content_tables.sql")
+                
+                # MOVED UP: Provision core app infrastructure, admin tracking, and user tables
+                apply_sql_blueprint(cur, "database_management/schemas/tables/app_tables.sql")
+                
+                # Now that app.accounts and admin.release_information exist, KB can safely build
+                apply_sql_blueprint(cur, "database_management/schemas/tables/kb_tables.sql")
+                
+                # Remaining downstream dependencies
+                apply_sql_blueprint(cur, "database_management/schemas/tables/ledger_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/nlp_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/search_tables.sql")
                 
     except Exception as e:
         print(f"CRITICAL: Structural provisioning halted.\nDetails: {e}")
@@ -133,7 +160,7 @@ def main():
 
     # Step 3: Trigger your external validation runner file cleanly
     # This separates installation code from pipeline verification rules.
-    run_pipeline_script(os.path.join("database-management", "validation", "verify_infrastructure.py"))
+    run_pipeline_script(os.path.join("database_management", "validation", "verify_infrastructure.py"))
 
     print("\n====================================================================")
     print("  Success: Workspace synchronized cleanly. Environmental boundaries live.  ")

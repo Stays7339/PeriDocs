@@ -57,16 +57,14 @@ async def _load() -> Dict[str, Any]:
     from core.mode_lock import SystemModeLock
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         try:
-            from core.database import db_pool
-            from database_management.storage_engines.postgres_engine import PostgresStorageEngine
-            engine = PostgresStorageEngine(db_pool)
-            _ledger_cache = await engine.load_ledger_bundle()
+            from core.database import db_engine
+            _ledger_cache = await db_engine.load_ledger_bundle()
             logger.info("[ledger_init] Authoritative database ledger rehydrated into cache.")
             return _ledger_cache
         except Exception as db_err:
             logger.error("[ledger_init] Database rehydration crashed: %s", db_err)
             if SystemModeLock.is_lock_file_present_on_disk():
-                raise db_err # Refuse file system corruption if database execution is mandatory
+                raise db_err 
             logger.warning("[ledger_init] System unburned. Falling back to parsing ledger.json on disk.")
 
     # --------------------------------------------------------
@@ -75,7 +73,6 @@ async def _load() -> Dict[str, Any]:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.path.exists(LEDGER_PATH):
-        # Check if centroids exist on disk
         centroids_exist = any(
             fname.endswith("_summary.json") for fname in os.listdir(os.path.join(DATA_DIR, "centroids"))
         )
@@ -84,7 +81,7 @@ async def _load() -> Dict[str, Any]:
             raise RuntimeError("Startup aborted: ledger.json missing while centroids exist")
 
         _ledger_cache = _initial_ledger()
-        await _save(_ledger_cache)  # safe write to disk
+        await _save(_ledger_cache)
     else:
         with open(LEDGER_PATH, "r", encoding="utf-8") as f:
             _ledger_cache = json.load(f)
@@ -102,10 +99,7 @@ async def _save(state: Dict[str, Any]) -> None:
     from core.mode_lock import SystemModeLock
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         from core.database import db_engine
-        from database_management.storage_engines.postgres_engine import PostgresStorageEngine
-        
-        engine = PostgresStorageEngine(db_pool)
-        await engine.save_ledger_bundle(state)
+        await db_engine.save_ledger_bundle(state)
         return
 
     # --------------------------------------------------------
@@ -115,7 +109,6 @@ async def _save(state: Dict[str, Any]) -> None:
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)
     os.replace(tmp, LEDGER_PATH)
-
 
 
 class IdentifierLedger:

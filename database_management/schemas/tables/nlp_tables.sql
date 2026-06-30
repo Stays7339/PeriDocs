@@ -2,7 +2,6 @@
 --  nlp_tables.sql
 -- ============================================================
 
--- Modified to correctly point to the content schema namespace
 CREATE TABLE IF NOT EXISTS public.entry_mean_embeddings (
     entry_id       VARCHAR(64) PRIMARY KEY REFERENCES content.entries(entry_id) ON DELETE CASCADE,
     mean_embedding REAL[] NOT NULL, 

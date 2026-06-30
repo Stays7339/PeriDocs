@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-06-11T15:27-04:00
+# Save-state: 2026-06-30T15:43-04:00
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
@@ -99,24 +99,24 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     _boot_in_progress = True
 
-    logger.warning("MAPPING_RUNTIME FILE LOADED FROM: %s", __file__)
-    logger.warning("INITIALIZE_RUNTIME ENTERED")
-    logger.warning("MAPPING_RUNTIME MODULE ID = %s", id(sys.modules[__name__]))
+    logger.info("MAPPING_RUNTIME FILE LOADED FROM: %s", __file__)
+    logger.info("INITIALIZE_RUNTIME ENTERED")
+    logger.info("MAPPING_RUNTIME MODULE ID = %s", id(sys.modules[__name__]))
 
     # Load ledger into memory
-    logger.warning("BOOT START")
+    logger.info("BOOT START")
     await ledger.load()
-    logger.warning("LEDGER LOADED")
+    logger.info("LEDGER LOADED")
 
     # entries should always load before centroids, since centroids are derived from entries
     await entry_runtime.initialize()
-    logger.warning("ENTRY RUNTIME READY")
+    logger.info("ENTRY RUNTIME READY")
     await entry_runtime._verify_integrity_on_startup()
     logger.info("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
     logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
 
     await centroid_system.load_state()
-    logger.warning("CENTROID SYSTEM LOADED")
+    logger.info("CENTROID SYSTEM LOADED")
 
     await ledger.verify_runtime_state(centroid_system)
 
@@ -135,40 +135,53 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     # Schedule periodic check after initialization
     asyncio.create_task(periodic_integrity_check())
 
-    logger.warning("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
-    logger.warning("initialize_runtime EXIT reached")
+    logger.debug("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
+    logger.debug("initialize_runtime EXIT reached")
 
 
 # Recheck that all the files are in order every once in a while
 # In seconds
 PERIODIC_INTEGRITY_INTERVAL_IN_SECONDS = 300
 
-
 async def periodic_integrity_check():
     """
     Periodically verify centroid integrity and create a zip backup if checks pass.
     """
+    from core.mode_lock import SystemModeLock
+    
     project_root = Path.cwd()  # project root
     backups_folder = project_root / "backups-for-the-main-data-folder"
-    backups_folder.mkdir(exist_ok=True)
+    
+    # Only establish the backup directory if we are operating locally
+    if SystemModeLock.resolve_operational_mode() == "OFFLINE":
+        backups_folder.mkdir(exist_ok=True)
 
     while True:
         try:
-            # Verify integrity
+            # Verify integrity across the runtime engines
             await _centroid_system._verify_integrity_on_startup()
             await _entry_runtime._verify_integrity_on_startup()
 
-            # Create name for the zip file backup of full data folder
-            timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
-            backup_name = backups_folder / f"peridocs_data_folder_backup_{timestamp}.zip"
+            # ============================================================
+            # CONTEXT-AWARE BACKUP INTERCEPTION
+            # ============================================================
+            if SystemModeLock.resolve_operational_mode() != "OFFLINE":
+                logger.debug(
+                    "[periodic_integrity_check] System integrity verified. "
+                    "Skipping flat-file zip backup because system is not in OFFLINE mode."
+                )
+            else:
+                # Create name for the zip file backup of full data folder
+                timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H-%M-%SZ")
+                backup_name = backups_folder / f"peridocs_data_folder_backup_{timestamp}.zip"
 
-            # Recursively zip DATA_DIR
-            data_dir_path = Path(DATA_DIR)
-            with zipfile.ZipFile(backup_name, "w", zipfile.ZIP_DEFLATED) as zf:
-                for file_path in data_dir_path.rglob("*"):
-                    zf.write(file_path, file_path.relative_to(data_dir_path))
+                # Recursively zip DATA_DIR
+                data_dir_path = Path(DATA_DIR)
+                with zipfile.ZipFile(backup_name, "w", zipfile.ZIP_DEFLATED) as zf:
+                    for file_path in data_dir_path.rglob("*"):
+                        zf.write(file_path, file_path.relative_to(data_dir_path))
 
-            logger.info(f"[periodic_integrity_check] Backup created: {backup_name}")
+                logger.info(f"[periodic_integrity_check] Backup created: {backup_name}")
 
         except Exception as e:
             logger.error(f"[periodic_integrity_check] Integrity check or backup failed: {e}")

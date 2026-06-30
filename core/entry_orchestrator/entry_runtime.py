@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-06-17T16:48-04:00
+# Save-state: 2026-06-30T14:53-04:00
 # ==========================================
 import asyncio
 import copy
@@ -205,17 +205,23 @@ class EntryWritingRuntime:
             return
 
         # ------------------------------------------------------------
-        # LOAD ENTRIES.JSON
+        # LOAD ENTRIES.JSON (Context-Aware Mode Adaption)
         # ------------------------------------------------------------
-        if not os.path.exists(entries_path):
-            raise RuntimeError(f"[entry_runtime] entries.json missing at {entries_path}")
+        from core.mode_lock import SystemModeLock
+        is_db_mode = SystemModeLock.resolve_operational_mode() == "DATABASE"
 
-        try:
-            with open(entries_path, "r", encoding="utf-8") as f:
-                entries_data = json.load(f)
-        except Exception as e:
-            logger.error("[entry_runtime] Failed to parse entries.json: %s", e)
-            raise RuntimeError("entries.json is corrupted or unreadable")
+        if is_db_mode:
+            entries_data = self._entries
+        else:
+            if not os.path.exists(entries_path):
+                raise RuntimeError(f"[entry_runtime] entries.json missing at {entries_path}")
+
+            try:
+                with open(entries_path, "r", encoding="utf-8") as f:
+                    entries_data = json.load(f)
+            except Exception as e:
+                logger.error("[entry_runtime] Failed to parse entries.json: %s", e)
+                raise RuntimeError("entries.json is corrupted or unreadable")
 
         if not isinstance(entries_data, list):
             raise RuntimeError("entries.json must be a list of entries")
@@ -244,36 +250,36 @@ class EntryWritingRuntime:
         # ------------------------------------------------------------
         # DETERMINE SYSTEM STATE (cold start vs existing system)
         # ------------------------------------------------------------
-
         system_has_history = (
             len(ledger_entry_ids) > 0
             and len(existing_entries) > 0
         )
 
         # ------------------------------------------------------------
-        # LOAD / REQUIRE EMBEDDING FILE BASED ON STATE
+        # LOAD / REQUIRE EMBEDDING FILE BASED ON STATE (Context-Aware Mode Adaption)
         # ------------------------------------------------------------
-
-
-        if not os.path.exists(mean_file):
-
-            if system_has_history:
-                raise RuntimeError(
-                    f"[entry_runtime] Missing embedding store but system has history. "
-                    f"Cannot bootstrap safely: {mean_file}"
-                )
-
-            logger.debug("[entry_runtime] Cold start detected. No embedding store exists yet.")
-            mean_data = {}   # in-memory empty state only
-
+        if is_db_mode:
+            mean_data = self._embeddings
         else:
-            try:
-                mean_data = np.load(mean_file)
-                mean_data = dict(mean_data)  # normalize NPZ -> dict view
-            except Exception as e:
-                raise RuntimeError(
-                    f"[entry_runtime] Failed to load canonical embedding file: {mean_file} | {e}"
-                )
+            if not os.path.exists(mean_file):
+
+                if system_has_history:
+                    raise RuntimeError(
+                        f"[entry_runtime] Missing embedding store but system has history. "
+                        f"Cannot bootstrap safely: {mean_file}"
+                    )
+
+                logger.debug("[entry_runtime] Cold start detected. No embedding store exists yet.")
+                mean_data = {}   # in-memory empty state only
+
+            else:
+                try:
+                    mean_data = np.load(mean_file)
+                    mean_data = dict(mean_data)  # normalize NPZ -> dict view
+                except Exception as e:
+                    raise RuntimeError(
+                        f"[entry_runtime] Failed to load canonical embedding file: {mean_file} | {e}"
+                    )
 
         # ------------------------------------------------------------
         # BUILD ENTRY SETS (EMBEDDING TABLES)
@@ -550,8 +556,6 @@ class EntryWritingRuntime:
 
     async def _persist(self) -> None:
         logger.debug("[PERSIST ENTERED]")
-        logger.debug("WRITING TO JSON: %s", self._entries_path)
-        logger.debug("WRITING TO NPZ: %s", self._npz_path)
         logger.debug("CWD=%s PID=%s", os.getcwd(), os.getpid())
 
         json_dir = os.path.dirname(self._entries_path)
@@ -614,6 +618,8 @@ class EntryWritingRuntime:
         # ============================================================
         # STEP 2a: ORIGINAL LOCAL STORAGE PIPELINE (100% UNCHANGED)
         # ============================================================
+        logger.debug("WRITING TO JSON: %s", self._entries_path)
+        logger.debug("WRITING TO NPZ: %s", self._npz_path)
         try:
             PERSISTED_FIELDS = (
                 "entry_id",

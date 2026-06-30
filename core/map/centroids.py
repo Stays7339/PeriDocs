@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-06-14T14:47-04:00
+# Save-state: 2026-06-30T15:00-04:00
 # ==========================================
 
 import os
@@ -248,6 +248,17 @@ class CentroidSystem:
         """
 
         await self._assert_ledger_ready()
+
+        # ============================================================
+        # CONTEXT-AWARE MODE ADAPTION
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            logger.info(
+                "[CentroidSystem] Database mode active. In-memory state safely rehydrated "
+                "from relational schemas. Bypassing flat-file disk validation."
+            )
+            return  # Authoritative DB states exist; bypass legacy shard file checks
 
         missing_files = []
         invalid_vectors = []

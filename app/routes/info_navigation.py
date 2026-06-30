@@ -1,7 +1,7 @@
 # ==========================================
 # app/routes/info_navigation.py
 # routes to /create-entry, /about , /privacy-policy , /terms-of-service and renders the homepage
-# save-state 2026-05-11T14:11:35-04:00 (YYYYMMDDhhmm)
+# save-state 2026-06-30T13:27-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 from fastapi import Request, Depends, HTTPException, status
@@ -22,7 +22,7 @@ async def validation_health_check(db: AsyncConnection = Depends(get_db)):
     """
     try:
         # Check active communication pathways by reading the pinned bundle info
-        result = await db.execute('SELECT release_id FROM "ADMIN".release_information WHERE is_active = true LIMIT 1;')
+        result = await db.execute('SELECT release_id FROM admin.release_information WHERE is_active = true LIMIT 1;')
         active_bundle = await result.fetchone()
         
         return {
