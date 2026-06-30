@@ -1,8 +1,7 @@
-# ==========================================
+# ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-06-22T15:14-04:00
-# ==========================================
-import io
+# Save-state: 2026-06-30T10:55-04:00
+# ============================================================================
 import json
 import logging
 from datetime import datetime, timezone
@@ -15,17 +14,13 @@ class PostgresStorageEngine:
     def __init__(self, pool):
         self.pool = pool
 
-    def _serialize_numpy(self, arr: np.ndarray | None) -> bytes | None:
-        if arr is None or not isinstance(arr, np.ndarray):
-            return None
-        buf = io.BytesIO()
-        np.save(buf, arr)
-        return buf.getvalue()
-
+    # ------------------------------------------------------------------------
+    # LEDGER STORAGE COMPONENT (ledger_tables.sql Alignment)
+    # ------------------------------------------------------------------------
     async def load_ledger_bundle(self) -> Dict[str, Any]:
         """
         Rehydrates the authoritative ledger state from the relational database.
-        Targets the strict 'ledger' schema namespace.
+        Targets the isolated 'ledger' schema namespace and deterministic event trail.
         """
         state = {
             "next_centroid_id": 1,
@@ -72,7 +67,7 @@ class PostgresStorageEngine:
     async def save_ledger_bundle(self, state: Dict[str, Any]) -> None:
         """
         Flushes global counters and appends structural history logs back to 
-        the authoritative ledger schema.
+        the authoritative ledger schema. Mirrors flat-file rewrite tendencies.
         """
         async with self.pool.connection() as conn:
             async with conn.transaction():
@@ -94,8 +89,7 @@ class PostgresStorageEngine:
                         ),
                     )
 
-                    # 2. Re-synchronize event trails cleanly 
-                    # (Adjust this block if your engine appends incrementally or uses a delta strategy)
+                    # 2. Re-synchronize event trails cleanly (Mirroring full file rewrites)
                     await cur.execute("TRUNCATE TABLE ledger.events;")
                     for event in state["events"]:
                         await cur.execute(
@@ -110,16 +104,20 @@ class PostgresStorageEngine:
                             ),
                         )
 
+    # ------------------------------------------------------------------------
+    # ENTRIES & NLP STORAGE COMPONENT (content_tables.sql & nlp_tables.sql Alignment)
+    # ------------------------------------------------------------------------
     async def load_entries_bundle(self) -> Dict[str, Any]:
         """
         Rehydrates wholesale entries and their multi-dimensional NLP tensor 
         projections from content.entries, public.entry_mean_embeddings, and public.entry_windows.
+        Enforces structural conventions expected natively by entry_runtime.py.
         """
-        entries_cache = {}
+        entries_list = []
         mean_embeddings = {}
-        window_embeddings = {}
-        window_text = {}
-        standout_window_flags = {}
+        raw_window_embeddings = {}
+        raw_window_text = {}
+        raw_standout_window_flags = {}
 
         async with self.pool.connection() as conn:
             async with conn.cursor() as cur:
@@ -134,7 +132,7 @@ class PostgresStorageEngine:
                 )
                 for row in await cur.fetchall():
                     eid = row[0]
-                    entries_cache[eid] = {
+                    entries_list.append({
                         "entry_id": eid,
                         "entry_nickname": row[1],
                         "timestamp": row[2].isoformat() if row[2] else None,
@@ -146,7 +144,7 @@ class PostgresStorageEngine:
                         "encrypted_raw_text": row[8],
                         "crisis_flag": row[9],
                         "hash_from_token_for_deleting_entries": row[10],
-                    }
+                    })
 
                 # 2. Fetch 1D mean embeddings
                 await cur.execute("SELECT entry_id, mean_embedding FROM public.entry_mean_embeddings;")
@@ -161,54 +159,71 @@ class PostgresStorageEngine:
                     ORDER BY entry_id, window_index ASC;
                     """
                 )
-                
-                # Group sliding windows by entry_id dynamically
                 for row in await cur.fetchall():
                     eid, w_embed, t_val, f_val = row
-                    
-                    if eid not in window_embeddings:
-                        window_embeddings[eid] = []
-                        window_text[eid] = []
-                        standout_window_flags[eid] = []
+                    if eid not in raw_window_embeddings:
+                        raw_window_embeddings[eid] = []
+                        raw_window_text[eid] = []
+                        raw_standout_window_flags[eid] = []
                         
-                    window_embeddings[eid].append(w_embed)
-                    window_text[eid].append(t_val)
-                    standout_window_flags[eid].append(f_val)
+                    raw_window_embeddings[eid].append(w_embed)
+                    raw_window_text[eid].append(t_val)
+                    raw_standout_window_flags[eid].append(f_val)
 
-                # Convert window lists into structured NumPy matrices for the runtime
-                for eid in window_embeddings:
-                    window_embeddings[eid] = np.array(window_embeddings[eid], dtype=np.float32)
-                    window_text[eid] = np.array(window_text[eid], dtype=object)
-                    standout_window_flags[eid] = np.array(standout_window_flags[eid], dtype=bool)
+        # Enforce unified key space structure across all dictionary projections
+        window_embeddings = {}
+        window_text = {}
+        window_flags = {}
+
+        for entry in entries_list:
+            eid = entry["entry_id"]
+            # Rehydrate mean embedding fallback if missing
+            if eid not in mean_embeddings:
+                mean_embeddings[eid] = np.array([], dtype=np.float32)
+
+            # Reconstruct sliding window collections into formal NumPy structures
+            if eid in raw_window_embeddings:
+                window_embeddings[eid] = np.array(raw_window_embeddings[eid], dtype=np.float32)
+                window_text[eid] = np.array(raw_window_text[eid], dtype=object)
+                window_flags[eid] = np.array(raw_standout_window_flags[eid], dtype=bool)
+            else:
+                window_embeddings[eid] = np.empty((0, 1024), dtype=np.float32)
+                window_text[eid] = np.array([], dtype=object)
+                window_flags[eid] = np.array([], dtype=bool)
 
         return {
-            "entries": entries_cache,
-            "mean_embeddings": mean_embeddings,
+            "entries": entries_list,
+            "embeddings": mean_embeddings,          # Corrected key to match entry_runtime.py
             "window_embeddings": window_embeddings,
             "window_text": window_text,
-            "standout_window_flags": standout_window_flags,
+            "window_flags": window_flags,           # Corrected key to match entry_runtime.py
         }
 
-    async def save_entries_bundle(self, bundle: Dict[str, Any]) -> None:
+    async def save_entries_bundle(
+        self,
+        snapshot: List[Dict[str, Any]],
+        embedding_snapshot: Dict[str, Any],
+        window_embeddings: Dict[str, Any],
+        window_text: Dict[str, Any],
+        standout_flags: Dict[str, Any]
+    ) -> None:
         """
         Flushes entry registries and vector arrays out to relational tables atomically.
+        Accepts the exact keyword payloads generated by the legacy _persist loop.
         """
-        entries = bundle.get("entries", {})
-        mean_embeds = bundle.get("mean_embeddings", {})
-        win_embeds = bundle.get("window_embeddings", {})
-        win_texts = bundle.get("window_text", {})
-        win_flags = bundle.get("standout_window_flags", {})
-
         async with self.pool.connection() as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
-                    # Clear volatile structures cleanly before writing modern frames
+                    # Clear relational structures cleanly before writing modern frames
                     await cur.execute("TRUNCATE TABLE public.entry_windows CASCADE;")
                     await cur.execute("TRUNCATE TABLE public.entry_mean_embeddings CASCADE;")
                     await cur.execute("TRUNCATE TABLE content.entries CASCADE;")
 
-                    # 1. Flush entries
-                    for eid, entry in entries.items():
+                    # 1. Flush entries master metadata list
+                    for entry in snapshot:
+                        eid = entry.get("entry_id") or entry.get("id")
+                        if not eid:
+                            continue
                         await cur.execute(
                             """
                             INSERT INTO content.entries (
@@ -225,9 +240,9 @@ class PostgresStorageEngine:
                             )
                         )
 
-                    # 2. Flush Mean Embeddings (convert NumPy arrays back to plain python lists for PG storage)
-                    for eid, arr in mean_embeds.items():
-                        if isinstance(arr, np.ndarray):
+                    # 2. Flush Mean Embeddings (convert NumPy arrays back to python lists for PG storage)
+                    for eid, arr in embedding_snapshot.items():
+                        if isinstance(arr, np.ndarray) and arr.size > 0:
                             await cur.execute(
                                 """
                                 INSERT INTO public.entry_mean_embeddings (entry_id, mean_embedding)
@@ -237,12 +252,12 @@ class PostgresStorageEngine:
                             )
 
                     # 3. Flush Zipped Sliding Windows
-                    for eid in win_embeds:
-                        embed_matrix = win_embeds[eid]
-                        text_vector = win_texts.get(eid, [])
-                        flag_vector = win_flags.get(eid, [])
+                    for eid in window_embeddings:
+                        embed_matrix = window_embeddings[eid]
+                        text_vector = window_text.get(eid, [])
+                        flag_vector = standout_flags.get(eid, [])
                         
-                        if not isinstance(embed_matrix, np.ndarray):
+                        if not isinstance(embed_matrix, np.ndarray) or embed_matrix.size == 0:
                             continue
                             
                         for idx in range(len(embed_matrix)):
@@ -258,95 +273,137 @@ class PostgresStorageEngine:
                                 (eid, idx, w_arr, t_val, f_val)
                             )
 
+    # ------------------------------------------------------------------------
+    # CENTROIDS STORAGE COMPONENT (search_tables.sql Alignment)
+    # ------------------------------------------------------------------------
     async def load_centroids_bundle(self) -> Dict[str, Any]:
         """
-        Rehydrates active coordinate maps and history trails from the search schema namespace.
+        Rehydrates all centroids and precentroids from relational storage.
+        Transforms flat database rows from the search schema into the specialized 
+        nested dictionary structure expected by core/map/centroids.py.
         """
-        centroids_cache = {}
-        states_log = []
+        centroids_map = {}
 
         async with self.pool.connection() as conn:
             async with conn.cursor() as cur:
-                # 1. Gather primary structural summaries
-                await cur.execute("SELECT centroid_id, title_from_human_moderator, description_from_human_moderator FROM search.centroids;")
+                # 1. Fetch core centroid metadata definitions from the search schema
+                await cur.execute(
+                    """
+                    SELECT centroid_id, title_from_human_moderator, description_from_human_moderator
+                    FROM search.centroids;
+                    """
+                )
                 for row in await cur.fetchall():
                     cid = row[0]
-                    centroids_cache[cid] = {
+                    centroids_map[cid] = {
                         "centroid_id": cid,
                         "title_from_human_moderator": row[1],
                         "description_from_human_moderator": row[2],
-                        "coordinate_matrix": None, 
-                        "assigned_points": []
+                        "states": {}  # Legacyside expects a lookup dictionary keyed by event_index
                     }
 
-                # 2. Extract detailed tracking sequences to wire up back to the memory runtime
+                # 2. Fetch historical state records ordered chronologically
                 await cur.execute(
                     """
                     SELECT centroid_id, event_index, entry_ids, vector, metadata
                     FROM search.centroid_states
-                    ORDER BY event_index ASC;
+                    ORDER BY centroid_id, event_index ASC;
                     """
                 )
                 for row in await cur.fetchall():
-                    cid, idx, entry_ids, vector, meta = row
-                    meta_dict = meta if isinstance(meta, dict) else json.loads(meta or "{}")
+                    cid, ev_idx, entry_ids, vector, metadata = row
                     
-                    states_log.append({
-                        "centroid_id": cid,
-                        "event_index": idx,
-                        "entry_ids": entry_ids,
-                        "vector": vector,
-                        "metadata": meta_dict
-                    })
-                    
-                    # Update active in-memory cache projections with the most recent transaction state
-                    if cid in centroids_cache:
-                        centroids_cache[cid]["coordinate_matrix"] = vector
-                        centroids_cache[cid]["assigned_points"] = entry_ids
+                    if cid in centroids_map:
+                        # Rehydrate the vector array back to a proper NumPy structure
+                        np_vector = np.array(vector, dtype=np.float32) if vector else np.array([], dtype=np.float32)
+                        
+                        # entry_ids is native TEXT[], psycopg unpacks it as a standard python list
+                        parsed_entries = entry_ids if isinstance(entry_ids, list) else json.loads(entry_ids or "[]")
+                        
+                        # metadata is JSONB, handled defensively if returned as string or pre-parsed dict
+                        parsed_metadata = metadata if isinstance(metadata, dict) else json.loads(metadata or "{}")
 
-        return {
-            "centroids_cache": centroids_cache,
-            "states_log": states_log
-        }
+                        # Inject the state into the dictionary using event_index as the lookup key
+                        centroids_map[cid]["states"][ev_idx] = {
+                            "event_index": ev_idx,
+                            "entry_ids": parsed_entries,
+                            "vector": np_vector,
+                            "metadata": parsed_metadata
+                        }
 
-    async def save_centroids_bundle(self, bundle: Dict[str, Any]) -> None:
+        return centroids_map
+
+    async def save_centroid_bundle(
+        self,
+        centroid_id: str,
+        summary_payload: Dict[str, Any],
+        npz_dump: Dict[str, Any]
+    ) -> None:
         """
-        Saves cluster locations and audit entries down to search.centroids and search.centroid_states.
+        Commits or updates a single centroid definition and its complete 
+        chronological state history array objects into search schema storage.
+        Accepts parameters directly from core/map/centroids.py's database branch.
         """
-        cache = bundle.get("centroids_cache", {})
-        log = bundle.get("states_log", [])
+        title = summary_payload.get("title_from_human_moderator")
+        description = summary_payload.get("description_from_human_moderator")
+        states = summary_payload.get("states", [])
+
+        # Defensive check: if the application state layer passes back a dictionary 
+        # keyed by event_index, extract the raw state objects sequentially.
+        if isinstance(states, dict):
+            states_iterable = states.values()
+        else:
+            states_iterable = states
 
         async with self.pool.connection() as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
-                    await cur.execute("TRUNCATE TABLE search.centroids CASCADE;")
+                    # 1. Upsert the master centroid metadata registry row
+                    await cur.execute(
+                        """
+                        INSERT INTO search.centroids (
+                            centroid_id, 
+                            title_from_human_moderator, 
+                            description_from_human_moderator
+                        ) VALUES (%s, %s, %s)
+                        ON CONFLICT (centroid_id) DO UPDATE SET
+                            title_from_human_moderator = EXCLUDED.title_from_human_moderator,
+                            description_from_human_moderator = EXCLUDED.description_from_human_moderator;
+                        """,
+                        (centroid_id, title, description)
+                    )
 
-                    # 1. Persist master indices
-                    for cid, obj in cache.items():
+                    # 2. Clear existing historical state rows ONLY for this specific cluster ID
+                    await cur.execute(
+                        "DELETE FROM search.centroid_states WHERE centroid_id = %s;",
+                        (centroid_id,)
+                    )
+
+                    # 3. Stream sequential records back down to the state tracking layout
+                    for state in states_iterable:
+                        ev_idx = state["event_index"]
+                        entry_ids = state["entry_ids"]
+                        vec = state["vector"]
+                        metadata = state["metadata"]
+
+                        # Ensure array properties match Postgres text array expectations perfectly
+                        entry_ids_list = entry_ids if isinstance(entry_ids, list) else list(entry_ids)
+                        vec_list = vec.tolist() if isinstance(vec, np.ndarray) else list(vec)
+                        
+                        # Prepare dictionary structures for target JSONB injection
+                        metadata_string = json.dumps(metadata) if isinstance(metadata, dict) else metadata
+
                         await cur.execute(
                             """
-                            INSERT INTO search.centroids (centroid_id, title_from_human_moderator, description_from_human_moderator)
-                            VALUES (%s, %s, %s);
-                            """,
-                            (cid, obj.get("title_from_human_moderator"), obj.get("description_from_human_moderator"))
-                        )
-
-                    # 2. Persist step logs
-                    for step in log:
-                        vector_data = step["vector"]
-                        if isinstance(vector_data, np.ndarray):
-                            vector_data = vector_data.tolist()
-
-                        await cur.execute(
-                            """
-                            INSERT INTO search.centroid_states (centroid_id, event_index, entry_ids, vector, metadata)
-                            VALUES (%s, %s, %s, %s, %s);
+                            INSERT INTO search.centroid_states (
+                                centroid_id, event_index, entry_ids, vector, metadata
+                            ) VALUES (%s, %s, %s, %s, %s::jsonb);
                             """,
                             (
-                                step["centroid_id"],
-                                step["event_index"],
-                                list(step["entry_ids"]),
-                                vector_data,
-                                json.dumps(step.get("metadata", {}))
+                                centroid_id, 
+                                ev_idx, 
+                                entry_ids_list, 
+                                vec_list, 
+                                metadata_string
                             )
                         )
