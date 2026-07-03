@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-06-14T15:27-04:00 (ISO 8601)
+# save-state 2026-07-03T11:40-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -163,27 +163,54 @@ async def startup_sequence():
 async def shutdown_sequence():
     logger.info("Starting shutdown sequence...")
 
-    await shutdown_account_runtime()
+    # 1. Authoritatively flush and close the entry runtime while DB connections are still hot
+    try:
+        from core.map.mapping_runtime import entry_runtime
+        logger.info("Draining entry runtime memory layers to database...")
+        
+        # Invoke standard shutdown routine first
+        await entry_runtime.shutdown()
+        
+        # FORCE an unconditional guarded flush to catch entries orphaned by the dirty counter race condition
+        logger.warning("[SHUTDOWN FIX] Forcing unconditional guarded persist of all memory states...")
+        if hasattr(entry_runtime, '_persist_guarded'):
+            await entry_runtime._persist_guarded()
+        elif hasattr(entry_runtime, '_persist'):
+            await entry_runtime._persist()
+            
+    except Exception as e:
+        logger.error("Failed to safely flush entry runtime during shutdown: %s", e)
+
+    # 2. Shutdown your account runtime tracking
+    try:
+        await shutdown_account_runtime()
+    except Exception as e:
+        logger.error("Failed to shutdown account runtime: %s", e)
+
+    # 3. Always drain and close database connection pools safely
+    logger.info("Draining database connections...")
+    try:
+        await close_database()
+    except Exception as e:
+        logger.error("Error occurred while closing database engine: %s", e)
+
+    # 4. Handle file system backup house-cleaning (isolated so it can't block core components)
     """
     Keep only the most recent backup, delete all others.
     Triggered on SIGINT (Ctrl+C) or SIGTERM (systemctl stop).
     """
     backup_dir = Path.cwd() / "backups-for-the-main-data-folder"
-    if not backup_dir.exists():
-        return
-
-    logger.info("Draining database connections...")
-    await close_database()
-
-    backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
-    # Keep the most recent
-    to_delete = backups[1:]
-    for f in to_delete:
-        try:
-            f.unlink()
-            logger.info(f"[shutdown] Deleted old backup: {f.name}")
-        except Exception as e:
-            logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
+    if backup_dir.exists():
+        backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
+        to_delete = backups[1:]
+        for f in to_delete:
+            try:
+                f.unlink()
+                logger.info(f"[shutdown] Deleted old backup: {f.name}")
+            except Exception as e:
+                logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
+    else:
+        logger.debug("[shutdown] Backup directory not found, skipping zip pruning.")
 
 @app.get("/favicon.ico")
 def favicon():

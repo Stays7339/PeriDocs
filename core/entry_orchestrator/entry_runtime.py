@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-06-30T14:53-04:00
+# Save-state: 2026-07-03T10:50-04:00
 # ==========================================
 import asyncio
 import copy
@@ -170,7 +170,7 @@ class EntryWritingRuntime:
 
         HARD GOAL:
             - If an entry_id appears anywhere in ledger.json,
-            it MUST exist in entries.json AND all embedding stores.
+            it MUST exist in the active storage layer AND all embedding stores.
             - Deleted entries STILL retain embeddings (no exceptions).
             - Missing entries or embeddings cause immediate RuntimeError.
         """
@@ -178,13 +178,13 @@ class EntryWritingRuntime:
         if not await self.ledger.is_loaded():
             raise RuntimeError("Ledger is not loaded")
 
-        # (_ledger) is used so that if integrity fails, you can trace causality directly:
-        # “ledger state caused entry validation failure” 
-        # rather than: “some global singleton state was inconsistent somewhere”
+        # ------------------------------------------------------------
+        # CONTEXT-AWARE MODE ADAPTATION
+        # ------------------------------------------------------------
+        from core.mode_lock import SystemModeLock
+        is_db_mode = SystemModeLock.resolve_operational_mode() == "DATABASE"
+        store_label = "Database Context" if is_db_mode else "entries.json"
 
-        # ------------------------------------------------------------
-        # CONFIG PATHS
-        # ------------------------------------------------------------
         entries_path = self._entries_path
         entries_dir = os.path.dirname(entries_path)
         mean_file = os.path.join(entries_dir, "entries_mean_embeddings_dump.npz")
@@ -205,11 +205,8 @@ class EntryWritingRuntime:
             return
 
         # ------------------------------------------------------------
-        # LOAD ENTRIES.JSON (Context-Aware Mode Adaption)
+        # DATA SNAPSHOT ACQUISITION
         # ------------------------------------------------------------
-        from core.mode_lock import SystemModeLock
-        is_db_mode = SystemModeLock.resolve_operational_mode() == "DATABASE"
-
         if is_db_mode:
             entries_data = self._entries
         else:
@@ -224,7 +221,7 @@ class EntryWritingRuntime:
                 raise RuntimeError("entries.json is corrupted or unreadable")
 
         if not isinstance(entries_data, list):
-            raise RuntimeError("entries.json must be a list of entries")
+            raise RuntimeError(f"{store_label} payload must be structured as a list of entries")
 
         existing_entries = set()
         for entry in entries_data:
@@ -233,7 +230,7 @@ class EntryWritingRuntime:
                 existing_entries.add(eid)
 
         # ------------------------------------------------------------
-        # CHECK 1: LEDGER ↔ ENTRIES.JSON CONSISTENCY
+        # CHECK 1: LEDGER ↔ STORAGE MEMBESHIP CONSISTENCY
         # ------------------------------------------------------------
         missing_entries = []
         for eid in ledger_entry_ids:
@@ -242,13 +239,13 @@ class EntryWritingRuntime:
 
         if missing_entries:
             for m in missing_entries:
-                logger.error("[entry_runtime] Ledger entry missing in entries.json: %s", m)
+                logger.error("[entry_runtime] Ledger entry missing in %s: %s", store_label, m)
             raise RuntimeError(
-                f"Entry integrity failure: {len(missing_entries)} ledger entries missing from entries.json"
+                f"Entry integrity failure: {len(missing_entries)} ledger entries missing from {store_label}"
             )
 
         # ------------------------------------------------------------
-        # DETERMINE SYSTEM STATE (cold start vs existing system)
+        # DETERMINE SYSTEM HISTORY STATE
         # ------------------------------------------------------------
         system_has_history = (
             len(ledger_entry_ids) > 0
@@ -256,13 +253,12 @@ class EntryWritingRuntime:
         )
 
         # ------------------------------------------------------------
-        # LOAD / REQUIRE EMBEDDING FILE BASED ON STATE (Context-Aware Mode Adaption)
+        # EMBEDDING MATRIX VERIFICATION ROUTINE
         # ------------------------------------------------------------
         if is_db_mode:
             mean_data = self._embeddings
         else:
             if not os.path.exists(mean_file):
-
                 if system_has_history:
                     raise RuntimeError(
                         f"[entry_runtime] Missing embedding store but system has history. "
@@ -271,7 +267,6 @@ class EntryWritingRuntime:
 
                 logger.debug("[entry_runtime] Cold start detected. No embedding store exists yet.")
                 mean_data = {}   # in-memory empty state only
-
             else:
                 try:
                     mean_data = np.load(mean_file)
@@ -282,7 +277,7 @@ class EntryWritingRuntime:
                     )
 
         # ------------------------------------------------------------
-        # BUILD ENTRY SETS (EMBEDDING TABLES)
+        # BUILD & VALIDATE ENTRY VECTOR SPACE
         # ------------------------------------------------------------
         embedding_keys = set()
         invalid_embeddings = []
@@ -293,9 +288,7 @@ class EntryWritingRuntime:
 
             embedding_keys.add(key)
 
-            # ----------------------------
-            # STRICT VECTOR VALIDATION
-            # ----------------------------
+            # Strict Vector Validations
             if vec is None:
                 invalid_embeddings.append((key, "mean", "None vector"))
                 continue
@@ -316,30 +309,24 @@ class EntryWritingRuntime:
                 invalid_embeddings.append((key, "mean", "zero vector"))
                 continue
 
-
         # ------------------------------------------------------------
-        # CHECK 2: LEDGER ↔ ENTRIES ↔ EMBEDDINGS (FULL COVERAGE CHECK)
+        # CHECK 2: FULL TRACE COVERAGE (LEDGER ↔ RAM ↔ MATRIX)
         # ------------------------------------------------------------
-
         missing_from_entries = []
         missing_from_embeddings = []
 
-        # entries.json index already built above
         for eid in ledger_entry_ids:
-
-            # must exist in entries.json
             if eid not in existing_entries:
                 missing_from_entries.append(eid)
 
-            # must exist in embeddings
             if eid not in embedding_keys:
                 missing_from_embeddings.append(eid)
 
         if missing_from_entries:
             for eid in missing_from_entries:
-                logger.error("[entry_runtime] Missing from entries.json: %s", eid)
+                logger.error("[entry_runtime] Missing from %s: %s", store_label, eid)
             raise RuntimeError(
-                f"[entry_runtime] Integrity failure: {len(missing_from_entries)} ledger entries missing from entries.json"
+                f"[entry_runtime] Integrity failure: {len(missing_from_entries)} ledger entries missing from {store_label}"
             )
 
         if missing_from_embeddings:
@@ -350,18 +337,17 @@ class EntryWritingRuntime:
             )
 
         # ------------------------------------------------------------
-        # FINAL FAILURE CONDITIONS
+        # CRITICAL REJECTION HANDLER
         # ------------------------------------------------------------
         if invalid_embeddings:
             for eid, label, reason in invalid_embeddings:
                 logger.error("[entry_runtime] Invalid embedding: %s | %s | %s", eid, label, reason)
-
             raise RuntimeError("Entry embedding integrity failure (invalid vectors detected)")
             
-        # ------------------------------------------------------------
-        # IF SUCCESSFUL
-        # ------------------------------------------------------------
-        logger.info("[entry_runtime] Full integrity passed (ledger ↔ entries ↔ embeddings fully consistent)")
+        logger.info(
+            "[entry_runtime] Full integrity passed (ledger ↔ %s ↔ embeddings fully consistent)", 
+            store_label
+        )
 
     async def _persist_guarded(self) -> None:
         async with self._persist_lock:
@@ -901,7 +887,7 @@ class EntryWritingRuntime:
 
         if not target:
             logger.warning("[EntryRuntime] Entry not found during strip_entry.")
-            return True
+            return False
 
         now = datetime.now(timezone.utc).isoformat()
                 
@@ -991,6 +977,8 @@ class EntryWritingRuntime:
     
     async def request_flush(self) -> None:
         await self._signal_dirty_queue()
+
+    
 
     def _load_window_embeddings_from_disk(self) -> None:
         self._window_embeddings = {}
