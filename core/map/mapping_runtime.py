@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-06-30T15:43-04:00
+# Save-state: 2026-07-03T21:44-04:00
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
@@ -168,7 +168,7 @@ async def periodic_integrity_check():
             if SystemModeLock.resolve_operational_mode() != "OFFLINE":
                 logger.debug(
                     "[periodic_integrity_check] System integrity verified. "
-                    "Skipping flat-file zip backup because system is not in OFFLINE mode."
+                    "Skipping flat-file zip backup because system is not in mode for flat-file 'OFFLINE' [sic] mode from .env."
                 )
             else:
                 # Create name for the zip file backup of full data folder

@@ -1,7 +1,7 @@
 #!/usr/bin/env sys executable
 # ==========================================
 # PeriDocs/setup.py
-# save-state 2026-06-30T13:29-04:00
+# save-state 2026-07-03T13:29-04:00
 # ==========================================
 import os
 import subprocess
@@ -140,7 +140,6 @@ def initialize_peridocs_database():
                 
                 # Remaining downstream dependencies
                 apply_sql_blueprint(cur, "database_management/schemas/tables/ledger_schema.sql")
-                apply_sql_blueprint(cur, "database_management/schemas/tables/nlp_tables.sql")
                 apply_sql_blueprint(cur, "database_management/schemas/tables/search_schema.sql")
                 
     except Exception as e:

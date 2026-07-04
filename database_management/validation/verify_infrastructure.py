@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ==========================================
-# save-state 2026-06-15T12:22-04:00
+# save-state 2026-07-03T21:43-04:00
 # database-management/validation/verify_infrastructure.py
 # ==========================================
 import os
@@ -69,10 +69,10 @@ def test_database_infrastructure():
                 # ================================================================
                 # Check 2: Core 8-Schema Segmentation (FIXED: Added 'inference')
                 # ================================================================
-                target_schemas = {'content', 'kb', 'search', 'inference', 'nlp', 'audit', 'admin', 'app'}
+                target_schemas = {'content', 'kb', 'search', 'inference', 'audit', 'admin', 'app'}
                 cur.execute("""
                     SELECT schema_name FROM information_schema.schemata 
-                    WHERE schema_name IN ('content', 'kb', 'search', 'inference', 'nlp', 'audit', 'admin', 'app');
+                    WHERE schema_name IN ('content', 'kb', 'search', 'inference', 'audit', 'admin', 'app');
                 """)
                 found_schemas = {row[0].lower() for row in cur.fetchall()}
                 missing_schemas = target_schemas - found_schemas
