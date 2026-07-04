@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-06-30T13:55-04:00
+## Canonical Project Directory as of 2026-07-03T21:16-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -485,8 +485,8 @@ PeriDocs/                         # Root project folder
 │
 │
 ├─ core/
-│   ├─ database.py 
-│   ├─ mode_lock.py 
+│   ├─ database.py # as the operational runtime glue that grabs the lower-level environment-agnostic engines and binds them to the live application via web-framework elements (i.e. this imports FastAPI).
+│   ├─ mode_lock.py # forces the app to focus on either only saving to PostgreSQL or only saving only to JSON and NPZ files, but never both of those options.
 │   │
 │   │
 │   ├─ entry-orchestrator/                      
@@ -563,23 +563,20 @@ PeriDocs/                         # Root project folder
 │   │     ├─02_schemas_init.sql # Establish clean structural boundaries to enforce domain separation,
 │   │     ├─03_permissions_init.sql # specifies what each database role can do
 │   │     └─ tables/
-│   │          ├─ app_tables.sql # Current just stores information for webapp end-user accounts.
-│   │          ├─ content_tables.sql # Stores the main user data. the raw text entries, their AI vector math, and those Creative Commons/public domain outlinks you mentioned.
-│   │          ├─ kb_tables.sql # Stores the moderation logic. the 500 approved concepts and the rules connecting those concepts to the outlinks.
-│   │          ├─ ledger_tables.sql # A historical logbook that tracks changes (great for backups and audit trails).
+│   │          ├─ app_schema.sql # Current just stores information for webapp end-user accounts.
+│   │          ├─ content_schema.sql # Stores the main user data. the raw text entries, their AI vector math, and those Creative Commons/public domain outlinks you mentioned.
+│   │          ├─ kb_schema.sql # Stores the moderation logic. the 500 approved concepts and the rules connecting those concepts to the outlinks.
+│   │          ├─ ledger_schema.sql # A historical logbook that tracks changes (great for backups and audit trails).
 │   │          ├─ nlp_tables.sql # Directly stores the vectors assigned to each entry
-│   │          └─ search_tables.sql # Vector Index & Cluster Optimization Storage
+│   │          └─ search_schema.sql # Vector Index & Cluster Optimization Storage
 │   │
 │   ├─ storage_engines/
 │   │     ├─ __init__.py            # Exposes the factory/bootloader
 │   │     └─ postgres_engine.py    # The actual worker code that takes Python data (like a user's text entry) and translates it into a SQL command to save it.
 │   │
 │   └─ validation/ 
-│      ├─ check_schemas.py 
-│      ├─ verify_infrastructure.py 
-│      └─ contracts/
-│          ├─ inference_summary.json
-│          └─ nlp_metadata.json
+│      └─ verify_infrastructure.py 
+│
 │
 │
 ├─ models/                             # Where open source pre-trained context-understanding models lives

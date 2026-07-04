@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-06-30T14:36-04:00
+# Save-state: 2026-07-03T21:09-04:00
 # ============================================================================
 import json
 import logging
@@ -15,7 +15,7 @@ class PostgresStorageEngine:
         self.pool = pool
 
     # ------------------------------------------------------------------------
-    # LEDGER STORAGE COMPONENT (ledger_tables.sql Alignment)
+    # LEDGER STORAGE COMPONENT (ledger_schema.sql Alignment)
     # ------------------------------------------------------------------------
     async def load_ledger_bundle(self) -> Dict[str, Any]:
         """
@@ -115,13 +115,15 @@ class PostgresStorageEngine:
                         )
 
     # ------------------------------------------------------------------------
-    # ENTRIES & NLP STORAGE COMPONENT (content_tables.sql & nlp_tables.sql Alignment)
+    # ENTRIES & NLP STORAGE COMPONENT (content_schema.sql & nlp_tables.sql Alignment)
+    # ------------------------------------------------------------------------
+    # ------------------------------------------------------------------------
+    # ENTRIES & NLP STORAGE COMPONENT (Reconciled to content_schema.sql)
     # ------------------------------------------------------------------------
     async def load_entries_bundle(self) -> Dict[str, Any]:
         """
         Rehydrates wholesale entries and their multi-dimensional NLP tensor 
-        projections from content.entries, public.entry_mean_embeddings, and public.entry_windows.
-        Enforces structural conventions expected natively by entry_runtime.py.
+        projections natively from the unified content schema.
         """
         entries_list = []
         mean_embeddings = {}
@@ -172,19 +174,19 @@ class PostgresStorageEngine:
                             "hash_from_token_for_deleting_entries": row[10],
                         })
 
-                # 2. Fetch 1D mean embeddings
-                await cur.execute("SELECT entry_id, mean_embedding FROM public.entry_mean_embeddings;")
+                # 2. Fetch 1D mean embeddings from the corrected table & column namespaces
+                await cur.execute("SELECT entry_id, embedding FROM content.embeddings;")
                 for row in await cur.fetchall():
                     if isinstance(row, dict):
-                        mean_embeddings[row["entry_id"]] = np.array(row["mean_embedding"], dtype=np.float32)
+                        mean_embeddings[row["entry_id"]] = np.array(row["embedding"], dtype=np.float32)
                     else:
                         mean_embeddings[row[0]] = np.array(row[1], dtype=np.float32)
 
-                # 3. Fetch sequential window matrices reconstructed chronologically
+                # 3. Fetch sequential window matrices reconstructed chronologically from content schema
                 await cur.execute(
                     """
                     SELECT entry_id, window_embedding, window_text, standout_flag
-                    FROM public.entry_windows
+                    FROM content.entry_windows
                     ORDER BY entry_id, window_index ASC;
                     """
                 )
@@ -213,11 +215,9 @@ class PostgresStorageEngine:
 
         for entry in entries_list:
             eid = entry["entry_id"]
-            # Rehydrate mean embedding fallback if missing
             if eid not in mean_embeddings:
                 mean_embeddings[eid] = np.array([], dtype=np.float32)
 
-            # Reconstruct sliding window collections into formal NumPy structures
             if eid in raw_window_embeddings:
                 window_embeddings[eid] = np.array(raw_window_embeddings[eid], dtype=np.float32)
                 window_text[eid] = np.array(raw_window_text[eid], dtype=object)
@@ -229,10 +229,10 @@ class PostgresStorageEngine:
 
         return {
             "entries": entries_list,
-            "embeddings": mean_embeddings,          # Corrected key to match entry_runtime.py
+            "embeddings": mean_embeddings,          
             "window_embeddings": window_embeddings,
             "window_text": window_text,
-            "window_flags": window_flags,           # Corrected key to match entry_runtime.py
+            "window_flags": window_flags,           
         }
 
     async def save_entries_bundle(
@@ -244,18 +244,16 @@ class PostgresStorageEngine:
         standout_flags: Dict[str, Any]
     ) -> None:
         """
-        Flushes entry registries and vector arrays out to relational tables atomically.
-        Guards referential integrity constraints defensively against async partial state flushes.
+        Flushes entry registries and vector arrays out to content schema tables atomically.
         """
         async with self.pool.connection() as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
-                    # Clear relational structures cleanly before writing modern frames
-                    await cur.execute("TRUNCATE TABLE public.entry_windows CASCADE;")
-                    await cur.execute("TRUNCATE TABLE public.entry_mean_embeddings CASCADE;")
+                    # Clear relational structures cleanly using modern namespaces
+                    await cur.execute("TRUNCATE TABLE content.entry_windows CASCADE;")
+                    await cur.execute("TRUNCATE TABLE content.embeddings CASCADE;")
                     await cur.execute("TRUNCATE TABLE content.entries CASCADE;")
 
-                    # Track entry IDs actively written during this specific transaction pass
                     valid_entry_ids = set()
 
                     # 1. Flush entries master metadata list
@@ -281,7 +279,7 @@ class PostgresStorageEngine:
                             )
                         )
 
-                    # 2. Flush Mean Embeddings (Guarded against ForeignKeyViolation)
+                    # 2. Flush Mean Embeddings using unified schema mapping
                     for eid, arr in embedding_snapshot.items():
                         if eid not in valid_entry_ids:
                             logger.debug("[Engine] Skipping detached embedding vector until master row is appended: %s", eid)
@@ -290,13 +288,13 @@ class PostgresStorageEngine:
                         if isinstance(arr, np.ndarray) and arr.size > 0:
                             await cur.execute(
                                 """
-                                INSERT INTO public.entry_mean_embeddings (entry_id, mean_embedding)
+                                INSERT INTO content.embeddings (entry_id, embedding)
                                 VALUES (%s, %s);
                                 """,
                                 (eid, arr.tolist())
                             )
 
-                    # 3. Flush Zipped Sliding Windows (Guarded against ForeignKeyViolation)
+                    # 3. Flush Zipped Sliding Windows into content schema
                     for eid in window_embeddings:
                         if eid not in valid_entry_ids:
                             continue
@@ -315,14 +313,13 @@ class PostgresStorageEngine:
                             
                             await cur.execute(
                                 """
-                                INSERT INTO public.entry_windows (entry_id, window_index, window_embedding, window_text, standout_flag)
+                                INSERT INTO content.entry_windows (entry_id, window_index, window_embedding, window_text, standout_flag)
                                 VALUES (%s, %s, %s, %s, %s);
                                 """,
                                 (eid, idx, w_arr, t_val, f_val)
                             )
-
     # ------------------------------------------------------------------------
-    # CENTROIDS STORAGE COMPONENT (search_tables.sql Alignment)
+    # CENTROIDS STORAGE COMPONENT (search_schema.sql Alignment)
     # ------------------------------------------------------------------------
     async def load_centroids_bundle(self) -> Dict[str, Any]:
         """

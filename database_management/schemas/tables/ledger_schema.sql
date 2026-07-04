@@ -1,6 +1,6 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: LEDGER SCHEMA & DETERMINISTIC EVENT TRAIL
--- Location: database-management/schemas/tables/ledger_tables.sql
+-- Location: database-management/schemas/tables/ledger_schema.sql
 -- ============================================================================
 
 BEGIN;

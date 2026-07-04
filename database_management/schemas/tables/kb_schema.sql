@@ -1,6 +1,6 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: KB SCHEMA (ONTOLOGY & KNOWLEDGE BASE LOGIC)
--- Location: database-management/schemas/tables/kb_tables.sql
+-- Location: database-management/schemas/tables/kb_schema.sql
 -- save-state: 2026-06-30T14:05-04:00
 -- ============================================================================
 

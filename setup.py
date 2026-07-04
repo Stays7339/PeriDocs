@@ -130,18 +130,18 @@ def initialize_peridocs_database():
                 apply_sql_blueprint(cur, "database_management/schemas/03_permissions_init.sql")
                 
                 # Core operational content layout
-                apply_sql_blueprint(cur, "database_management/schemas/tables/content_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/content_schema.sql")
                 
                 # MOVED UP: Provision core app infrastructure, admin tracking, and user tables
-                apply_sql_blueprint(cur, "database_management/schemas/tables/app_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/app_schema.sql")
                 
                 # Now that app.accounts and admin.release_information exist, KB can safely build
-                apply_sql_blueprint(cur, "database_management/schemas/tables/kb_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/kb_schema.sql")
                 
                 # Remaining downstream dependencies
-                apply_sql_blueprint(cur, "database_management/schemas/tables/ledger_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/ledger_schema.sql")
                 apply_sql_blueprint(cur, "database_management/schemas/tables/nlp_tables.sql")
-                apply_sql_blueprint(cur, "database_management/schemas/tables/search_tables.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/search_schema.sql")
                 
     except Exception as e:
         print(f"CRITICAL: Structural provisioning halted.\nDetails: {e}")
