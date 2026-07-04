@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-07-03T10:35-04:00
+# Save-state: 2026-07-03T19:19-04:00
 # ==========================================
 
 """
@@ -170,6 +170,7 @@ class DeletionManager:
         *,
         entry_id: str,
         token_hash: str,
+        data_dir: Optional[str] = None,
     ) -> Dict[str, List[str]]:
 
         await self._centroids._assert_ledger_ready()

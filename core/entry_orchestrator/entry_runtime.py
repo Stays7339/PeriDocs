@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-03T10:50-04:00
+# Save-state: 2026-07-03T14:26-04:00
 # ==========================================
 import asyncio
 import copy
@@ -371,7 +371,6 @@ class EntryWritingRuntime:
                         # immediate final flush (no batching delay)
                         if self._dirty_mutation_count > 0:
                             await self._persist_guarded()
-                            self._dirty_mutation_count = 0
                             self._last_flush_time = time.time()
                     finally:
                         # ensure loop always exits immediately
@@ -379,7 +378,6 @@ class EntryWritingRuntime:
 
                 if self._should_flush_to_disk():
                     await self._persist_guarded()
-                    self._dirty_mutation_count = 0
                     self._last_flush_time = time.time()
 
             except Exception as e:
@@ -414,7 +412,6 @@ class EntryWritingRuntime:
     
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
-
         if not isinstance(entry, dict):
             raise RuntimeError("Invalid entry type: must be dict")
 
@@ -428,25 +425,21 @@ class EntryWritingRuntime:
         if not entry_id:
             raise RuntimeError("Entry missing identifier field")
 
-        # ----------------------------
-        # immediate memory mutation
-        # ----------------------------
-        self._entries.append(entry)
-        self._entry_index[entry_id] = entry
+        # --- FIX: Safely update provisional shell in-place or insert fresh ---
+        if entry_id in self._entry_index:
+            existing_shell = self._entry_index[entry_id]
+            existing_shell.update(entry)
+        else:
+            self._entries.append(entry)
+            self._entry_index[entry_id] = entry
 
+        # --- FIX: Ensure the token index always links directly to the master record ---
         if entry.get("hash_from_token_for_deleting_entries"):
             self._index_for_hashed_tokens_for_deleting_entries[
                 entry["hash_from_token_for_deleting_entries"]
-            ] = entry
+            ] = self._entry_index[entry_id]
 
-        # ----------------------------
-        # dirty tracking
-        # ----------------------------
         self._dirty_mutation_count += 1
-
-        # ----------------------------
-        # wake flush worker (non-blocking)
-        # ----------------------------
         await self._signal_dirty_queue()
         
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
@@ -505,6 +498,9 @@ class EntryWritingRuntime:
             logger.error("[EmbeddingContract] zero-vector rejected | eid=%s", entry_id)
             raise RuntimeError("Zero-vector embedding not allowed")
 
+        # --- FIX: Ensure parent record structural integrity ---
+        self._ensure_provisional_shell(entry_id)
+
         # ------------------------------------------
         # STORE CANONICALIZED RESULT (memory is now immediate, no queueing)
         # ------------------------------------------
@@ -514,6 +510,7 @@ class EntryWritingRuntime:
         await self._signal_dirty_queue()
 
     async def set_window_text(self, entry_id: str, windows: np.ndarray) -> None:
+        self._ensure_provisional_shell(entry_id)
         windows = np.asarray(windows, dtype=str)
         self._window_text[entry_id] = windows
         self._dirty_mutation_count += 1
@@ -529,12 +526,15 @@ class EntryWritingRuntime:
         if embeddings.shape[1] != EMBEDDING_DIM:
             raise RuntimeError("invalid embedding dim")
 
+        self._ensure_provisional_shell(entry_id)
+
         self._window_embeddings[entry_id] = embeddings
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
 
 
     async def set_standout_window_flags(self, entry_id: str, flags: np.ndarray) -> None:
+        self._ensure_provisional_shell(entry_id)
         flags = np.asarray(flags, dtype=bool)
         self._standout_window_flags[entry_id] = flags
         self._dirty_mutation_count += 1
@@ -543,6 +543,11 @@ class EntryWritingRuntime:
     async def _persist(self) -> None:
         logger.debug("[PERSIST ENTERED]")
         logger.debug("CWD=%s PID=%s", os.getcwd(), os.getpid())
+
+        # --- FIX: Capture exactly how many mutations are currently in memory ---
+        # Since we are already inside the lock, no async context switches can happen 
+        # between this line and the deepcopy statements below.
+        mutations_to_deduct = self._dirty_mutation_count
 
         json_dir = os.path.dirname(self._entries_path)
         npz_dir = os.path.dirname(self._npz_path)
@@ -581,8 +586,11 @@ class EntryWritingRuntime:
                     standout_flags=self._standout_window_flags
                 )
                 # --------------------------------------------------------
+
+                # --- Successfully written to DB, safely deduct ONLY what we snapshotted ---
+                self._dirty_mutation_count = max(0, self._dirty_mutation_count - mutations_to_deduct)
                 
-                # SUCCESS: If the database transaction committed cleanly, lock it in!
+                # If the database transaction committed cleanly, lock it in!
                 SystemModeLock.lock_mode_permanently() # Burns the fuse on first success
                 logger.info("[PERSIST] Central database flush completed. Bypassing disk I/O.")
                 return # Exit early! Your hard drive never has to spin up.
@@ -715,6 +723,9 @@ class EntryWritingRuntime:
                 self._standout_window_flags_npz_path,
                 **self._standout_window_flags
             )
+
+            # --- FIX: Successfully written to disk, safely deduct what we snapshotted ---
+            self._dirty_mutation_count = max(0, self._dirty_mutation_count - mutations_to_deduct)
 
             logger.debug("NPZ commit complete -> %s", self._npz_path)
 
@@ -859,6 +870,31 @@ class EntryWritingRuntime:
         return copy.deepcopy(self._entries) 
         # ------
 
+    # =====================================================================
+    # ADD THIS HELPER METHOD INSIDE THE EntryWritingRuntime CLASS
+    # =====================================================================
+    def _ensure_provisional_shell(self, entry_id: str) -> None:
+        """
+        Ensures a parent master row shell exists in memory before child vectors 
+        or window components attempt to flush to a relational database engine.
+        """
+        if entry_id not in self._entry_index:
+            provisional_entry = {
+                "entry_id": entry_id,
+                "entry_nickname": entry_id[:12] if entry_id else "pending",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "user_id": None,
+                "safe_text": "",  # Populated later via append_entry
+                "centroids": [],
+                "ip_hash": "",
+                "encrypted_raw_ip": "",
+                "encrypted_raw_text": "",
+                "crisis_flag": False,
+                "hash_from_token_for_deleting_entries": ""
+            }
+            self._entries.append(provisional_entry)
+            self._entry_index[entry_id] = provisional_entry
+
     async def purge_entry_metadata(
         self,
         *,
@@ -977,8 +1013,6 @@ class EntryWritingRuntime:
     
     async def request_flush(self) -> None:
         await self._signal_dirty_queue()
-
-    
 
     def _load_window_embeddings_from_disk(self) -> None:
         self._window_embeddings = {}
