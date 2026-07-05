@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-07-03T21:44-04:00
+# Save-state: 2026-07-05T15:23-04:00
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
@@ -57,7 +57,7 @@ entry_runtime = _entry_runtime
 # ---------------------------------------------------------------------
 
 def is_runtime_ready() -> bool:
-    logger.warning(
+    logger.debug(
         "READING READY FLAG = %s | time=%s",
         _runtime_ready,
         datetime.utcnow().isoformat()
@@ -66,7 +66,7 @@ def is_runtime_ready() -> bool:
     return _runtime_ready
 
 def is_runtime_starting() -> bool:
-    logger.warning("READING READY FLAG = %s", _runtime_ready)
+    logger.debug("READING READY FLAG = %s", _runtime_ready)
     return _boot_in_progress
 
 async def initialize_runtime(force_reload: bool = False, verify: bool = False) -> None:
@@ -112,7 +112,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
     await entry_runtime.initialize()
     logger.info("ENTRY RUNTIME READY")
     await entry_runtime._verify_integrity_on_startup()
-    logger.info("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
+    logger.debug("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
     logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
 
     await centroid_system.load_state()
@@ -128,7 +128,7 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     _initialized = True
     _runtime_ready = True
-    logger.warning("RUNTIME READY FLAG SET -> TRUE at %s", datetime.utcnow().isoformat())
+    logger.debug("RUNTIME READY FLAG SET -> TRUE at %s", datetime.utcnow().isoformat())
     _boot_in_progress = False
     logger.info("Mapping runtime is now READY.")
 

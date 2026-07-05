@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-07-05T12:27-04:00
+// save-state 2026-07-05T15:41-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -101,6 +101,9 @@ async function toggleEntries(precentroidId) {
   entriesContainer.innerHTML = "";
 
   for (const e of data.entries) {
+    // DIAGNOSTIC LOG: See exactly what keys and values JavaScript is receiving
+    console.log("Rendering entry data object:", e);
+
     const p = document.createElement("p");
     p.className = "matched-snippet";
     p.textContent = e.safe_text;

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-05T12:23-04:00
+# save-state 2026-07-05T13:00-04:00
 # ==========================================
 import os
 import json
@@ -392,7 +392,7 @@ async def create_resource(payload: CreateResourcePayload):
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"PostgreSQL persistence failure: {str(e)}")
 
-    # CASE B: FLAT-FILE PRODUCTION MODE (JSON/NPZ)
+    # CASE B: FLAT-FILE MODE (JSON/NPZ)
     else:
         try:
             os.makedirs(os.path.dirname(RESOURCES_JSON_FILE), exist_ok=True)

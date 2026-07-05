@@ -1,6 +1,6 @@
 # ==========================================
 # core/mode_lock.py
-# Save-state: 2026-06-17T14:58-04:00
+# Save-state: 2026-07-05T12:59-04:00
 # ==========================================
 
 import os
@@ -15,7 +15,7 @@ TMP_LOCK_PATH = DATA_DIR / ".system_mode_lock.tmp"
 
 class SystemModeLock:
     """
-    Guarantees the system permanently binds to either DATABASE or LOCAL storage
+    Guarantees the system permanently binds to either DATABASE or OFFLINE storage
     after the initial successful write, preventing mid-lifecycle drift.
     """
     _resolved_mode: str | None = None
@@ -40,7 +40,7 @@ class SystemModeLock:
         if cls.is_lock_file_present_on_disk():
             try:
                 locked_mode = MODE_LOCK_PATH.read_text(encoding="utf-8").strip()
-                if locked_mode in ("DATABASE", "LOCAL"):
+                if locked_mode in ("DATABASE", "OFFLINE"):
                     logger.info("[MODE LOCK] Sticky lock active. System anchored to: %s", locked_mode)
                     cls._resolved_mode = locked_mode
                     return cls._resolved_mode
@@ -49,12 +49,12 @@ class SystemModeLock:
 
         # 2. Fallback to .env inspection if no lock file exists yet
         env_mode = os.getenv("DATABASE_MODE", "").strip()
-        if env_mode in ("PRODUCTION", "LOCAL"):
+        if env_mode in ("PRODUCTION", "SANDBOX"):
             logger.info("[MODE LOCK] No active lock file. .env requests online engine.")
             cls._resolved_mode = "DATABASE"
         else:
-            logger.info("[MODE LOCK] No active lock file. Defaulting to local file engine.")
-            cls._resolved_mode = "LOCAL"
+            logger.info("[MODE LOCK] No active lock file. Defaulting to  flat-file engine.")
+            cls._resolved_mode = "OFFLINE"
 
         # A3. UTOMATICALLY BURN FUSE HERE INDEPENDENTLY OF THE RUNTIMES
         cls.lock_mode_permanently()
@@ -70,7 +70,12 @@ class SystemModeLock:
         if cls.is_lock_file_present_on_disk():
             return # Already locked on disk
 
-        current_mode = cls._resolved_mode or "LOCAL"
+        # Check if the initialization sequence was bypassed
+        if cls._resolved_mode is None:
+            logger.warning("[MODE LOCK] cls._resolved_mode was uninitialized; assuming OFFLINE mode without check.")
+            current_mode = "OFFLINE"
+        else:
+            current_mode = cls._resolved_mode
         
         try:
             DATA_DIR.mkdir(parents=True, exist_ok=True)

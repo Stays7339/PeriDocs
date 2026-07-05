@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==========================================
 # PeriDocs/core/database.py
-# save-state 2026-06-15T13:34-04:00
+# save-state 2026-07-05T13:01-04:00
 # ==========================================
 import os
 import contextlib
@@ -23,7 +23,7 @@ ASYNC_CONN_INFO = None
 db_engine = None
 
 # Guarded configuration setup to protect OFFLINE_MOCK mode from missing dependencies
-if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+if DATABASE_MODE in ("PRODUCTION", "SANDBOX"):
     import psycopg
 
     env_var = "DATABASE_URL" if DATABASE_MODE == "PRODUCTION" else "LOCAL_DATABASE_URL"
@@ -44,7 +44,7 @@ async def initialize_database():
     # Added db_engine to the global namespace allocation block
     global db_pool, db_engine
     
-    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+    if DATABASE_MODE in ("PRODUCTION", "SANDOX"):
         from psycopg_pool import AsyncConnectionPool
         from psycopg.rows import dict_row
 
@@ -87,7 +87,7 @@ async def initialize_database():
 async def close_database():
     """Explicitly called during the app's shutdown sequence."""
     global db_pool
-    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+    if DATABASE_MODE in ("PRODUCTION", "SANDBOX"):
         print(f"[SHUTDOWN] [{DATABASE_MODE}] Draining connection pool...")
         if db_pool:
             await db_pool.close()
@@ -97,7 +97,7 @@ async def close_database():
 
 async def get_db() -> AsyncGenerator:
     global db_pool
-    if DATABASE_MODE in ("PRODUCTION", "LOCAL"):
+    if DATABASE_MODE in ("PRODUCTION", "SANDOX"):
         if db_pool is None:
             raise RuntimeError("Database pool is offline.")
         async with db_pool.connection() as session:
@@ -106,7 +106,7 @@ async def get_db() -> AsyncGenerator:
     else:
         class LocalMockConnection:
             async def execute(self, query: str, params: tuple = None):
-                print(f"[LOCAL MOCK SQL] Executing statement context: {query}")
+                print(f"[SANDBOX LOCAL MOCK SQL] Executing statement context: {query}")
                 
                 class MockCursor:
                     async def fetchone(self):

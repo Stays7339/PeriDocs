@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-07-03T11:40-04:00 (ISO 8601)
+# save-state 2026-07-05T15:23-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -157,7 +157,6 @@ async def startup_sequence():
     await initialize_account_runtime()
 
     logger.info("Startup sequence complete.")
-    logger.warning("STARTUP EVENT COMPLETE")
 
 @app.on_event("shutdown")
 async def shutdown_sequence():
