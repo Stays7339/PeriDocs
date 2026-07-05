@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-06-11T15:22-04:00
+# save-state 2026-07-05T15:22-04:00
 # ==========================================
 
 
@@ -230,16 +230,11 @@ async def process_entry_async(
     report_progress()  # 8 / total_steps
 
     # ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
+    reasoning_result = None
     try:
-
         reasoning_result = await run_reasoning(entry)
-
-        # attach but DO NOT persist to embeddings / centroid system
-        entry["reasoning"] = reasoning_result
-
     except Exception as e:
         logger.exception("Reasoning pipeline failed; continuing without it.")
-        entry["reasoning"] = None
 
     report_progress()  # 9 / total_steps
 
@@ -266,14 +261,20 @@ async def process_entry_async(
 
     entry["centroids"] = entry.get("centroids", [])
 
-    return (
-        build_persisted_entry(
-            entry=entry,
-            user_id=user_id,
-            centroids=entry.get("centroids", [])
-        ),
-        delete_token
+    entry["centroids"] = entry.get("centroids", [])
+
+    # 1. Build the clean, standard persistence dictionary
+    formatted_entry = build_persisted_entry(
+        entry=entry,
+        user_id=user_id,
+        centroids=entry.get("centroids", [])
     )
+
+    # 2. Inject the ephemeral reasoning results solely for the in-memory runtime cache
+    formatted_entry["reasoning"] = reasoning_result
+
+    # 3. Return the exact 2-tuple the background routing expects
+    return formatted_entry, delete_token
 
 
 def build_persisted_entry(

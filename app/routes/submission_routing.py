@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/submission_routing.py
-# save-state 2026-06-11T16:19-04:00
+# save-state 2026-07-05T16:19-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -379,3 +379,46 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
             "delete.html",
             {"request": request, "error": "Deletion requests are currently not working. Please contact support."}
         )
+
+async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
+    """
+    Unified read abstraction to gather resources for submit-success formatting.
+    Works seamlessly with both Postgres and Flat-File JSON configurations.
+    """
+    if not deduced_tags:
+        return []
+
+    # CASE A: POSTGRESQL ENGINE MODE
+    if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
+        from core.database import db_engine
+        try:
+            async with db_engine.pool.acquire() as conn:
+                rows = await conn.fetch(
+                    """
+                    SELECT DISTINCT er.title, er.url, er.description 
+                    FROM kb_schema.external_resources er
+                    JOIN kb_schema.resource_concept_mappings rcm ON er.resource_id = rcm.resource_id
+                    WHERE rcm.concept_id = ANY($1);
+                    """,
+                    deduced_tags
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []  # Fallback gracefully to empty list on database hiccups
+
+    # CASE B: FLAT-FILE MODE (JSON/NPZ)
+    else:
+        if not os.path.exists(RESOURCES_JSON_FILE):
+            return []
+        try:
+            with open(RESOURCES_JSON_FILE, "r", encoding="utf-8") as f:
+                all_res = json.load(f)
+            
+            # Intersection match: pull resources that share at least one tag
+            return [
+                {"title": r["title"], "url": r["url"], "description": r["description"]}
+                for r in all_res 
+                if len(set(r.get("assigned_concepts", [])) & set(deduced_tags)) > 0
+            ]
+        except Exception:
+            return []

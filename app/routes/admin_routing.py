@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-05-11T14:33:08-04:00
+# save-state 2026-07-05T12:23-04:00
 # ==========================================
 import os
 import json
@@ -18,7 +18,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-
+from core.mode_lock import SystemModeLock  # Enforces DB vs Flat-File runtime constraint
 from core.map.mapping_runtime import centroid_system
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from core.map.perist_reasoning_data import (
@@ -31,6 +31,7 @@ from core.map.perist_reasoning_data import (
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
+RESOURCES_JSON_FILE = os.path.join("data", "reasoning", "resources.json")
 
 # Initialize router with proper prefix and tags
 router = APIRouter(
@@ -60,6 +61,14 @@ class EntriesSafeTextPayload(BaseModel):
 class CreateHeuristicPayload(BaseModel):
     givens: List[str]
     outputs: List[Dict[str, Any]]  # {concept, likelihood, justification?}
+
+
+class CreateResourcePayload(BaseModel):
+    title: str = Field(..., min_length=1)
+    url: str = Field(..., min_length=1)
+    description: str | None = None
+    assigned_concepts: List[str] = Field(..., min_length=1)
+
 # -----------------------------
 # Admin HTML Dashboard Route
 # -----------------------------
@@ -325,3 +334,90 @@ async def get_concepts():
             })
 
     return {"concepts": concepts}
+
+@router.post("/create-resource")
+async def create_resource(payload: CreateResourcePayload):
+    """
+    Ingests an outlink resource and binds it to system concepts.
+    Adapts automatically between Postgres and Flat-File JSON modes.
+    """
+    # Clean and normalize concept strings from the typeahead field
+    cleaned_concepts = [extract_concept_id(c.strip()) for c in payload.assigned_concepts]
+    cleaned_concepts = [c for c in cleaned_concepts if c]
+
+    if not cleaned_concepts:
+        raise HTTPException(status_code=400, detail="Resource must be linked to at least one valid concept.")
+
+    new_resource = {
+        "resource_id": str(uuid.uuid4()),
+        "title": payload.title.strip(),
+        "url": payload.url.strip(),
+        "description": payload.description.strip() if payload.description else "",
+        "assigned_concepts": cleaned_concepts,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+
+    # =========================================================================
+    # DUAL PERSISTENCE STRATEGY
+    # =========================================================================
+    
+    # CASE A: POSTGRESQL ENGINE MODE
+    if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
+        from core.database import db_engine
+        try:
+            # We execute query bindings inside the active engine instance
+            async with db_engine.pool.acquire() as conn:
+                async with conn.transaction():
+                    # Insert Master Resource Record
+                    await conn.execute(
+                        """
+                        INSERT INTO kb_schema.external_resources (resource_id, title, url, description)
+                        VALUES ($1, $2, $3, $4) ON CONFLICT (url) DO UPDATE SET title = $2, description = $4;
+                        """,
+                        uuid.UUID(new_resource["resource_id"]), new_resource["title"], new_resource["url"], new_resource["description"]
+                    )
+                    
+                    # Fetch resource id if it already existed via URL conflict rule
+                    r_id = await conn.fetchval("SELECT resource_id FROM kb_schema.external_resources WHERE url = $1;", new_resource["url"])
+
+                    # Bind concepts to relationship mapping table
+                    for concept in cleaned_concepts:
+                        await conn.execute(
+                            """
+                            INSERT INTO kb_schema.resource_concept_mappings (resource_id, concept_id)
+                            VALUES ($1, $2) ON CONFLICT (resource_id, concept_id) DO NOTHING;
+                            """,
+                            r_id, concept
+                        )
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"PostgreSQL persistence failure: {str(e)}")
+
+    # CASE B: FLAT-FILE PRODUCTION MODE (JSON/NPZ)
+    else:
+        try:
+            os.makedirs(os.path.dirname(RESOURCES_JSON_FILE), exist_ok=True)
+            
+            if os.path.exists(RESOURCES_JSON_FILE):
+                loop = asyncio.get_event_loop()
+                resources_list = await loop.run_in_executor(None, lambda: json.load(open(RESOURCES_JSON_FILE, "r")))
+            else:
+                resources_list = []
+
+            # Check for existing URL conflict to update record in-place
+            existing_record = next((r for r in resources_list if r["url"] == new_resource["url"]), None)
+            if existing_record:
+                existing_record["title"] = new_resource["title"]
+                existing_record["description"] = new_resource["description"]
+                # Merge lists without duplicating strings
+                existing_record["assigned_concepts"] = list(set(existing_record["assigned_concepts"] + cleaned_concepts))
+            else:
+                resources_list.append(new_resource)
+
+            # Persist back to local filesystem safely
+            with open(RESOURCES_JSON_FILE, "w", encoding="utf-8") as f:
+                json.dump(resources_list, f, indent=2)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Flat-file JSON persistence failure: {str(e)}")
+
+    return {"status": "ok", "resource_id": new_resource["resource_id"]}
