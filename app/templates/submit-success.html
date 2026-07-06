@@ -1,4 +1,4 @@
-{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-05-27T14:00:30-04:00 #}
+{# PeriDocs-code/app/templates/submit-success.html — save-state 2026-07-05T16:08-04:00 #}
 {% extends "base.html" %}
 {% block title %}Entry saved | PeriDocs{% endblock %}
 
@@ -45,6 +45,48 @@
     <ul class="metrics">
       <br><li><strong>Average similarity to other entries:</strong> {{ average_similarity_pct }}%</li><br>
     </ul>
+
+    <!-- INJECT REASONING TRACE HERE -->
+    {% if reasoning %}
+    <blockquote class="matched-snippet reasoning-receipt-block">
+      <div class="reasoning-header">
+        <strong>Engine Reasoning Trace</strong>
+        <span class="receipt-id">Path: {{ reasoning.receipt[0].path_id[:8] if reasoning.receipt else 'N/A' }}</span>
+      </div>
+
+      <div class="concepts-summary">
+        <div class="concepts-grid">
+          {% for concept, score in reasoning.final_concepts.items() %}
+            <div class="concept-tag">
+              <span class="concept-name">{{ concept }}</span>
+              <span class="similarity-badge {% if 'centroid' in concept %}centroid-badge{% endif %}">
+                {{ "%.4f"|format(score) }}
+              </span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="timeline-steps">
+        {% for step in reasoning.receipt %}
+          <div class="timeline-item">
+            <div class="step-badge">Step {{ step.step }}</div>
+            <div class="step-content">
+              <div class="step-meta">
+                <span class="heuristic">Heuristic: <code>{{ step.heuristic_id }}</code></span>
+                <span class="weight">+{{ "%.3f"|format(step.weight) }}</span>
+              </div>
+              <div class="step-logic">
+                <span class="inputs">{{ step.input_concepts | join(', ') }}</span>
+                <span class="arrow">&rarr;</span>
+                <span class="output"><strong>{{ step.output_concept }}</strong></span>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </blockquote>
+    {% endif %}
 
     <!-- Top 20 matched entries -->
     {% if top_matches %}

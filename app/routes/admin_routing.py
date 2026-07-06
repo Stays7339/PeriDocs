@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-05T13:00-04:00
+# save-state 2026-07-06T15:00-04:00
 # ==========================================
 import os
 import json
@@ -62,12 +62,13 @@ class CreateHeuristicPayload(BaseModel):
     givens: List[str]
     outputs: List[Dict[str, Any]]  # {concept, likelihood, justification?}
 
-
 class CreateResourcePayload(BaseModel):
     title: str = Field(..., min_length=1)
     url: str = Field(..., min_length=1)
+    resource_type: str = Field(..., min_length=1)
     description: str | None = None
     assigned_concepts: List[str] = Field(..., min_length=1)
+
 
 # -----------------------------
 # Admin HTML Dashboard Route
@@ -335,6 +336,7 @@ async def get_concepts():
 
     return {"concepts": concepts}
 
+
 @router.post("/create-resource")
 async def create_resource(payload: CreateResourcePayload):
     """
@@ -348,10 +350,16 @@ async def create_resource(payload: CreateResourcePayload):
     if not cleaned_concepts:
         raise HTTPException(status_code=400, detail="Resource must be linked to at least one valid concept.")
 
+    url_clean = payload.url.strip()
+    
+    # Programmatic Resource_ID generated deterministically via URL hash matching standard UUID rules
+    deterministic_id = str(uuid.uuid5(uuid.NAMESPACE_URL, url_clean))
+
     new_resource = {
-        "resource_id": str(uuid.uuid4()),
+        "resource_id": deterministic_id,
         "title": payload.title.strip(),
-        "url": payload.url.strip(),
+        "url": url_clean,
+        "resource_type": payload.resource_type.strip(),
         "description": payload.description.strip() if payload.description else "",
         "assigned_concepts": cleaned_concepts,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -362,22 +370,27 @@ async def create_resource(payload: CreateResourcePayload):
     # =========================================================================
     
     # CASE A: POSTGRESQL ENGINE MODE
-    if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
+    from core.mode_lock import SystemModeLock
+    
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
         from core.database import db_engine
         try:
-            # We execute query bindings inside the active engine instance
             async with db_engine.pool.acquire() as conn:
                 async with conn.transaction():
-                    # Insert Master Resource Record
+                    # Insert Master Resource Record with the alpha-ready schema extensions
                     await conn.execute(
                         """
-                        INSERT INTO kb_schema.external_resources (resource_id, title, url, description)
-                        VALUES ($1, $2, $3, $4) ON CONFLICT (url) DO UPDATE SET title = $2, description = $4;
+                        INSERT INTO kb_schema.external_resources (resource_id, title, url, resource_type, description)
+                        VALUES ($1, $2, $3, $4, $5) 
+                        ON CONFLICT (url) DO UPDATE SET title = $2, resource_type = $4, description = $5;
                         """,
-                        uuid.UUID(new_resource["resource_id"]), new_resource["title"], new_resource["url"], new_resource["description"]
+                        uuid.UUID(new_resource["resource_id"]), 
+                        new_resource["title"], 
+                        new_resource["url"], 
+                        new_resource["resource_type"], 
+                        new_resource["description"]
                     )
                     
-                    # Fetch resource id if it already existed via URL conflict rule
                     r_id = await conn.fetchval("SELECT resource_id FROM kb_schema.external_resources WHERE url = $1;", new_resource["url"])
 
                     # Bind concepts to relationship mapping table
@@ -407,13 +420,12 @@ async def create_resource(payload: CreateResourcePayload):
             existing_record = next((r for r in resources_list if r["url"] == new_resource["url"]), None)
             if existing_record:
                 existing_record["title"] = new_resource["title"]
+                existing_record["resource_type"] = new_resource["resource_type"]
                 existing_record["description"] = new_resource["description"]
-                # Merge lists without duplicating strings
                 existing_record["assigned_concepts"] = list(set(existing_record["assigned_concepts"] + cleaned_concepts))
             else:
                 resources_list.append(new_resource)
 
-            # Persist back to local filesystem safely
             with open(RESOURCES_JSON_FILE, "w", encoding="utf-8") as f:
                 json.dump(resources_list, f, indent=2)
 

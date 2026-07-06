@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-07-05T15:41-04:00
+// save-state 2026-07-06T14:44-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -378,3 +378,59 @@ document.addEventListener("DOMContentLoaded", () => {
   // initial load
   fetchQueue();
 });
+
+// =====================================================
+// EXTERNAL RESOURCES SUBSYSTEM
+// =====================================================
+
+// resourceConceptsContainer is already imported earlier in the script
+
+function addResourceConcept(value = "") {
+  const div = document.createElement("div");
+  div.style.margin = "6px 0";
+  div.innerHTML = `
+    <input class="input resource-concept-input" placeholder="Search concept or cluster tag..." value="${value}" style="width:100%; margin-top:4px;">
+  `;
+  resourceConceptsContainer.appendChild(div);
+  
+  // Directly bind into your existing Typeahead system
+  attachTypeahead(div.querySelector(".resource-concept-input"));
+}
+
+async function submitResource() {
+  const title = document.getElementById("resource-title").value.trim();
+  const url = document.getElementById("resource-url").value.trim();
+  const resource_type = document.getElementById("resource-type").value.trim();
+  const description = document.getElementById("resource-desc").value.trim();
+  
+  const assigned_concepts = [...resourceConceptsContainer.querySelectorAll("input")]
+    .map(i => i.value.trim())
+    .filter(Boolean);
+
+  if (!title || !url || !resource_type || assigned_concepts.length === 0) {
+    alert("Please populate Title, URL, Type, and at least one linked concept match.");
+    return;
+  }
+
+  try {
+    const res = await authFetch("/admin/create-resource", {
+      method: "POST",
+      body: JSON.stringify({ title, url, resource_type, description, assigned_concepts })
+    });
+    
+    const result = await res.json();
+    if (res.ok) {
+      alert("External resource mapped and synchronized successfully.");
+      // Clear inputs safely
+      document.getElementById("resource-title").value = "";
+      document.getElementById("resource-url").value = "";
+      document.getElementById("resource-type").value = "";
+      document.getElementById("resource-desc").value = "";
+      resourceConceptsContainer.innerHTML = "";
+    } else {
+      alert(`Provision error: ${result.detail || "Server rejected submission."}`);
+    }
+  } catch (err) {
+    alert(`Network transmission failure: ${err.message}`);
+  }
+}
