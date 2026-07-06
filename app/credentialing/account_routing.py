@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-06-03T22:32-04:00
+# save-state 2026-07-06T17:19-04:00
 # ==========================================
 
 import io
@@ -126,7 +126,8 @@ async def account_page(request: Request):
         {
             "request": request,
             "is_authenticated": request.state.is_authenticated,
-            "username": request.state.username
+            "username": request.state.username,
+            "user_role": request.state.role
         }
     )
 

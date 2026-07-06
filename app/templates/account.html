@@ -1,4 +1,4 @@
-{# PeriDocs/app/templates/account.html save-state 2026-05-25T15:23:50-04:00 #}
+{# PeriDocs/app/templates/account.html save-state 2026-07-06T17:21-04:00 #}
 {% extends "base.html" %}
 {% block title %}Your Account | PeriDocs.org{% endblock %}
 {% block content %}
@@ -6,13 +6,15 @@
 
   <h1>Welcome, {{ username }}</h1>
 
-<button id="signout-btn" class="general-button">Signout</button>
-<button
-  id="delete-account-btn"
-  class="general-button"
->
-  Delete Account
-</button>
+  <button id="signout-btn" class="general-button">Signout</button>
+  <button id="delete-account-btn" class="general-button">Delete Account</button>
+
+  {# Since we are already inside the authenticated block, we just inspect the role string #}
+  {% if user_role == 'administrator' %}
+    <a href="/admin" class="general-button">
+      Control Admin Panel
+    </a>
+  {% endif %}
 
 {% else %}
 
