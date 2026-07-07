@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-06T20:53-04:00
+# save-state 2026-07-07T10:51-04:00
 # ==========================================
 import os
 import json
@@ -212,12 +212,42 @@ async def create_heuristic(payload: CreateHeuristicPayload):
 
     cleaned_givens = [extract_concept_id(g.strip()) for g in payload.givens]
 
-    cleaned_outputs = []
-    for o in payload.outputs:
-        concept = extract_concept_id(o.get("concept", "").strip())
+    # Use the existing get_concepts registry to see what concepts already exist
+    concepts_resp = await get_concepts()
+    existing_concepts = concepts_resp.get("concepts", [])
 
-        if not concept:
+    cleaned_outputs = []
+    output_meta = []  # Parallel array to safely carry metadata down to the TTL loop
+    
+    for o in payload.outputs:
+        raw_concept = o.get("concept", "").strip()
+        if not raw_concept:
             raise HTTPException(status_code=400, detail="Output concept missing")
+
+        # Separate the potential URN identifier from the plain human-readable string
+        extracted_id = extract_concept_id(raw_concept)
+        extracted_label = regex.sub(r"\s*\([^)]+\)$", "", raw_concept).strip()
+
+        # Search the registry for a match by either ID or Label string
+        matched_concept = None
+        for c in existing_concepts:
+            if c["id"].lower() == extracted_id.lower() or c["label"].lower() == extracted_label.lower():
+                matched_concept = c
+                break
+
+        if matched_concept:
+            # Concept exists: map strictly to its known system URN
+            concept_val = matched_concept["id"]
+            is_new = False
+            file_id_part = None
+            label_val = matched_concept["label"]
+        else:
+            # Concept does not exist: generate a fresh unique machine token segment right here
+            dt = datetime.now(timezone.utc)
+            file_id_part = f"cfh_{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
+            concept_val = f"concept_from_heuristic:{file_id_part}"
+            is_new = True
+            label_val = extracted_label  # Save original string to write out as rdfs:label
 
         likelihood = o.get("likelihood", 0)
 
@@ -232,9 +262,15 @@ async def create_heuristic(payload: CreateHeuristicPayload):
             likelihood = 0.0
 
         cleaned_outputs.append({
-            "concept": concept,
+            "concept": concept_val,  # Receives URN or the generated machine ID string
             "likelihood": float(likelihood),
             "justification": o.get("justification")
+        })
+
+        output_meta.append({
+            "is_new": is_new,
+            "file_id": file_id_part,
+            "label": label_val
         })
 
     heuristic = {
@@ -260,17 +296,23 @@ async def create_heuristic(payload: CreateHeuristicPayload):
     # ============================================================
     # NEW BEHAVIOR: ONE OUTPUT → ONE GRAPH → ONE TTL FILE
     # ============================================================
-    for o in cleaned_outputs:
+    for i, o in enumerate(cleaned_outputs):
+        meta = output_meta[i]
         concept_id = o["concept"]
 
-        dt = datetime.now(timezone.utc)
-        file_id = f"cfh_{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
+        # If the concept already exists, completely bypass TTL file generation
+        if not meta["is_new"]:
+            continue
+
+        # Use the ID part generated up above
+        file_id = meta["file_id"]
+        human_label = meta["label"]
 
         # IMPORTANT: each output gets its own isolated graph
         g = Graph()
 
         already_exists = concept_exists(
-            label=concept_id,
+            label=human_label,
             description=heuristic_description
         )
 
@@ -278,9 +320,9 @@ async def create_heuristic(payload: CreateHeuristicPayload):
             create_reasoning_data_from_heuristic(
                 g,
                 heuristic_id=heuristic["heuristic_id"],
-                concept_id=concept_id,
-                file_id=file_id,
-                label=concept_id,
+                concept_id=concept_id,  # Uses the clean, earlier-generated machine URN
+                file_id=file_id,        # Reuses the exact same identifier string
+                label=human_label,      # Passes the pristine human label for the rdfs:label field
                 description=heuristic_description
             )
         else:
@@ -297,6 +339,8 @@ async def create_heuristic(payload: CreateHeuristicPayload):
             file_id,
             turtle
         )
+
+        await get_concepts("concepts", [])
 
     return {"status": "ok", "heuristic": heuristic}
 

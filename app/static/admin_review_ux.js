@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-07-06T14:44-04:00
+// save-state 2026-07-06T21:58-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -214,7 +214,7 @@ function addOutput(concept = "", likelihood = "") {
   const div = document.createElement("div");
   div.innerHTML = `
     <input class="input concept-input" placeholder="Output concept..." value="${concept}">
-    <input class="input" placeholder="Likelihood (0-1 or %)" value="${likelihood}">
+    <input class="input" placeholder="Likelihood (0-1 decimal or out of 100 integer)" value="${likelihood}">
   `;
 
   outputsContainer.appendChild(div);

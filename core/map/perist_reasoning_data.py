@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/perist_reasoning_data.py
-# Save-state: 2026-04-24T21:54:00-04:00
+# Save-state: 2026-07-07T11:32-04:00
 # ==========================================
 import os
 import re
@@ -80,7 +80,8 @@ def create_reasoning_data_from_heuristic(
     description: Optional[str] = None
 ) -> URIRef:
 
-    uri = PERIDOCS[f"concept_from_heuristic:cfh_{file_id}"]
+    # Fix: Directly use the clean concept_id passed from the router
+    uri = PERIDOCS[concept_id]
 
     exists = (uri, None, None) in graph
     if exists:
