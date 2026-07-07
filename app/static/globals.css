@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-06-11T17:01-04:00
+save-state 2027-07-06T19:35-04:00
 */
 
 /* =========================
@@ -779,14 +779,13 @@ The next mention is to control the width as button are added and removed from th
 
 .card-grid {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* Allows cards to dynamically drop into new rows */
   gap: 18px;
 
   justify-content: center;
-  align-items: stretch;
-
+  align-items: flex-start; /* FIX #1: Stops short cards from stretching to match the tallest card */
   padding-bottom: 05%;
-  text-decoration: none;
+  text-decoration: none;   
 }
 
 

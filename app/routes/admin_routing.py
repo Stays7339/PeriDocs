@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-06T15:00-04:00
+# save-state 2026-07-06T20:53-04:00
 # ==========================================
 import os
 import json
@@ -264,7 +264,7 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         concept_id = o["concept"]
 
         dt = datetime.now(timezone.utc)
-        file_id = f"{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
+        file_id = f"cfh_{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
 
         # IMPORTANT: each output gets its own isolated graph
         g = Graph()
