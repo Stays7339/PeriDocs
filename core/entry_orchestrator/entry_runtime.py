@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-03T14:26-04:00
+# Save-state: 2026-07-08T17:22-04:00
 # ==========================================
 import asyncio
 import copy
@@ -412,6 +412,9 @@ class EntryWritingRuntime:
     
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
+        """
+        Serializes ingestion and updates provisional shells or appends fresh records.
+        """
         if not isinstance(entry, dict):
             raise RuntimeError("Invalid entry type: must be dict")
 
@@ -425,22 +428,39 @@ class EntryWritingRuntime:
         if not entry_id:
             raise RuntimeError("Entry missing identifier field")
 
-        # --- FIX: Safely update provisional shell in-place or insert fresh ---
-        if entry_id in self._entry_index:
-            existing_shell = self._entry_index[entry_id]
-            existing_shell.update(entry)
-        else:
-            self._entries.append(entry)
-            self._entry_index[entry_id] = entry
+        token_hash = entry.get("hash_from_token_for_deleting_entries")
 
-        # --- FIX: Ensure the token index always links directly to the master record ---
-        if entry.get("hash_from_token_for_deleting_entries"):
-            self._index_for_hashed_tokens_for_deleting_entries[
-                entry["hash_from_token_for_deleting_entries"]
-            ] = self._entry_index[entry_id]
+        from core.mode_lock import SystemModeLock
+        is_database_mode = (SystemModeLock.resolve_operational_mode() == "DATABASE")
 
-        self._dirty_mutation_count += 1
-        await self._signal_dirty_queue()
+        async with self._lock:
+            # --- MODE-AWARE TARGET REFERENCE RESOLUTION ---
+            if is_database_mode and token_hash:
+                # Isolate target shell specifically by its transactional identity instance
+                existing_shell = self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
+            else:
+                # Maintain original flat-file fallback lookup by text identifier
+                existing_shell = self._entry_index.get(entry_id)
+
+            if existing_shell and existing_shell.get("is_provisional") is True:
+                # In-place update of the validated provisional tracking object
+                existing_shell.update(entry)
+                if "is_provisional" not in entry:
+                    existing_shell.pop("is_provisional", None)
+                target_entry_ref = existing_shell
+            else:
+                # Append a brand new record block into the primary list array
+                self._entries.append(entry)
+                self._entry_index[entry_id] = entry
+                target_entry_ref = entry
+
+            # Synchronize secondary lookup mappings
+            if token_hash:
+                self._index_for_hashed_tokens_for_deleting_entries[token_hash] = target_entry_ref
+
+            self._dirty_mutation_count += 1
+            await self._signal_dirty_queue()
+
         
     async def set_embedding(self, entry_id: str, embedding: np.ndarray) -> None:
         """
@@ -870,13 +890,12 @@ class EntryWritingRuntime:
         return copy.deepcopy(self._entries) 
         # ------
 
-    # =====================================================================
-    # ADD THIS HELPER METHOD INSIDE THE EntryWritingRuntime CLASS
-    # =====================================================================
     def _ensure_provisional_shell(self, entry_id: str) -> None:
         """
         Ensures a parent master row shell exists in memory before child vectors 
         or window components attempt to flush to a relational database engine.
+        And we did that specifically because the database was getting called for a flush 
+        the same moment connections were being made for a pre-centroid.
         """
         if entry_id not in self._entry_index:
             provisional_entry = {
@@ -890,7 +909,8 @@ class EntryWritingRuntime:
                 "encrypted_raw_ip": "",
                 "encrypted_raw_text": "",
                 "crisis_flag": False,
-                "hash_from_token_for_deleting_entries": ""
+                "hash_from_token_for_deleting_entries": "",
+                "is_provisional": True,
             }
             self._entries.append(provisional_entry)
             self._entry_index[entry_id] = provisional_entry
@@ -902,103 +922,123 @@ class EntryWritingRuntime:
         token_hash: str,
     ) -> bool:
         """
-        Runtime-coherent entry redaction.
-
-        Returns:
-            True  -> entry was found, stripped, and persisted
-            False -> no-op (not found or nothing changed)
+        Redacts user personal data from a single targeted submission instance.
         """
+        from core.mode_lock import SystemModeLock
+        is_database_mode = (SystemModeLock.resolve_operational_mode() == "DATABASE")
 
-        # memory mutation now immediate
+        async with self._lock:
+            # Enforce transactional identity lookup over text-space keys under database mode
+            if is_database_mode and token_hash:
+                target = self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
+            else:
+                target = self._entry_index.get(entry_id)
 
-        target = None
+            if not target:
+                logger.warning(
+                    "[EntryRuntime] Target entry instance not located for purge: id=%s, token=%s", 
+                    entry_id, token_hash
+                )
+                return False
 
-        for entry in self._entries:  # moved out of operation
-            if (
-                entry.get("hash_from_token_for_deleting_entries")
-                == token_hash
-            ):
-                target = entry
-                break
+            now = datetime.now(timezone.utc).isoformat()
+            stripped_entry_id = target.get("entry_id") or target.get("id") or entry_id
 
-        if not target:
-            logger.warning("[EntryRuntime] Entry not found during strip_entry.")
-            return False
+            # Construct structural placeholder containing only non-identifying fields
+            stripped = {
+                "entry_id": stripped_entry_id,
+                "entry_nickname": None,
+                "timestamp": now,
+                "user_id": None,
+                "safe_text": "",
+                "embedding_file": None,
+                "centroids": [],
+                "ip_hash": target.get("ip_hash"),
+                "encrypted_raw_ip": None,
+                "encrypted_raw_text": None,
+                "crisis_flag": bool(target.get("crisis_flag", False)),
+                "hash_from_token_for_deleting_entries": token_hash or target.get("hash_from_token_for_deleting_entries"),
+            }
 
-        now = datetime.now(timezone.utc).isoformat()
-                
-        stripped = {
-            # identity
-            "entry_id": target.get("entry_id") or target.get("id"),
-            "entry_nickname": None,
-            "timestamp": now,
-            "user_id": None,
+            try:
+                list_index = self._entries.index(target)
+                self._entries[list_index] = stripped
+            except ValueError:
+                logger.error("[EntryRuntime] Target record detached from main tracking collection array.")
+                return False
 
-            # core content (neutralized, not removed)
-            "safe_text": "",
-            "embedding_file": None,
+            # Refresh token index mapping parameters
+            if token_hash:
+                self._index_for_hashed_tokens_for_deleting_entries[token_hash] = stripped
 
-            # structure
-            "centroids": [],
+            # --- DUAL-MODE REGENERATION CORRECTION ---
+            if is_database_mode:
+                # Scan memory to find if another active submission shares this identical text string
+                remaining_active_duplicate = next(
+                    (e for e in self._entries 
+                     if (e.get("entry_id") == stripped_entry_id or e.get("id") == stripped_entry_id) 
+                     and e.get("safe_text") != ""),
+                    None
+                )
+                # Keep the fast cache pointed to an active instance if one is alive; else drop back to stripped
+                self._entry_index[stripped_entry_id] = remaining_active_duplicate if remaining_active_duplicate else stripped
+            else:
+                # Maintain original predictable flat-file behavior
+                self._entry_index[stripped_entry_id] = stripped
 
-            # encryption / security (preserve traceability if needed)
-            "ip_hash": target.get("ip_hash"),
-            "encrypted_raw_ip": None,
-            "encrypted_raw_text": None,
+            # Safe semantic cleanup: verify if any other live copies need the heavy vector assets
+            still_has_active_duplicates = any(
+                e for e in self._entries
+                if (e.get("entry_id") == stripped_entry_id or e.get("id") == stripped_entry_id)
+                and e.get("hash_from_token_for_deleting_entries") != token_hash
+                and e.get("safe_text") != ""
+            )
 
-            # flags
-            "crisis_flag": bool(target.get("crisis_flag", False)),
+            if not still_has_active_duplicates:
+                self._window_text.pop(stripped_entry_id, None)
+                self._standout_window_flags.pop(stripped_entry_id, None)
 
-            # deletion state
-            "deleted": True,
-            "deleted_at": now,
-            "hash_from_token_for_deleting_entries": None,
-        }
-
-        self._window_text.pop(entry_id, None)
-        self._standout_window_flags.pop(entry_id, None)
-
-        index = self._entries.index(target)
-
-        self._entries[index] = stripped
-
-        stripped_entry_id = stripped.get("entry_id") or stripped.get("id")
-
-        self._entry_index[stripped_entry_id] = stripped
-
-        logger.info("[EntryRuntime] Entry %s stripped.", stripped_entry_id)
-
-        self._dirty_mutation_count += 1
-        await self._signal_dirty_queue()
-
-        return True
+            logger.info("[EntryRuntime] Target entry instance successfully redacted in memory.")
+            self._dirty_mutation_count += 1
+            await self._signal_dirty_queue()
+            
+            return True
 
     def get_current_embedding_file(self) -> str:
         return self._npz_path
     
-    def _rebuild_entry_index(self):
+    def _rebuild_entry_index(self) -> None:
         """
-        # This is a lookup cache, not a second dataset.
-
-        # It exists only to answer one question efficiently:
-
-        # “Given an entry_id, where is the entry?”
-
-        # Think of it as the table of contents at the front of the notebook;
-
-        # It does not store new information. It just points to entries already in _entries.
-        # _entries is for ordered iteration lists in detail. 
-        # _entry_index is for fast O(1) lookup via dicts
-        # If you delete _entry_index, nothing is lost except speed.
-        # If you delete _entries, everything is lost.
-        # the real architectural win is that you are reducing cognitive load later, 
-        # because you stop scanning lists just to answer simple identity queries.
+        Rebuilds internal structural index maps for O(1) memory lookups.
+        
+        Preserves original flat-file behavior while making database mode
+        resilient against duplicate text content hashes masking active records.
         """
-        self._entry_index = {
-            (e.get("entry_id") or e.get("id")): e
-            for e in self._entries
-        }
+        from core.mode_lock import SystemModeLock
+        
+        # Resolve current system operational constraints
+        operational_mode = SystemModeLock.resolve_operational_mode()
 
+        if operational_mode == "DATABASE":
+            # In database mode, duplicate entry_ids can coexist. We prioritize 
+            # active records (safe_text populated) over redacted placeholders 
+            # by sorting them last, guaranteeing active content wins the index cache.
+            sorted_entries = sorted(
+                self._entries, 
+                key=lambda e: 1 if (e.get("safe_text") is not None and e.get("safe_text") != "") else 0
+            )
+            self._entry_index = {
+                (e.get("entry_id") or e.get("id")): e
+                for e in sorted_entries
+            }
+        else:
+            # Flat-file mode remains completely untouched, preserving absolute 1:1 invariants
+            self._entry_index = {
+                (e.get("entry_id") or e.get("id")): e
+                for e in self._entries
+            }
+
+        # The token-hash mapping functions uniformly across both storage engine tracks
         self._index_for_hashed_tokens_for_deleting_entries = {
             e.get("hash_from_token_for_deleting_entries"): e
             for e in self._entries

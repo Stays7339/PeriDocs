@@ -1,12 +1,12 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: CONTENT SCHEMA & RELATED DEPENDENCIES
 -- Location: database-management/schemas/tables/content_schema.sql
--- save-state: 2026-07-03T21:01-04:00
+-- save-state: 2026-07-07T13:12-04:00
 -- ============================================================================
 
 -- 1. Primary Source of Truth Text Entries
 CREATE TABLE IF NOT EXISTS content.entries (
-    entry_id                             VARCHAR(64) PRIMARY KEY,
+    entry_id                             VARCHAR(64) NOT NULL,
     entry_nickname                       VARCHAR(255),
     timestamp                            TIMESTAMPTZ NOT NULL,
     user_id                              VARCHAR(64), 
@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS content.entries (
     encrypted_raw_ip                     TEXT,
     encrypted_raw_text                   TEXT,
     crisis_flag                          BOOLEAN DEFAULT FALSE,
-    hash_from_token_for_deleting_entries TEXT,
+    hash_from_token_for_deleting_entries VARCHAR(64) PRIMARY KEY,
     created_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
@@ -24,14 +24,14 @@ CREATE TABLE IF NOT EXISTS content.entries (
 -- 2. Consolidated Master Entry Vectors 
 -- (Note: Ensure your Python storage engine targets 'embedding' and 'created_at'!)
 CREATE TABLE IF NOT EXISTS content.embeddings (
-    entry_id   VARCHAR(64) PRIMARY KEY REFERENCES content.entries(entry_id) ON DELETE CASCADE,
+    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(delete_token_hash) ON DELETE CASCADE,
     embedding  REAL[] NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. Sliced Text Chunks & Chunk Vectors (Successfully Migrated)
 CREATE TABLE IF NOT EXISTS content.entry_windows (
-    entry_id         VARCHAR(64) REFERENCES content.entries(entry_id) ON DELETE CASCADE,
+    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(delete_token_hash) ON DELETE CASCADE,
     window_index     INT NOT NULL, 
     window_embedding REAL[] NOT NULL, 
     window_text      TEXT NOT NULL,      
