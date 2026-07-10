@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # ==========================================
 # PeriDocs/core/database.py
-# save-state 2026-07-05T13:01-04:00
+# save-state 2026-07-10T12:24-04:00
 # ==========================================
 import os
 import contextlib
@@ -44,7 +44,7 @@ async def initialize_database():
     # Added db_engine to the global namespace allocation block
     global db_pool, db_engine
     
-    if DATABASE_MODE in ("PRODUCTION", "SANDOX"):
+    if DATABASE_MODE in ("PRODUCTION", "SANDBOX"):
         from psycopg_pool import AsyncConnectionPool
         from psycopg.rows import dict_row
 
@@ -97,7 +97,7 @@ async def close_database():
 
 async def get_db() -> AsyncGenerator:
     global db_pool
-    if DATABASE_MODE in ("PRODUCTION", "SANDOX"):
+    if DATABASE_MODE in ("PRODUCTION", "SANDBOX"):
         if db_pool is None:
             raise RuntimeError("Database pool is offline.")
         async with db_pool.connection() as session:

@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-06-17T14:54-04:00
+# Save-state: 2026-07-10T14:54-04:00
 # ==========================================
 
 """
@@ -50,15 +50,22 @@ async def _load() -> Dict[str, Any]:
     global _ledger_cache
     if _ledger_cache is not None:
         return _ledger_cache
-
     # --------------------------------------------------------
     # ONLINE MODE INTERCEPTION
     # --------------------------------------------------------
     from core.mode_lock import SystemModeLock
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         try:
-            from core.database import db_engine
-            _ledger_cache = await db_engine.load_ledger_bundle()
+            # Import the parent module itself rather than copying the engine variable pointer
+            import core.database
+            
+            if core.database.db_engine is None:
+                raise RuntimeError(
+                    "[ledger_init] core.database.db_engine is uninitialized. "
+                    "Ensure the database startup lifecycle runs before ledger rehydration."
+                )
+
+            _ledger_cache = await core.database.db_engine.load_ledger_bundle()
             logger.info("[ledger_init] Authoritative database ledger rehydrated into cache.")
             return _ledger_cache
         except Exception as db_err:
@@ -66,7 +73,6 @@ async def _load() -> Dict[str, Any]:
             if SystemModeLock.is_lock_file_present_on_disk():
                 raise db_err 
             logger.warning("[ledger_init] System unburned. Falling back to parsing ledger.json on disk.")
-
     # --------------------------------------------------------
     # ORIGINAL LOCAL STORAGE FALLBACK PIPELINE (Unchanged)
     # --------------------------------------------------------

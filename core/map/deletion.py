@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/deletion.py
-# Save-state: 2026-07-03T19:19-04:00
+# Save-state: 2026-07-10T13:38-04:00
 # ==========================================
 
 """
@@ -168,32 +168,63 @@ class DeletionManager:
     async def delete_entry(
         self,
         *,
-        entry_id: str,
+        entry_id: Optional[str] = None,  # Made optional; token_hash is now the sole authoritative credential
         token_hash: str,
         data_dir: Optional[str] = None,
     ) -> Dict[str, List[str]]:
 
         await self._centroids._assert_ledger_ready()
 
-        # ------------------------------------------------------------
-        # STEP 1: REMOVE FROM CENTROIDS
-        # ------------------------------------------------------------
-        affected = await self.remove_entry_globally(entry_id=entry_id)
+        if not token_hash:
+            logger.warning("[DELETE_ENTRY] Purge rejected: token_hash is required.")
+            return {}
 
-        if not affected:
+        # ------------------------------------------------------------
+        # STEP 1: RESOLVE authoritative record via token hash map
+        # ------------------------------------------------------------
+        target = self._entry_runtime._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
+        if not target:
             logger.warning(
-                f"[DELETE_ENTRY] No centroids contained entry {entry_id} (no-op or already missing)."
+                f"[DELETE_ENTRY] No entry instance located for token_hash: {token_hash} (no-op)."
             )
+            return {}
+
+        resolved_entry_id = target.get("entry_id") or target.get("id") or entry_id
+        if not resolved_entry_id:
+            logger.warning(f"[DELETE_ENTRY] Target record lacks a valid identifier shell.")
+            return {}
+
+        # Identify how many instances sharing this entry_id are still active (unpurged)
+        active_instances = [
+            e for e in self._entry_runtime._entries
+            if (e.get("entry_id") == resolved_entry_id or e.get("id") == resolved_entry_id)
+            and e.get("safe_text") != ""
+        ]
+
+        affected: Dict[str, List[str]] = {}
+
+        # ------------------------------------------------------------
+        # STEP 2: REMOVE FROM CENTROIDS (Conditional Guard)
+        # ------------------------------------------------------------
+        # Only unlink from global centroids if this is the absolute LAST active duplicate instance.
+        # If other duplicate instances remain active, they still depend on these centroid relationships!
+        if len(active_instances) <= 1:
+            affected = await self.remove_entry_globally(entry_id=resolved_entry_id)
+            if affected:
+                logger.info(
+                    f"[DELETE_ENTRY] Last active instance of {resolved_entry_id} cleared from centroids: {list(affected.keys())}"
+                )
         else:
             logger.info(
-                f"[DELETE_ENTRY] Entry {entry_id} removed from centroids: {list(affected.keys())}"
+                f"[DELETE_ENTRY] Bypassing centroid unlinking for {resolved_entry_id}. "
+                f"{len(active_instances) - 1} other duplicate instance(s) remain active."
             )
 
         # ------------------------------------------------------------
-        # STEP 2: PURGE METADATA
+        # STEP 3: PURGE METADATA
         # ------------------------------------------------------------
         purge_result = await self._entry_runtime.purge_entry_metadata(
-            entry_id=entry_id,
+            entry_id=resolved_entry_id,
             token_hash=token_hash,
         )
 
@@ -201,11 +232,12 @@ class DeletionManager:
         if purge_result:
             await self._ledger.record_event({
                 "type": "DELETE_ENTRY",
-                "entry_id": entry_id,
+                "entry_id": resolved_entry_id,  # Retained for ledger rehydration loop validation requirements
+                "token_hash": token_hash,
             })
         else:
             logger.warning(
-                f"[DELETE_ENTRY] Entry {entry_id} metadata purge did NOT complete or no-op."
+                f"[DELETE_ENTRY] Entry {resolved_entry_id} metadata purge did NOT complete or no-op."
             )
 
         return affected

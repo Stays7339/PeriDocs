@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-07-03T21:09-04:00
+# Save-state: 2026-07-10T12:43-04:00
 # ============================================================================
 import json
 import logging
@@ -175,7 +175,14 @@ class PostgresStorageEngine:
                         })
 
                 # 2. Fetch 1D mean embeddings from the corrected table & column namespaces
-                await cur.execute("SELECT entry_id, embedding FROM content.embeddings;")
+                await cur.execute("""
+                    SELECT 
+                        e.entry_id, 
+                        emb.embedding 
+                    FROM content.embeddings emb
+                    JOIN content.entries e 
+                    ON emb.hash_from_token_for_deleting_entries = e.hash_from_token_for_deleting_entries;
+                """)
                 for row in await cur.fetchall():
                     if isinstance(row, dict):
                         mean_embeddings[row["entry_id"]] = np.array(row["embedding"], dtype=np.float32)
@@ -236,88 +243,89 @@ class PostgresStorageEngine:
         }
 
     async def save_entries_bundle(
-        self,
-        snapshot: List[Dict[str, Any]],
-        embedding_snapshot: Dict[str, Any],
-        window_embeddings: Dict[str, Any],
-        window_text: Dict[str, Any],
-        standout_flags: Dict[str, Any]
+        self, 
+        snapshot: list, 
+        embedding_snapshot: dict, 
+        window_embeddings: dict, 
+        window_text: dict, 
+        standout_flags: dict
     ) -> None:
         """
-        Flushes entry registries and vector arrays out to content schema tables atomically.
+        Executes a unified transactional flush of master text entries, 
+        consolidated vectors, and sequential sub-window text chunks.
         """
+        # Assuming you acquire your connection/pool manager here (e.g., self.pool or self.conn)
         async with self.pool.connection() as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
-                    # Clear relational structures cleanly using modern namespaces
-                    await cur.execute("TRUNCATE TABLE content.entry_windows CASCADE;")
-                    await cur.execute("TRUNCATE TABLE content.embeddings CASCADE;")
-                    await cur.execute("TRUNCATE TABLE content.entries CASCADE;")
-
-                    valid_entry_ids = set()
-
-                    # 1. Flush entries master metadata list
+                    
                     for entry in snapshot:
-                        eid = entry.get("entry_id") or entry.get("id")
-                        if not eid:
+                        entry_id = entry.get("entry_id")
+                        token_hash = entry.get("hash_from_token_for_deleting_entries")
+                        
+                        if not token_hash:
+                            logger.warning("[DB_ENGINE] Skipping save for entry_id %s: No token hash provided.", entry_id)
                             continue
                         
-                        valid_entry_ids.add(eid)
-                        await cur.execute(
-                            """
+                        # 1. Upsert into content.entries
+                        await cur.execute("""
                             INSERT INTO content.entries (
-                                entry_id, entry_nickname, timestamp, user_id, safe_text, centroids,
-                                ip_hash, encrypted_raw_ip, encrypted_raw_text, crisis_flag, 
-                                hash_from_token_for_deleting_entries
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                            """,
-                            (
-                                eid, entry.get("entry_nickname"), entry.get("timestamp"),
-                                entry.get("user_id"), entry.get("safe_text"), json.dumps(entry.get("centroids", [])),
-                                entry.get("ip_hash"), entry.get("encrypted_raw_ip"), entry.get("encrypted_raw_text"),
-                                entry.get("crisis_flag", False), entry.get("hash_from_token_for_deleting_entries")
-                            )
-                        )
-
-                    # 2. Flush Mean Embeddings using unified schema mapping
-                    for eid, arr in embedding_snapshot.items():
-                        if eid not in valid_entry_ids:
-                            logger.debug("[Engine] Skipping detached embedding vector until master row is appended: %s", eid)
-                            continue
-                            
-                        if isinstance(arr, np.ndarray) and arr.size > 0:
-                            await cur.execute(
-                                """
-                                INSERT INTO content.embeddings (entry_id, embedding)
-                                VALUES (%s, %s);
-                                """,
-                                (eid, arr.tolist())
-                            )
-
-                    # 3. Flush Zipped Sliding Windows into content schema
-                    for eid in window_embeddings:
-                        if eid not in valid_entry_ids:
-                            continue
-                            
-                        embed_matrix = window_embeddings[eid]
-                        text_vector = window_text.get(eid, [])
-                        flag_vector = standout_flags.get(eid, [])
+                                entry_id, entry_nickname, timestamp, user_id, safe_text, 
+                                centroids, ip_hash, encrypted_raw_ip, encrypted_raw_text, 
+                                crisis_flag, hash_from_token_for_deleting_entries
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (hash_from_token_for_deleting_entries) 
+                            DO UPDATE SET 
+                                entry_nickname = EXCLUDED.entry_nickname,
+                                safe_text = EXCLUDED.safe_text,
+                                centroids = EXCLUDED.centroids,
+                                crisis_flag = EXCLUDED.crisis_flag,
+                                updated_at = CURRENT_TIMESTAMP;
+                        """, (
+                            entry_id, entry.get("entry_nickname"), entry.get("timestamp"),
+                            entry.get("user_id"), entry.get("safe_text"), json.dumps(entry.get("centroids", [])),
+                            entry.get("ip_hash"), entry.get("encrypted_raw_ip"), entry.get("encrypted_raw_text"),
+                            entry.get("crisis_flag", False), token_hash
+                        ))
                         
-                        if not isinstance(embed_matrix, np.ndarray) or embed_matrix.size == 0:
-                            continue
+                        # 2. Extract and Upsert into content.embeddings using the token_hash
+                        if entry_id in embedding_snapshot:
+                            raw_vector = embedding_snapshot[entry_id]
+                            # Handle converting numpy array or list format cleanly
+                            vector_payload = raw_vector.tolist() if hasattr(raw_vector, "tolist") else raw_vector
                             
-                        for idx in range(len(embed_matrix)):
-                            w_arr = embed_matrix[idx].tolist()
-                            t_val = str(text_vector[idx]) if idx < len(text_vector) else ""
-                            f_val = bool(flag_vector[idx]) if idx < len(flag_vector) else False
+                            await cur.execute("""
+                                INSERT INTO content.embeddings (hash_from_token_for_deleting_entries, embedding)
+                                VALUES (%s, %s)
+                                ON CONFLICT (hash_from_token_for_deleting_entries) 
+                                DO UPDATE SET embedding = EXCLUDED.embedding;
+                            """, (token_hash, vector_payload))
+                        
+                        # 3. Extract and Settle sequential window chunks into content.entry_windows
+                        if entry_id in window_embeddings:
+                            w_embeds = window_embeddings[entry_id]
+                            w_texts = window_text.get(entry_id, [])
+                            w_flags = standout_flags.get(entry_id, [])
                             
-                            await cur.execute(
-                                """
-                                INSERT INTO content.entry_windows (entry_id, window_index, window_embedding, window_text, standout_flag)
-                                VALUES (%s, %s, %s, %s, %s);
-                                """,
-                                (eid, idx, w_arr, t_val, f_val)
-                            )
+                            # Clean old windows for this specific transaction token to clear out dirty stale sequences
+                            await cur.execute("""
+                                DELETE FROM content.entry_windows 
+                                WHERE hash_from_token_for_deleting_entries = %s;
+                            """, (token_hash,))
+                            
+                            # Sequential batch insert loop
+                            for idx in range(len(w_embeds)):
+                                current_vector = w_embeds[idx].tolist() if hasattr(w_embeds[idx], "tolist") else w_embeds[idx]
+                                current_text = w_texts[idx] if idx < len(w_texts) else ""
+                                current_flag = bool(w_flags[idx]) if idx < len(w_flags) else False
+                                
+                                await cur.execute("""
+                                    INSERT INTO content.entry_windows (
+                                        hash_from_token_for_deleting_entries, entry_id, window_index, 
+                                        window_embedding, window_text, standout_flag
+                                    ) VALUES (%s, %s, %s, %s, %s, %s);
+                                """, (token_hash, entry_id, idx, current_vector, current_text, current_flag))
+
     # ------------------------------------------------------------------------
     # CENTROIDS STORAGE COMPONENT (search_schema.sql Alignment)
     # ------------------------------------------------------------------------

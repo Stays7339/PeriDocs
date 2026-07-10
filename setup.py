@@ -1,7 +1,7 @@
 #!/usr/bin/env sys executable
 # ==========================================
 # PeriDocs/setup.py
-# save-state 2026-07-03T13:29-04:00
+# save-state 2026-07-07T12:16-04:00
 # ==========================================
 import os
 import subprocess
@@ -16,7 +16,6 @@ try:
 except ImportError:
     print("CRITICAL: 'psycopg' library not found. Please run: pip install psycopg[binary]")
     sys.exit(1)
-
 
 def run_pipeline_script(script_name):
     """Safely runs a sibling python validation/setup script."""
@@ -52,7 +51,7 @@ def initialize_peridocs_database():
         # If explicitly setting PRODUCTION, target the real Hetzner cluster connection string
         admin_url_string = os.getenv("DATABASE_URL")
         print("\n[WARNING] setup.py is targeting the LIVE REMOTE HETZNER PRODUCTION ENVIRONMENT! ⚠️")
-    elif DATABASE_MODE == "LOCAL":
+    elif DATABASE_MODE == "SANDBOX":
         # Default to your safe, local loopback database sandbox string
         admin_url_string = os.getenv("LOCAL_DATABASE_URL")
         print("\n[LOCAL] setup.py is targeting your LOCAL SANDBOX DATABASE environment.")
@@ -81,7 +80,7 @@ def initialize_peridocs_database():
                 # ---------------------------------------------------------
                 # NEW: SANDBOX TEARDOWN GUARD FOR TRULY FORKABLE SLATES
                 # ---------------------------------------------------------
-                if DATABASE_MODE == "LOCAL":
+                if DATABASE_MODE == "SANDBOX":
                     print("\n[CLEAN SLATE] Terminating lingering processes and dropping local sandbox...")
                     # Terminate any zombie server connections blocking a database drop
                     cur.execute("""

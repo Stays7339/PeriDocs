@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-06-30T15:00-04:00
+# Save-state: 2026-07-10T12:50-04:00
 # ==========================================
 
 import os
@@ -686,14 +686,14 @@ class CentroidSystem:
         import sys
         import core.map.mapping_runtime as mr
 
-        logger.warning("RUNTIME STATE CHECK:")
-        logger.warning("_initialized = %s", mr._initialized)
-        logger.warning("_runtime_ready = %s", mr._runtime_ready)
-        logger.warning("_boot_in_progress = %s", mr._boot_in_progress)
-        logger.warning("CENTROID MODULE ID = %s", id(mr))
-        logger.warning("CENTROID READY (mr) = %s", mr.is_runtime_ready())
-        logger.warning("CENTROID READY (local import) = %s", mr.is_runtime_ready())
-        logger.warning("CENTROID sys.modules ID = %s", id(sys.modules["core.map.mapping_runtime"]))
+        logger.debug("RUNTIME STATE CHECK:")
+        logger.debug("_initialized = %s", mr._initialized)
+        logger.debug("_runtime_ready = %s", mr._runtime_ready)
+        logger.debug("_boot_in_progress = %s", mr._boot_in_progress)
+        logger.debug("CENTROID MODULE ID = %s", id(mr))
+        logger.debug("CENTROID READY (mr) = %s", mr.is_runtime_ready())
+        logger.debug("CENTROID READY (local import) = %s", mr.is_runtime_ready())
+        logger.debug("CENTROID sys.modules ID = %s", id(sys.modules["core.map.mapping_runtime"]))
         
 
         if not mr.is_runtime_ready():

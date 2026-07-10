@@ -1,7 +1,7 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: CONTENT SCHEMA & RELATED DEPENDENCIES
 -- Location: database-management/schemas/tables/content_schema.sql
--- save-state: 2026-07-07T13:12-04:00
+-- save-state: 2026-07-07T13:21-04:00
 -- ============================================================================
 
 -- 1. Primary Source of Truth Text Entries
@@ -22,21 +22,21 @@ CREATE TABLE IF NOT EXISTS content.entries (
 );
 
 -- 2. Consolidated Master Entry Vectors 
--- (Note: Ensure your Python storage engine targets 'embedding' and 'created_at'!)
 CREATE TABLE IF NOT EXISTS content.embeddings (
-    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(delete_token_hash) ON DELETE CASCADE,
+    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(hash_from_token_for_deleting_entries) ON DELETE CASCADE,
     embedding  REAL[] NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Sliced Text Chunks & Chunk Vectors (Successfully Migrated)
+-- 3. Sliced Text Chunks & Chunk Vectors
 CREATE TABLE IF NOT EXISTS content.entry_windows (
-    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(delete_token_hash) ON DELETE CASCADE,
+    hash_from_token_for_deleting_entries    VARCHAR(64) REFERENCES content.entries(hash_from_token_for_deleting_entries) ON DELETE CASCADE,
+    entry_id         VARCHAR(64) NOT NULL, -- Added missing column definition
     window_index     INT NOT NULL, 
     window_embedding REAL[] NOT NULL, 
     window_text      TEXT NOT NULL,      
     standout_flag    BOOLEAN NOT NULL,   
-    PRIMARY KEY (entry_id, window_index)
+    PRIMARY KEY (hash_from_token_for_deleting_entries, window_index) -- Unified single composite key
 );
 
 -- 4. Standalone Curated Knowledge Resources (Outlinks)
@@ -58,5 +58,5 @@ CREATE INDEX IF NOT EXISTS idx_entries_timestamp ON content.entries(timestamp DE
 CREATE INDEX IF NOT EXISTS idx_entries_crisis_flag ON content.entries(crisis_flag) WHERE crisis_flag = TRUE;
 CREATE INDEX IF NOT EXISTS idx_resources_url ON content.resources(resource_url);
 
--- Brought over and corrected from nlp_tables.sql for fast sequence rehydration loops
+-- Fast sequence rehydration index loop lookup
 CREATE INDEX IF NOT EXISTS idx_entry_windows_lookup ON content.entry_windows(entry_id, window_index ASC);

@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-07T12:51-04:00
+# Save-state: 2026-07-10T13:58-04:00
 # ==========================================
 import asyncio
 import copy
@@ -12,6 +12,7 @@ import numpy as np
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 import time
+import secrets
 from app.helpers.json_safe import json_safe
 
 logger = logging.getLogger(__name__)
@@ -99,10 +100,6 @@ class EntryWritingRuntime:
         )
         logger.debug("[INIT EntryRuntime] id=%s", id(self))
 
-        self._load_window_embeddings_from_disk()
-        self._load_window_text_from_disk()
-        self._load_standout_window_flags_from_disk()
-
     async def initialize(self) -> None:
         """
         Load entries.json into memory once.
@@ -150,11 +147,19 @@ class EntryWritingRuntime:
                     raise db_err # Refuse file system fallback if the app is officially locked to DB mode
                 logger.warning("[EntryWritingRuntime] Lock unburned. Retrying fallback to local storage files.")
 
+
+        # Otherwise 
+
         self._entries = self._load_entries_json_from_disk()
         self._rebuild_entry_index()
         self._load_entries_embeddings_from_disk()
 
         await self._verify_integrity_on_startup()
+
+        # Safely load clause/window structures for offline usage only
+        self._load_window_embeddings_from_disk()
+        self._load_window_text_from_disk()
+        self._load_standout_window_flags_from_disk()
 
         self._background_flush_worker = asyncio.create_task(
             self._flush_worker()
@@ -412,6 +417,11 @@ class EntryWritingRuntime:
     
 
     async def append_entry(self, entry: Dict[str, Any]) -> None:
+        """
+        Appends or updates an entry in the in-memory master state.
+        In flat-file mode, tracks uniquely by entry_id.
+        In database mode, tracks uniquely by hash_from_token_for_deleting_entries.
+        """
         if not isinstance(entry, dict):
             raise RuntimeError("Invalid entry type: must be dict")
 
@@ -427,32 +437,50 @@ class EntryWritingRuntime:
 
         token_hash = entry.get("hash_from_token_for_deleting_entries")
 
-        # --- Safely update provisional shell in-place or insert fresh ---
-        # Search specifically for an active provisional shell belonging to THIS submission instance
-        existing_shell = next(
-            (e for e in self._entries 
-             if (e.get("entry_id") == entry_id or e.get("id") == entry_id)
-             and e.get("hash_from_token_for_deleting_entries") == token_hash 
-             and e.get("is_provisional") is True), 
-            None
-        )
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            # Database mode path: hash_from_token_for_deleting_entries is the authoritative PK
+            if not token_hash:
+                raise RuntimeError("Database mode requires a valid hash_from_token_for_deleting_entries")
 
-        if existing_shell:
-            # Found the active provisional shell for this exact transaction; update it safely in-place
-            existing_shell.update(entry)
-            # If the incoming layer is the finalized payload, remove the provisional flag
-            if "is_provisional" not in entry:
+            existing_shell = self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
+            
+            # Fallback: check if a vector setter generated a provisional entry shell using only entry_id
+            if not existing_shell:
+                existing_shell = next(
+                    (e for e in self._entries 
+                     if (e.get("entry_id") == entry_id or e.get("id") == entry_id) 
+                     and e.get("is_provisional") is True 
+                     and not e.get("hash_from_token_for_deleting_entries")), 
+                    None
+                )
+
+            if existing_shell and existing_shell.get("is_provisional") is True:
+                existing_shell.update(entry)
                 existing_shell.pop("is_provisional", None)
-            target_entry_ref = existing_shell
-        else:
-            # Fresh text entirely, or a legitimate text-hash duplicate entry
-            self._entries.append(entry)
-            self._entry_index[entry_id] = entry
-            target_entry_ref = entry
+                target_ref = existing_shell
+            else:
+                self._entries.append(entry)
+                target_ref = entry
 
-        # --- Ensure the token index always links directly to the master record reference ---
-        if token_hash:
-            self._index_for_hashed_tokens_for_deleting_entries[token_hash] = target_entry_ref
+            # Update database-specific indexes
+            self._index_for_hashed_tokens_for_deleting_entries[token_hash] = target_ref
+            # Maintain entry_index point to coordinate incoming vector shells
+            self._entry_index[entry_id] = target_ref
+        else:
+            # Flat-file mode track: completely isolated 1:1 legacy mapping behavior
+            existing_shell = self._entry_index.get(entry_id)
+            if existing_shell and existing_shell.get("is_provisional") is True:
+                existing_shell.update(entry)
+                existing_shell.pop("is_provisional", None)
+                target_ref = existing_shell
+            else:
+                self._entries.append(entry)
+                self._entry_index[entry_id] = entry
+                target_ref = entry
+
+            if token_hash:
+                self._index_for_hashed_tokens_for_deleting_entries[token_hash] = target_ref
 
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
@@ -581,25 +609,50 @@ class EntryWritingRuntime:
             try:
                 logger.debug("[PERSIST] System is locked to DATABASE. Extracting payloads...")
                 
-                # Extract the JSON snapshot using your existing logic
-                PERSISTED_FIELDS = ("entry_id", "entry_nickname", "timestamp", "user_id", "safe_text", "centroids", "ip_hash", "encrypted_raw_ip", "encrypted_raw_text", "crisis_flag", "hash_from_token_for_deleting_entries")
-                def project(entry): return {k: entry.get(k) for k in PERSISTED_FIELDS}
-                snapshot = json_safe([project(e) for e in copy.deepcopy(self._entries)])
+                # Extract the JSON snapshot safely by projecting explicitly allowed fields
+                PERSISTED_FIELDS = (
+                    "entry_id", 
+                    "entry_nickname", 
+                    "timestamp", 
+                    "user_id", 
+                    "safe_text", 
+                    "centroids", 
+                    "ip_hash", 
+                    "encrypted_raw_ip", 
+                    "encrypted_raw_text", 
+                    "crisis_flag", 
+                    "hash_from_token_for_deleting_entries"
+                )
                 
-                # Extract your current NPZ snapshots
+                # Perform a deep copy of the raw memory lists to prevent state mutation during the async await
+                entries_working_copy = copy.deepcopy(self._entries)
+                snapshot = []
+                for entry in entries_working_copy:
+                    projected_entry = {k: entry.get(k) for k in PERSISTED_FIELDS}
+                    snapshot.append(projected_entry)
+                
+                # Safely deep-copy numpy vectors and text windows to shield background I/O from runtime mutations
                 embedding_snapshot = copy.deepcopy(self._embeddings)
+                window_embeddings_snapshot = copy.deepcopy(self._window_embeddings)
+                window_text_snapshot = copy.deepcopy(self._window_text)
+                standout_flags_snapshot = copy.deepcopy(self._standout_window_flags)
+                
+                # Ensure the projected JSON payload contains valid serializable structures
+                snapshot = json_safe(snapshot)
                 
                 # --------------------------------------------------------
                 # INTERFACE BOUNDARY: The Database Handshake (ACTIVE)
                 # --------------------------------------------------------
                 from core.database import db_engine  # Assumes db_engine exports initialized PostgresStorageEngine
                 
+                # We preserve entry_id as the dictionary keys here because the engine uses the 
+                # snapshot metadata list to resolve the relational token hashes during loop extraction.
                 await db_engine.save_entries_bundle(
                     snapshot=snapshot,
                     embedding_snapshot=embedding_snapshot,
-                    window_embeddings=self._window_embeddings,
-                    window_text=self._window_text,
-                    standout_flags=self._standout_window_flags
+                    window_embeddings=window_embeddings_snapshot,
+                    window_text=window_text_snapshot,
+                    standout_flags=standout_flags_snapshot
                 )
                 # --------------------------------------------------------
 
@@ -607,9 +660,9 @@ class EntryWritingRuntime:
                 self._dirty_mutation_count = max(0, self._dirty_mutation_count - mutations_to_deduct)
                 
                 # If the database transaction committed cleanly, lock it in!
-                SystemModeLock.lock_mode_permanently() # Burns the fuse on first success
+                SystemModeLock.lock_mode_permanently()  # Burns the fuse on first success
                 logger.info("[PERSIST] Central database flush completed. Bypassing disk I/O.")
-                return # Exit early! Your hard drive never has to spin up.
+                return  # Exit early! Your hard drive never has to spin up.
 
             except Exception as db_err:
                 logger.error("[PERSIST] Database transaction failed: %s", db_err)
@@ -618,7 +671,7 @@ class EntryWritingRuntime:
                 # If the lock file ALREADY exists on disk, the database is our ONLY true source of truth.
                 # Falling back to stale local files now would corrupt your emergent clusters.
                 if SystemModeLock.is_lock_file_present_on_disk():
-                    logger.critical("[PERSIST] CATASTROPHIC: System is legally locked to DATABASE, but Germany is unreachable. Halting to prevent split-brain cluster corruption.")
+                    logger.critical("[PERSIST] CATASTROPHIC: System is legally locked to DATABASE, but backend cluster is unreachable. Halting to prevent split-brain cluster corruption.")
                     raise db_err
                 
                 # If the lock file DOES NOT exist yet, this was just an initial test boot that failed.
@@ -914,120 +967,141 @@ class EntryWritingRuntime:
     async def purge_entry_metadata(
         self,
         *,
-        entry_id: str,
+        entry_id: str = None,  # Kept in keyword args for caller signature compatibility, but bypassed for lookup
         token_hash: str,
     ) -> bool:
         """
-        Runtime-coherent entry redaction.
-
-        Returns:
-            True  -> entry was found, stripped, and persisted
-            False -> no-op (not found or nothing changed)
+        Redacts user personal data from a single targeted submission instance.
+        Matches strictly by token_hash across ALL operational modes, as the token hash
+        serves as the sole authoritative credential for identifying distinct duplicate rows.
         """
-
-        # memory mutation now immediate
-        target = None
-
-        for entry in self._entries:  # moved out of operation
-            if (
-                entry.get("hash_from_token_for_deleting_entries")
-                == token_hash
-            ):
-                target = entry
-                break
-
-        if not target:
-            logger.warning("[EntryRuntime] Entry not found during strip_entry.")
+        if not token_hash:
+            logger.warning("[EntryRuntime] Purge requested without an authoritative token_hash.")
             return False
 
-        now = datetime.now(timezone.utc).isoformat()
-                
-        stripped = {
-            # identity
-            "entry_id": target.get("entry_id") or target.get("id"),
-            "entry_nickname": None,
-            "timestamp": now,
-            "user_id": None,
+        # Complete lookup unification: Both DATABASE and flat-file modes leverage the token hash index map
+        target = self._index_for_hashed_tokens_for_deleting_entries.get(token_hash)
 
-            # core content (neutralized, not removed)
+        if not target:
+            logger.warning(
+                "[EntryRuntime] Target entry instance not located for purge with token_hash: %s", 
+                token_hash
+            )
+            return False
+
+        # Extract values directly from the matched structural instance
+        stripped_entry_id = target.get("entry_id") or target.get("id")
+        
+        # Preserve original submission/ingestion time instead of overwriting with the current deletion time
+        original_timestamp = target.get("timestamp")
+
+        # Generate an anonymous, unique tombstone value (exactly 39 chars, comfortably under VARCHAR(64))
+        # This completely sanitizes the original credential while keeping Postgres PK unique/non-null
+        # Generate a highly descriptive, unique tombstone primary key string.
+        # Format: "purged-{unix_timestamp}-{16_char_hex}" -> ~32 characters total.
+        # This comfortably fits under VARCHAR(64) and gives you exact auditability.
+        
+        purge_time_epoch = int(time.time())
+        purged_tombstone_pk = f"purged-{purge_time_epoch}-{secrets.token_hex(8)}"
+
+        stripped = {
+            "entry_id": stripped_entry_id,
+            "entry_nickname": None,
+            "timestamp": original_timestamp,  # Retains historical record integrity
+            "user_id": None,
             "safe_text": "",
             "embedding_file": None,
-
-            # structure
             "centroids": [],
-
-            # encryption / security (preserve traceability if needed)
             "ip_hash": target.get("ip_hash"),
             "encrypted_raw_ip": None,
             "encrypted_raw_text": None,
-
-            # flags
             "crisis_flag": bool(target.get("crisis_flag", False)),
-
-            # Dropped 'deleted' and 'deleted_at' to keep PostgreSQL completely happy 
-            # and maintain strict adherence to your database schema fields.
-            "hash_from_token_for_deleting_entries": None,
+            "hash_from_token_for_deleting_entries": purged_tombstone_pk, # Original shall be stripped, but postgres requires a unique value to still be there.
+            # so we're doing purged-[epochtime]-[randomhex] to stay within postgresql's character limit.
         }
 
-        # --- Duplicate-Aware Vector Key-Space Cleanup ---
-        # Scan memory to check if any OTHER active duplicate records still require these vectors
-        still_has_active_duplicates = any(
-            e for e in self._entries 
-            if (e.get("entry_id") == entry_id or e.get("id") == entry_id) 
+        try:
+            # Find the true sequential list index of this specific reference object in the master tracking array
+            list_index = self._entries.index(target)
+            self._entries[list_index] = stripped
+        except ValueError:
+            logger.error("[EntryRuntime] Target record detached from main tracking collection array.")
+            return False
+
+        # Sync the deletion token tracking index
+        self._index_for_hashed_tokens_for_deleting_entries[token_hash] = stripped
+
+        from core.mode_lock import SystemModeLock
+        is_database_mode = (SystemModeLock.resolve_operational_mode() == "DATABASE")
+
+        if is_database_mode:
+            # Point entry_index to an active record sharing this entry_id if one is still alive
+            remaining_active = next(
+                (e for e in self._entries 
+                 if (e.get("entry_id") == stripped_entry_id or e.get("id") == stripped_entry_id) 
+                 and e.get("safe_text") != ""),
+                None
+            )
+            self._entry_index[stripped_entry_id] = remaining_active if remaining_active else stripped
+        else:
+            self._entry_index[stripped_entry_id] = stripped
+
+        # Clean up vector space projections only if no active duplicate records use this text hash space
+        still_has_active = any(
+            e for e in self._entries
+            if (e.get("entry_id") == stripped_entry_id or e.get("id") == stripped_entry_id)
             and e.get("safe_text") != ""
         )
 
-        # Only evict the key space from vector maps if this was the last surviving record
-        if not still_has_active_duplicates:
-            self._window_text.pop(entry_id, None)
-            self._standout_window_flags.pop(entry_id, None)
+        if not still_has_active:
+            self._window_text.pop(stripped_entry_id, None)
+            self._standout_window_flags.pop(stripped_entry_id, None)
 
-        index = self._entries.index(target)
-
-        self._entries[index] = stripped
-
-        stripped_entry_id = stripped.get("entry_id") or stripped.get("id")
-
-        self._entry_index[stripped_entry_id] = stripped
-
-        logger.info("[EntryRuntime] Entry %s stripped.", stripped_entry_id)
-
+        logger.info("[EntryRuntime] Target entry instance successfully redacted in memory via token hash credential.")
         self._dirty_mutation_count += 1
         await self._signal_dirty_queue()
-
+        
         return True
 
     def get_current_embedding_file(self) -> str:
         return self._npz_path
     
-    def _rebuild_entry_index(self):
+    def _rebuild_entry_index(self) -> None:
         """
-        # This is a lookup cache, not a second dataset.
-
-        # It exists only to answer one question efficiently:
-
-        # “Given an entry_id, where is the entry?”
-
-        # Think of it as the table of contents at the front of the notebook;
-
-        # It does not store new information. It just points to entries already in _entries.
-        # _entries is for ordered iteration lists in detail. 
-        # _entry_index is for fast O(1) lookup via dicts
-        # If you delete _entry_index, nothing is lost except speed.
-        # If you delete _entries, everything is lost.
-        # the real architectural win is that you are reducing cognitive load later, 
-        # because you stop scanning lists just to answer simple identity queries.
+        Rebuilds internal structural index maps for O(1) memory lookups.
+        In database mode, prioritizes hash_from_token_for_deleting_entries as the authoritative PK.
         """
-        self._entry_index = {
-            (e.get("entry_id") or e.get("id")): e
-            for e in self._entries
-        }
+        from core.mode_lock import SystemModeLock
+        operational_mode = SystemModeLock.resolve_operational_mode()
 
-        self._index_for_hashed_tokens_for_deleting_entries = {
-            e.get("hash_from_token_for_deleting_entries"): e
-            for e in self._entries
-            if e.get("hash_from_token_for_deleting_entries")
-        }
+        if operational_mode == "DATABASE":
+            # Map every record uniquely by its token hash primary key
+            self._index_for_hashed_tokens_for_deleting_entries = {
+                e.get("hash_from_token_for_deleting_entries"): e
+                for e in self._entries
+                if e.get("hash_from_token_for_deleting_entries")
+            }
+            
+            # Sort so active entries take precedence over redacted entries in entry_index lookup
+            sorted_entries = sorted(
+                self._entries, 
+                key=lambda e: 1 if (e.get("safe_text") is not None and e.get("safe_text") != "") else 0
+            )
+            self._entry_index = {
+                (e.get("entry_id") or e.get("id")): e
+                for e in sorted_entries
+            }
+        else:
+            # Original flat-file mode isolation logic
+            self._entry_index = {
+                (e.get("entry_id") or e.get("id")): e
+                for e in self._entries
+            }
+            self._index_for_hashed_tokens_for_deleting_entries = {
+                e.get("hash_from_token_for_deleting_entries"): e
+                for e in self._entries
+                if e.get("hash_from_token_for_deleting_entries")
+            }
 
     def get_entry_by_id(self, entry_id: str):
         return self._entry_index.get(entry_id)
