@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-10T13:58-04:00
+# Save-state: 2026-07-10T15:06-04:00
 # ==========================================
 import asyncio
 import copy
@@ -1016,6 +1016,7 @@ class EntryWritingRuntime:
             "encrypted_raw_ip": None,
             "encrypted_raw_text": None,
             "crisis_flag": bool(target.get("crisis_flag", False)),
+            "original_hash_for_purge": token_hash,
             "hash_from_token_for_deleting_entries": purged_tombstone_pk, # Original shall be stripped, but postgres requires a unique value to still be there.
             # so we're doing purged-[epochtime]-[randomhex] to stay within postgresql's character limit.
         }

@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-07-10T12:43-04:00
+# Save-state: 2026-07-10T15:16-04:00
 # ============================================================================
 import json
 import logging
@@ -114,12 +114,6 @@ class PostgresStorageEngine:
                             ),
                         )
 
-    # ------------------------------------------------------------------------
-    # ENTRIES & NLP STORAGE COMPONENT (content_schema.sql & nlp_tables.sql Alignment)
-    # ------------------------------------------------------------------------
-    # ------------------------------------------------------------------------
-    # ENTRIES & NLP STORAGE COMPONENT (Reconciled to content_schema.sql)
-    # ------------------------------------------------------------------------
     async def load_entries_bundle(self) -> Dict[str, Any]:
         """
         Rehydrates wholesale entries and their multi-dimensional NLP tensor 
@@ -266,8 +260,40 @@ class PostgresStorageEngine:
                         if not token_hash:
                             logger.warning("[DB_ENGINE] Skipping save for entry_id %s: No token hash provided.", entry_id)
                             continue
+
+                        is_tombstone = isinstance(token_hash, str) and token_hash.startswith("purged-")
+
+                        if is_tombstone:
+                            original_hash = entry.get("original_hash_for_purge")
+                            
+                            # Check if ANY other entries with this entry_id exist (excluding the one we are purging)
+                            await cur.execute("""
+                                SELECT COUNT(*) 
+                                FROM content.entries 
+                                WHERE entry_id = %s 
+                                AND hash_from_token_for_deleting_entries != %s;
+                            """, (entry_id, original_hash))
+                            
+                            count = (await cur.fetchone())[0]
+                            
+                            # ONLY if count is 0, we are at the last duplicate. 
+                            # The CASCADE will then safely remove the final embedding/window records.
+                            if count == 0:
+                                await cur.execute("""
+                                    DELETE FROM content.entries 
+                                    WHERE hash_from_token_for_deleting_entries = %s;
+                                """, (original_hash,))
+                            else:
+                                # If count > 0, we keep the entry record but update it to be purged,
+                                # but we DO NOT delete the embedding/window records yet.
+                                # Just update the safe_text to empty.
+                                await cur.execute("""
+                                    UPDATE content.entries 
+                                    SET safe_text = '', hash_from_token_for_deleting_entries = %s 
+                                    WHERE hash_from_token_for_deleting_entries = %s;
+                                """, (token_hash, original_hash))
                         
-                        # 1. Upsert into content.entries
+                        # 2. Upsert into content.entries
                         await cur.execute("""
                             INSERT INTO content.entries (
                                 entry_id, entry_nickname, timestamp, user_id, safe_text, 
@@ -288,7 +314,7 @@ class PostgresStorageEngine:
                             entry.get("crisis_flag", False), token_hash
                         ))
                         
-                        # 2. Extract and Upsert into content.embeddings using the token_hash
+                        # 3. Extract and Upsert into content.embeddings using the token_hash
                         if entry_id in embedding_snapshot:
                             raw_vector = embedding_snapshot[entry_id]
                             # Handle converting numpy array or list format cleanly
@@ -301,7 +327,7 @@ class PostgresStorageEngine:
                                 DO UPDATE SET embedding = EXCLUDED.embedding;
                             """, (token_hash, vector_payload))
                         
-                        # 3. Extract and Settle sequential window chunks into content.entry_windows
+                        # 4. Extract and Settle sequential window chunks into content.entry_windows
                         if entry_id in window_embeddings:
                             w_embeds = window_embeddings[entry_id]
                             w_texts = window_text.get(entry_id, [])

@@ -1,7 +1,7 @@
 # ==========================================
 # app/routes/info_navigation.py
 # routes to /create-entry, /about , /privacy-policy , /terms-of-service and renders the homepage
-# save-state 2026-06-30T13:27-04:00 (YYYYMMDDhhmm)
+# save-state 2026-07-10T15:39-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 from fastapi import Request, Depends, HTTPException, status
@@ -75,3 +75,10 @@ async def terms_of_service(request: Request):
     Render the Terms of Service page.
     """
     return templates.TemplateResponse("terms-of-service.html", {"request": request})
+
+@app.get("/ways-to-help", response_class=HTMLResponse)
+async def ways_to_help(request: Request):
+    """
+    Render the Ways To Help page.
+    """
+    return templates.TemplateResponse("ways-to-help.html", {"request": request})
