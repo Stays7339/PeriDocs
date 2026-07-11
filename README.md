@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-07-03T21:16-04:00
+## Canonical Project Directory as of 2026-07-11T12:57-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -473,6 +473,7 @@ PeriDocs/                         # Root project folder
 │   ├─ privacy.html                   # Privacy policy page template
 │   ├─ submit-success.html            # Submission success page template
 │   ├─ terms-of-service.html          # Terms of Service page template
+│   ├─ ways-to-help.html          # Terms of Service page template
 │   └─ includes/                      # Partial web-page templates
 │      ├─ modal-crisis.html
 │      └─ modal-feedback.html
@@ -492,8 +493,8 @@ PeriDocs/                         # Root project folder
 │   ├─ entry-orchestrator/                      
 │   │   ├─ __init__.py              # Exposes EntryRuntime
 │   │   ├─ entry_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
-│   │   ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
-│   │   └─ top_matches.py                # API-ready top matches + JSON-safe outputs
+│   │   └─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│   │
 │   │
 │   │
 │   ├─ map/
@@ -520,15 +521,19 @@ PeriDocs/                         # Root project folder
 │   |   └─ __pycache__/
 │   | 
 │   | 
-│   └─ reasoning/
-│           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
-│           ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
-│           ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
-│           ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
-│           ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
-│           ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
-│           ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
-│           └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│   ├─ reasoning/
+│   |       ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
+│   |       ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
+│   |       ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
+│   |       ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
+│   |       ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
+│   |       ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
+│   |       ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
+│   |       └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│   | 
+│   | 
+│   ├─ database.py # builds the foundations of the bridge between the database and the runtime of the app. Also helps open and close the database when starting and stopping the app.
+│   └─ mode_lock.py  # forces the system to remember whether it started in database mode (PostgreSQL or Flat-file JSON + NPZ) upon the first time setting up the app (bootstrapping) with no data subfolder / a blank database.
 │ 
 │           
 │
@@ -550,6 +555,7 @@ PeriDocs/                         # Root project folder
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
 │  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ .system_mode_lock                   # the actual file that remembers whether the app should be sticking to database mode (including Sandbox mode) or sticking to offline / flat-file mode
 │  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
@@ -567,7 +573,6 @@ PeriDocs/                         # Root project folder
 │   │          ├─ content_schema.sql # Stores the main user data. the raw text entries, their AI vector math, and those Creative Commons/public domain outlinks you mentioned.
 │   │          ├─ kb_schema.sql # Stores the moderation logic. the 500 approved concepts and the rules connecting those concepts to the outlinks.
 │   │          ├─ ledger_schema.sql # A historical logbook that tracks changes (great for backups and audit trails).
-│   │          ├─ nlp_tables.sql # Directly stores the vectors assigned to each entry
 │   │          └─ search_schema.sql # Vector Index & Cluster Optimization Storage
 │   │
 │   ├─ storage_engines/
@@ -613,12 +618,12 @@ PeriDocs/                         # Root project folder
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
-├─ README.md                 # Project overview, setup, and usage
 ├─ audit_entries_store.py
 ├─ list_the_table_of_contents_for_this_npz_file.py
+├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
 ├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
-└─ setup.py  # setups the database configurations, including specifiying between test sandbox empty dummy vs local actual database vs centralized real production server. Also, runs the setup_roberta.py script mentioned before.
+└─ setup.py  # loads in the specific configurations of the database, including specifiying between test sandbox empty dummy vs local actual database vs centralized real production server. Also, runs the setup_roberta.py script mentioned before.
 ```
 </details>
 

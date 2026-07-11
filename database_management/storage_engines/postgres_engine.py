@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-07-10T15:16-04:00
+# Save-state: 2026-07-11T14:58-04:00
 # ============================================================================
 import json
 import logging
@@ -168,22 +168,15 @@ class PostgresStorageEngine:
                             "hash_from_token_for_deleting_entries": row[10],
                         })
 
-                # 2. Fetch 1D mean embeddings from the corrected table & column namespaces
-                await cur.execute("""
-                    SELECT 
-                        e.entry_id, 
-                        emb.embedding 
-                    FROM content.embeddings emb
-                    JOIN content.entries e 
-                    ON emb.hash_from_token_for_deleting_entries = e.hash_from_token_for_deleting_entries;
-                """)
+                # 2. Simplified: Fetch 1D mean embeddings directly by entry_id (1-Dimensional Array, only has width)
+                await cur.execute("SELECT entry_id, embedding FROM content.embeddings;")
                 for row in await cur.fetchall():
                     if isinstance(row, dict):
                         mean_embeddings[row["entry_id"]] = np.array(row["embedding"], dtype=np.float32)
                     else:
                         mean_embeddings[row[0]] = np.array(row[1], dtype=np.float32)
 
-                # 3. Fetch sequential window matrices reconstructed chronologically from content schema
+                # 3. Fetch sequential window matrices chronologically
                 await cur.execute(
                     """
                     SELECT entry_id, window_embedding, window_text, standout_flag
@@ -245,61 +238,145 @@ class PostgresStorageEngine:
         standout_flags: dict
     ) -> None:
         """
-        Executes a unified transactional flush of master text entries, 
-        consolidated vectors, and sequential sub-window text chunks.
+        Intercepts the runtime's full flush request and runs a streamlined,
+        transactional batch synchronization across all content tables.
         """
-        # Assuming you acquire your connection/pool manager here (e.g., self.pool or self.conn)
+        # 1. Delegate core text data insertion and deletion tracking to our snapshot mechanism
+        await self.sync_entries_snapshot(snapshot)
+
+        # Extract active entry IDs from the snapshot to ensure we only process living vectors
+        active_entry_ids = {entry["entry_id"] for entry in snapshot if "entry_id" in entry}
+
         async with self.pool.connection() as conn:
             async with conn.transaction():
                 async with conn.cursor() as cur:
                     
-                    for entry in snapshot:
-                        entry_id = entry.get("entry_id")
-                        token_hash = entry.get("hash_from_token_for_deleting_entries")
-                        
-                        if not token_hash:
-                            logger.warning("[DB_ENGINE] Skipping save for entry_id %s: No token hash provided.", entry_id)
+                    # --------------------------------------------------------
+                    # PHASE 1: Synchronize High-Dimensional Master Vectors
+                    # --------------------------------------------------------
+                    for entry_id, raw_vector in embedding_snapshot.items():
+                        # Structural Visibility Guard: Bypass deleted or uninitialized states
+                        if entry_id not in active_entry_ids or raw_vector is None or len(raw_vector) == 0:
                             continue
 
-                        is_tombstone = isinstance(token_hash, str) and token_hash.startswith("purged-")
-
-                        if is_tombstone:
-                            original_hash = entry.get("original_hash_for_purge")
-                            
-                            # Check if ANY other entries with this entry_id exist (excluding the one we are purging)
-                            await cur.execute("""
-                                SELECT COUNT(*) 
-                                FROM content.entries 
-                                WHERE entry_id = %s 
-                                AND hash_from_token_for_deleting_entries != %s;
-                            """, (entry_id, original_hash))
-                            
-                            count = (await cur.fetchone())[0]
-                            
-                            # ONLY if count is 0, we are at the last duplicate. 
-                            # The CASCADE will then safely remove the final embedding/window records.
-                            if count == 0:
-                                await cur.execute("""
-                                    DELETE FROM content.entries 
-                                    WHERE hash_from_token_for_deleting_entries = %s;
-                                """, (original_hash,))
-                            else:
-                                # If count > 0, we keep the entry record but update it to be purged,
-                                # but we DO NOT delete the embedding/window records yet.
-                                # Just update the safe_text to empty.
-                                await cur.execute("""
-                                    UPDATE content.entries 
-                                    SET safe_text = '', hash_from_token_for_deleting_entries = %s 
-                                    WHERE hash_from_token_for_deleting_entries = %s;
-                                """, (token_hash, original_hash))
+                        vector_payload = raw_vector.tolist() if hasattr(raw_vector, "tolist") else list(raw_vector)
                         
-                        # 2. Upsert into content.entries
-                        await cur.execute("""
+                        await cur.execute(
+                            """
+                            INSERT INTO content.embeddings (entry_id, embedding)
+                            VALUES (%s, %s)
+                            ON CONFLICT (entry_id) DO NOTHING;
+                            """,
+                            (entry_id, vector_payload)
+                        )
+
+                    # --------------------------------------------------------
+                    # PHASE 2: Synchronize Granular Sliding Window Text Chunks
+                    # --------------------------------------------------------
+                    for entry_id, w_embeds in window_embeddings.items():
+                        # Structural Visibility Guard
+                        if entry_id not in active_entry_ids or w_embeds is None or len(w_embeds) == 0:
+                            continue
+
+                        w_texts = window_text.get(entry_id, [])
+                        w_flags = standout_flags.get(entry_id, [])
+
+                        for idx in range(len(w_embeds)):
+                            current_vector = w_embeds[idx].tolist() if hasattr(w_embeds[idx], "tolist") else list(w_embeds[idx])
+                            current_text = w_texts[idx] if idx < len(w_texts) else ""
+                            current_flag = bool(w_flags[idx]) if idx < len(w_flags) else False
+
+                            await cur.execute(
+                                """
+                                INSERT INTO content.entry_windows (
+                                    entry_id, window_index, window_embedding, window_text, standout_flag
+                                ) VALUES (%s, %s, %s, %s, %s)
+                                ON CONFLICT (entry_id, window_index) DO UPDATE SET
+                                    window_text = EXCLUDED.window_text,
+                                    standout_flag = EXCLUDED.standout_flag;
+                                """,
+                                (entry_id, idx, current_vector, current_text, current_flag)
+                            )
+
+        logger.info("[DB SYNC] Vector and text window matrices successfully synchronized.")
+
+
+    async def sync_entries_snapshot(self, memory_entries: list[dict[str, Any]]) -> None:
+        """
+        Syncs the database tables to perfectly mirror the authoritative in-memory state.
+        This handles inserts, updates, and deletes in a single write-behind operation.
+        """
+        # Step 1: Extract all active deletion tokens currently in memory
+        active_tokens = [
+            entry["hash_from_token_for_deleting_entries"] 
+            for entry in memory_entries 
+            if "hash_from_token_for_deleting_entries" in entry
+        ]
+
+        # Step 2: Extract all active text content hashes (entry_ids) currently in memory
+        active_entry_ids = list(set(
+            entry["entry_id"] 
+            for entry in memory_entries 
+            if "entry_id" in entry
+        ))
+
+        # Open a single database connection and transaction block
+        async with self.pool.connection() as conn:
+            async with conn.cursor() as cur:
+                try:
+                    # --------------------------------------------------------
+                    # PHASE A: REMOVE DELETED DATA
+                    # --------------------------------------------------------
+                    
+                    # Wipe any entry rows from the database if their token hash is no longer in memory
+                    # Using '= ANY(%s)' is highly efficient and safe for passing lists to Postgres
+                    await cur.execute(
+                        """
+                        DELETE FROM content.entries 
+                        WHERE NOT (hash_from_token_for_deleting_entries = ANY(%s));
+                        """,
+                        (active_tokens,)
+                    )
+                    
+                    # Wipe shared vectors if their entry_id is completely missing from memory.
+                    # Thanks to your 'ON DELETE CASCADE' rule, this single command also 
+                    # instantly cleans up all orphaned text slices in the entry_windows table.
+                    await cur.execute(
+                        """
+                        DELETE FROM content.embeddings 
+                        WHERE NOT (entry_id = ANY(%s));
+                        """,
+                        (active_entry_ids,)
+                    )
+
+                    # --------------------------------------------------------
+                    # PHASE B: UPSERT ACTIVE DATA
+                    # --------------------------------------------------------
+                    
+                    # Save or update the remaining entries that are still alive in memory
+                    for entry in memory_entries:
+                        # Extract the data fields cleanly from the dictionary template
+                        entry_id = entry["entry_id"]
+                        nickname = entry.get("entry_nickname")
+                        timestamp = entry["timestamp"]
+                        user_id = entry.get("user_id")
+                        safe_text = entry.get("safe_text", "")
+                        centroids = json.dumps(entry.get("centroids", []))
+                        ip_hash = entry.get("ip_hash")
+                        enc_ip = entry.get("encrypted_raw_ip")
+                        enc_text = entry.get("encrypted_raw_text")
+                        crisis_flag = bool(entry.get("crisis_flag", False))
+                        token_hash = entry["hash_from_token_for_deleting_entries"]
+
+                        # Write the entry to the main content tracking table
+                        # If the row already exists, update its data fields automatically
+                        await cur.execute(
+                            """
                             INSERT INTO content.entries (
                                 entry_id, entry_nickname, timestamp, user_id, safe_text, 
                                 centroids, ip_hash, encrypted_raw_ip, encrypted_raw_text, 
                                 crisis_flag, hash_from_token_for_deleting_entries
-                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ) VALUES (%s, %s, %s, %s, %s, %s::jsonb, %s, %s, %s, %s, %s)
                             ON CONFLICT (hash_from_token_for_deleting_entries) 
                             DO UPDATE SET 
                                 entry_nickname = EXCLUDED.entry_nickname,
@@ -307,50 +384,23 @@ class PostgresStorageEngine:
                                 centroids = EXCLUDED.centroids,
                                 crisis_flag = EXCLUDED.crisis_flag,
                                 updated_at = CURRENT_TIMESTAMP;
-                        """, (
-                            entry_id, entry.get("entry_nickname"), entry.get("timestamp"),
-                            entry.get("user_id"), entry.get("safe_text"), json.dumps(entry.get("centroids", [])),
-                            entry.get("ip_hash"), entry.get("encrypted_raw_ip"), entry.get("encrypted_raw_text"),
-                            entry.get("crisis_flag", False), token_hash
-                        ))
-                        
-                        # 3. Extract and Upsert into content.embeddings using the token_hash
-                        if entry_id in embedding_snapshot:
-                            raw_vector = embedding_snapshot[entry_id]
-                            # Handle converting numpy array or list format cleanly
-                            vector_payload = raw_vector.tolist() if hasattr(raw_vector, "tolist") else raw_vector
-                            
-                            await cur.execute("""
-                                INSERT INTO content.embeddings (hash_from_token_for_deleting_entries, embedding)
-                                VALUES (%s, %s)
-                                ON CONFLICT (hash_from_token_for_deleting_entries) 
-                                DO UPDATE SET embedding = EXCLUDED.embedding;
-                            """, (token_hash, vector_payload))
-                        
-                        # 4. Extract and Settle sequential window chunks into content.entry_windows
-                        if entry_id in window_embeddings:
-                            w_embeds = window_embeddings[entry_id]
-                            w_texts = window_text.get(entry_id, [])
-                            w_flags = standout_flags.get(entry_id, [])
-                            
-                            # Clean old windows for this specific transaction token to clear out dirty stale sequences
-                            await cur.execute("""
-                                DELETE FROM content.entry_windows 
-                                WHERE hash_from_token_for_deleting_entries = %s;
-                            """, (token_hash,))
-                            
-                            # Sequential batch insert loop
-                            for idx in range(len(w_embeds)):
-                                current_vector = w_embeds[idx].tolist() if hasattr(w_embeds[idx], "tolist") else w_embeds[idx]
-                                current_text = w_texts[idx] if idx < len(w_texts) else ""
-                                current_flag = bool(w_flags[idx]) if idx < len(w_flags) else False
-                                
-                                await cur.execute("""
-                                    INSERT INTO content.entry_windows (
-                                        hash_from_token_for_deleting_entries, entry_id, window_index, 
-                                        window_embedding, window_text, standout_flag
-                                    ) VALUES (%s, %s, %s, %s, %s, %s);
-                                """, (token_hash, entry_id, idx, current_vector, current_text, current_flag))
+                            """,
+                            (
+                                entry_id, nickname, timestamp, user_id, safe_text, 
+                                centroids, ip_hash, enc_ip, enc_text, 
+                                crisis_flag, token_hash
+                            )
+                        )
+
+                    logger.info(
+                        f"[DB SYNC] Successfully mirrored {len(memory_entries)} entries. "
+                        f"Cleaned up orphaned entries and vectors."
+                    )
+
+                except Exception as e:
+                    # Log the exact error and cancel the transaction to keep the database clean
+                    logger.exception(f"[DB SYNC] Failed to execute write-behind replication: {e}")
+                    raise e
 
     # ------------------------------------------------------------------------
     # CENTROIDS STORAGE COMPONENT (search_schema.sql Alignment)

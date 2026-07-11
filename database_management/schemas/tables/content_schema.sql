@@ -1,7 +1,7 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: CONTENT SCHEMA & RELATED DEPENDENCIES
 -- Location: database-management/schemas/tables/content_schema.sql
--- save-state: 2026-07-07T13:21-04:00
+-- save-state: 2026-07-11T12:09-04:00
 -- ============================================================================
 
 -- 1. Primary Source of Truth Text Entries
@@ -21,22 +21,21 @@ CREATE TABLE IF NOT EXISTS content.entries (
     updated_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 2. Consolidated Master Entry Vectors 
+-- 2. Consolidated Master Entry Vectors (Keyed strictly to entry_id)
 CREATE TABLE IF NOT EXISTS content.embeddings (
-    hash_from_token_for_deleting_entries    VARCHAR(64) PRIMARY KEY REFERENCES content.entries(hash_from_token_for_deleting_entries) ON DELETE CASCADE,
+    entry_id   VARCHAR(64) PRIMARY KEY, -- Anchored to the shared text hash
     embedding  REAL[] NOT NULL,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. Sliced Text Chunks & Chunk Vectors
+-- 3. Sliced Text Chunks & Chunk Vectors (Cascades from entry_id)
 CREATE TABLE IF NOT EXISTS content.entry_windows (
-    hash_from_token_for_deleting_entries    VARCHAR(64) REFERENCES content.entries(hash_from_token_for_deleting_entries) ON DELETE CASCADE,
-    entry_id         VARCHAR(64) NOT NULL, -- Added missing column definition
+    entry_id         VARCHAR(64) REFERENCES content.embeddings(entry_id) ON DELETE CASCADE,
     window_index     INT NOT NULL, 
     window_embedding REAL[] NOT NULL, 
     window_text      TEXT NOT NULL,      
     standout_flag    BOOLEAN NOT NULL,   
-    PRIMARY KEY (hash_from_token_for_deleting_entries, window_index) -- Unified single composite key
+    PRIMARY KEY (entry_id, window_index)
 );
 
 -- 4. Standalone Curated Knowledge Resources (Outlinks)
