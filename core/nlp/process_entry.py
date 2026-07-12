@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-07-05T15:22-04:00
+# save-state 2026-07-12T16:39-04:00
 # ==========================================
 
 
@@ -45,7 +45,7 @@ async def process_entry_async(
     if not text.strip():
         raise ValueError("Empty or whitespace-only entry.")
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(timezone.utc)
     ip_hash = hashlib.sha256(user_ip.encode()).hexdigest()
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
@@ -239,8 +239,10 @@ async def process_entry_async(
     report_progress()  # 9 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
+    # we've got to convert the more efficient yet complex timestamp into a simple string
+    timestamp_str = timestamp.isoformat()
     # compact timestamp to embed in the token
-    timestamp_compact = timestamp.replace(":", "").replace("-", "")
+    timestamp_compact = timestamp_str.replace(":", "").replace("-", "").replace(".", "")
 
     # construct user-visible deletion token with a random sceret included
     delete_token = f"{entry['entry_id']}.{timestamp}.{secrets.token_hex(16)}"

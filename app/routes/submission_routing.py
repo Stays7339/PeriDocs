@@ -392,7 +392,7 @@ async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
     if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
         from core.database import db_engine
         try:
-            async with db_engine.pool.acquire() as conn:
+            async with db_engine.pool.connection() as conn:
                 rows = await conn.fetch(
                     """
                     SELECT DISTINCT er.title, er.url, er.description 

@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-07-06T17:19-04:00
+# save-state 2026-07-12T15:43-04:00
 # ==========================================
 
 import io
@@ -64,7 +64,16 @@ class DeleteAccountRequest(BaseModel):
 async def account_signup_start(
     data: AccountSignupStartRequest
 ):
-
+    # 1. Check Username Uniqueness
+    if account_runtime.is_username_taken(data.username):
+        # By raising this, FastAPI automatically stops the function
+        # and returns a 409 Conflict to the user's browser.
+        raise HTTPException(
+            status_code=409, 
+            detail="Username already taken"
+        )
+    
+    # 2. Proceed with signup logic if the username is available
     result = await (
         account_runtime.begin_account_signup(
             username=data.username,

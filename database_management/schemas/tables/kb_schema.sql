@@ -1,7 +1,7 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: KB SCHEMA (ONTOLOGY & KNOWLEDGE BASE LOGIC)
 -- Location: database-management/schemas/tables/kb_schema.sql
--- save-state: 2026-06-30T14:05-04:00
+-- save-state: 2026-07-12T10:50-04:00
 -- ============================================================================
 
 BEGIN;
@@ -9,8 +9,6 @@ BEGIN;
 -- ----------------------------------------------------------------------------
 -- 0. FOUNDATIONAL ADMINISTRATIVE DEPENDENCIES
 -- ----------------------------------------------------------------------------
--- Provision administrative infrastructure so downstream ontology registries
--- can track governance, evolution history, and deployment releases safely.
 CREATE TABLE IF NOT EXISTS admin.release_information (
     release_id                           VARCHAR(64) PRIMARY KEY,
     release_version                      VARCHAR(50),
@@ -21,69 +19,39 @@ CREATE TABLE IF NOT EXISTS admin.release_information (
 -- ----------------------------------------------------------------------------
 -- 1. THE RECOGNIZED CONCEPT REGISTRY
 -- ----------------------------------------------------------------------------
--- Core registry of the 500-concept ontology vocabulary.
--- This ensures the identification layer never emits a positive label outside
--- of this controlled, pinned vocabulary.
+-- Simple flat table replacing the text-file scanning loop for heuristic concepts
 CREATE TABLE IF NOT EXISTS kb.concepts (
-    concept_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), --
-    concept_code VARCHAR(100) UNIQUE NOT NULL, -- Machine-readable string (e.g., 'AFF_SADNESS')
-    pref_label VARCHAR(150) NOT NULL,          -- Human-readable preferred term
-    definition TEXT NOT NULL,                  -- Strict semantic scope note
-    concept_scheme VARCHAR(50) NOT NULL CHECK (concept_scheme IN ('QUESTION_SEMANTICS', 'ANSWER_SEMANTICS')), --
-    
-    -- Governance and Evolution Tracking
-    introduced_in_release VARCHAR(64) NOT NULL REFERENCES admin.release_information(release_id), --
-    is_deprecated BOOLEAN DEFAULT FALSE NOT NULL, --
-    deprecated_in_release VARCHAR(64) REFERENCES admin.release_information(release_id), --
-    
-    CONSTRAINT chk_deprecation_release CHECK (
-        (is_deprecated = FALSE AND deprecated_in_release IS NULL) OR --
-        (is_deprecated = TRUE AND deprecated_in_release IS NOT NULL) --
-    )
-);
-
--- Indexing for rapid validation sweeps by the rule-based extractor
-CREATE INDEX IF NOT EXISTS idx_kb_concepts_active_code 
-ON kb.concepts (concept_code) 
-WHERE is_deprecated = FALSE; --
-
--- ----------------------------------------------------------------------------
--- 2. HIERARCHICAL RELATIONSHIPS (SKOS / BROADER-NARROWER MAPS)
--- ----------------------------------------------------------------------------
--- Captures taxonomy trees. The retrieval layer leverages these explicit
--- parent-child paths natively to compute traversal depth weightings.
-CREATE TABLE IF NOT EXISTS kb.concept_hierarchies (
-    parent_concept_id UUID NOT NULL REFERENCES kb.concepts(concept_id) ON DELETE RESTRICT, --
-    child_concept_id UUID NOT NULL REFERENCES kb.concepts(concept_id) ON DELETE RESTRICT, --
-    relationship_type VARCHAR(50) DEFAULT 'broader_than' NOT NULL, --
-    established_in_release VARCHAR(64) NOT NULL REFERENCES admin.release_information(release_id), --
-    
-    PRIMARY KEY (parent_concept_id, child_concept_id), --
-    CONSTRAINT chk_self_reference CHECK (parent_concept_id <> child_concept_id) --
+    concept_id                           VARCHAR(255) PRIMARY KEY, -- e.g., 'concept_from_heuristic:cfh_...'
+    label                                TEXT NOT NULL,
+    description                          TEXT
 );
 
 -- ----------------------------------------------------------------------------
--- 3. INTER-RATER MANAGEMENT & MIGRATION CONTRACTS
+-- 2b. MODERATOR HEURISTICS & OUTLINK RULES
 -- ----------------------------------------------------------------------------
--- Tracks the inter-rater agreement process. If changes occur or a term
--- is deprecated, this links affected resources to migration tasks.
-CREATE TABLE IF NOT EXISTS kb.migration_reviews (
-    review_id UUID PRIMARY KEY DEFAULT gen_random_uuid(), --
-    deprecated_concept_id UUID NOT NULL REFERENCES kb.concepts(concept_id), --
-    target_resource_id UUID NOT NULL REFERENCES content.resources(resource_id) ON DELETE CASCADE, --
-    assigned_curator_id UUID NOT NULL REFERENCES app.accounts(user_id), --
-    is_resolved BOOLEAN DEFAULT FALSE NOT NULL, --
-    resolved_at TIMESTAMPTZ, --
-    notes TEXT --
+
+-- Holds the moderator-curated evaluation heuristics
+CREATE TABLE IF NOT EXISTS kb.heuristics (
+    heuristic_id          VARCHAR(12) PRIMARY KEY,
+    givens                TEXT[] NOT NULL, -- Array of concept codes or IDs
+    outputs               JSONB NOT NULL,  -- List of matching concept weights & reasons
+    introduced_in_release VARCHAR(64) NOT NULL REFERENCES admin.release_information(release_id)
+);
+
+-- The rule table connecting your external content resources to the concept registry
+CREATE TABLE IF NOT EXISTS kb.resource_concept_mappings (
+    resource_id UUID REFERENCES content.resources(resource_id) ON DELETE CASCADE,
+    concept_id  VARCHAR(255) REFERENCES kb.concepts(concept_id) ON DELETE CASCADE,
+    PRIMARY KEY (resource_id, concept_id)
 );
 
 -- ----------------------------------------------------------------------------
 -- 4. APPLICATION PRIVILEGES
 -- ----------------------------------------------------------------------------
-GRANT USAGE ON SCHEMA kb TO peri_app; --
-GRANT SELECT ON ALL TABLES IN SCHEMA kb TO peri_app; --
+GRANT USAGE ON SCHEMA kb TO peri_app; 
+GRANT SELECT ON ALL TABLES IN SCHEMA kb TO peri_app; 
 
-GRANT USAGE ON SCHEMA kb TO curator; --
-GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA kb TO curator; --
+GRANT USAGE ON SCHEMA kb TO curator; 
+GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA kb TO curator; 
 
-COMMIT; --
+COMMIT;

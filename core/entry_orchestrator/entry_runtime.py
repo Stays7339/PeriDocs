@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-12T09:02-04:00
+# Save-state: 2026-07-12T14:32-04:00
 # ==========================================
 import asyncio
 import copy
@@ -712,7 +712,14 @@ class EntryWritingRuntime:
             logger.debug("JSON tmp path=%s", json_tmp)
 
             with open(json_tmp, "w", encoding="utf-8") as f:
-                json.dump(snapshot, f, ensure_ascii=False, indent=2)
+                json.dump(
+                    snapshot, 
+                    f, 
+                    ensure_ascii=False, 
+                    indent=2,
+                    # This is the "magic" line:
+                    default=lambda x: x.isoformat() if isinstance(x, datetime) else x 
+                )
                 f.flush()
                 os.fsync(f.fileno())
 
@@ -722,7 +729,7 @@ class EntryWritingRuntime:
 
         except Exception as e:
             logger.exception("[PERSIST] CRITICAL: JSON write failed: %s", e)
-            raise  # ONLY JSON failure should crash system
+            raise  
 
         # ------------------------------------------------------------
         # 2B. WRITE NPZ
@@ -881,7 +888,36 @@ class EntryWritingRuntime:
 
         try:
             with open(self._entries_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+                 data = json.load(f)
+
+            # 1. Structural Check FIRST
+            if not isinstance(data, list):
+                raise RuntimeError("entries.json must be a list")
+
+            # 2. Preserve your flatten behavior
+            if data and isinstance(data[0], list):
+                data = [item for sublist in data for item in sublist]
+
+            # 3. Hydration Loop
+            for entry in data:
+                raw_ts = entry.get("timestamp")
+                
+                if isinstance(raw_ts, str):
+                    try:
+                        entry["timestamp"] = datetime.fromisoformat(raw_ts)
+                    except ValueError as e:
+                        raise RuntimeError(
+                            f"CRITICAL: Found unparseable timestamp '{raw_ts}' "
+                            f"in entry ID: {entry.get('entry_id')}. "
+                            "System integrity compromised."
+                        ) from e
+                # If it's already a datetime (idempotent) or valid in some other way, pass.
+                # If it's None, a number, or a dict, this raises our 'Fail-Fast' error.
+                elif not isinstance(raw_ts, datetime):
+                    raise RuntimeError(
+                        f"CRITICAL: Entry ID {entry.get('entry_id')} missing valid timestamp format."
+                    )
+
         except Exception as e:
             raise RuntimeError(f"Failed to load entries.json: {e}")
 

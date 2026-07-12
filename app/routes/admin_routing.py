@@ -419,7 +419,7 @@ async def create_resource(payload: CreateResourcePayload):
     if SystemModeLock.resolve_operational_mode() == "DATABASE":
         from core.database import db_engine
         try:
-            async with db_engine.pool.acquire() as conn:
+            async with db_engine.pool.connection() as conn:
                 async with conn.transaction():
                     # Insert Master Resource Record with the alpha-ready schema extensions
                     await conn.execute(

@@ -1,7 +1,7 @@
 -- ============================================================================
 -- PERIDOCS SCHEMAS: CONTENT SCHEMA & RELATED DEPENDENCIES
 -- Location: database-management/schemas/tables/content_schema.sql
--- save-state: 2026-07-11T12:09-04:00
+-- save-state: 2026-07-12T16:03-04:00
 -- ============================================================================
 
 -- 1. Primary Source of Truth Text Entries
@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS content.resources (
     resource_id                          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     title                                VARCHAR(255) NOT NULL,
     resource_url                         TEXT NOT NULL UNIQUE,
-    description                          TEXT,               
+    description                          TEXT,
+    resource_type                        VARCHAR(100),               
     license_type                         VARCHAR(100),       
     created_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     updated_at                           TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP

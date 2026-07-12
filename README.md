@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-07-11T12:57-04:00
+## Canonical Project Directory as of 2026-07-12T16:59-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -562,7 +562,7 @@ PeriDocs/                         # Root project folder
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
 │
-├─ database-management/ 
+├─ database-management/ # aims to be an environment-agnostic infrastructure layer. It holds static SQL schemas, validation utilities, and raw storage drivers
 │   ├─ schemas/
 │   │     ├─00_db_init.sql # initializes the physical catalog storage engine if absent.
 │   │     ├─01_roles_init.sql # loosely defines roles for the postgres instance itself, not for the webapp

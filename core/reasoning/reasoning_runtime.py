@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/reasoning_runtime.py
-# Save-state: 2026-07-06T16:56-04:00
+# Save-state: 2026-07-12T16:18-04:00
 # ==========================================
 
 import os
@@ -8,22 +8,31 @@ import json
 import asyncio
 from typing import Dict, Any, List
 
+
+from core.database import db_engine
 from core.mode_lock import SystemModeLock  # Enforces DB vs Flat-File runtime constraint
 from .build_evaluation_group import build_initial_evaluation_group
-from .heuristic_loader import load_heuristics
+from .heuristic_loader import registry
 from .evaluator import evaluate_heuristic
 from .damping import apply_damping
 from .receipt_maker import summarize_pool_of_active_concepts
 from .types import ConceptSignal, Inference
 from .evaluator import integrate_inference
 
+
 MIN_MEANINGFUL_WEIGHT = 0.01
 MAX_STEPS = 6  # safety cap
 RESOURCES_JSON_FILE = os.path.join("data", "reasoning", "resources.json")
 
 async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
+    # 1. ALWAYS initialize the registry before accessing data
+    if not registry._initialized:
+        await registry.initialize(db_engine)
+
     pool_of_active_concepts: Dict[str, ConceptSignal] = build_initial_evaluation_group(entry)
-    heuristics = load_heuristics()
+    
+    # 2. Access the list directly from the registry
+    heuristics = registry._heuristics
 
     receipt: List[dict] = []
     step = 1
@@ -32,7 +41,7 @@ async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
     while step <= MAX_STEPS:
         new_inferences: List[Inference] = []
 
-        # Written to run all of your dozens of heuristics simultaneously during every single step
+        # Now this loop works perfectly with your registry data
         for h in heuristics:
             results = evaluate_heuristic(pool_of_active_concepts, h, step)
             new_inferences.extend(results)
@@ -79,7 +88,7 @@ async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
             from core.database import db_engine
             try:
                 active_concept_ids = list(final_concepts.keys())
-                async with db_engine.pool.acquire() as conn:
+                async with db_engine.pool.connection() as conn:
                     # Query matches concepts against our active concept array mapping
                     query = """
                         SELECT r.resource_id, r.title, r.url, r.resource_type, r.description, r.created_at,

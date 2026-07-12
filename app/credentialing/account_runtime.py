@@ -1,12 +1,13 @@
 # ==========================================
 # app/credentialing/account_runtime.py
-# save-state 2026-06-05T15:52-04:00
+# save-state 2026-07-12T15:36-04:00
 # ==========================================
 
 import os
 import json
 import copy
 import time
+import uuid
 import secrets
 import asyncio
 import logging
@@ -14,6 +15,8 @@ import logging
 from typing import Dict, Optional, Any
 from pathlib import Path
 from fastapi import HTTPException
+
+from datetime import datetime, timedelta, timezone
 
 from app.credentialing.security_fundamentals import (
     encrypt_value,
@@ -89,7 +92,7 @@ class AccountRuntime:
 
         self._max_seconds_without_save: float = 60.0  # safety durability trigger
 
-        self._last_save_time: float = time.time()
+        self._last_save_time: float = datetime.now(timezone.utc).timestamp()
 
         # -----------------------------------------
         # startup state
@@ -229,10 +232,9 @@ class AccountRuntime:
 
                         username = event["username"]
 
-                        if username in self._accounts_snapshot:
-                            raise RuntimeError(
-                                f"Username already exists: {username}"
-                            )
+                        if self.is_username_taken(username):
+                            raise RuntimeError(f"Username already exists: {username}")
+
                     elif event_type == DELETE_ACCOUNT_EVENT:
 
                         user_id = event["user_id"]
@@ -299,7 +301,7 @@ class AccountRuntime:
         await self._persist_accounts_to_disk()
 
         self._changes_waiting_to_be_saved = 0
-        self._last_save_time = time.time()
+        self._last_save_time = datetime.now(timezone.utc).timestamp()
 
     async def enqueue_account_operation(
         self,
@@ -358,11 +360,8 @@ class AccountRuntime:
 
         self._cleanup_expired_pending_signups()
 
-        if username in self._accounts_snapshot:
-
-            raise RuntimeError(
-                "Username already exists."
-            )
+        if self.is_username_taken(username):
+            raise RuntimeError(f"Username already exists: {username}")
 
         expired_or_replaced_tokens = []
 
@@ -401,14 +400,11 @@ class AccountRuntime:
             "generated_totp_secret":
                 generated_totp_secret,
 
-            "created_at":
-                time.time(),
+            "created_at": 
+                datetime.now(timezone.utc),
 
             "expires_at":
-                (
-                    time.time()
-                    + self._pending_signup_expiration_seconds
-                ),
+                (datetime.now(timezone.utc) + timedelta(seconds=self._pending_signup_expiration_seconds)),
         }
 
         return {
@@ -444,7 +440,7 @@ class AccountRuntime:
                 detail="Invalid TOTP code"
             )
 
-        if time.time() > pending["expires_at"]:
+        if datetime.now(timezone.utc) > pending["expires_at"]:
 
             self._pending_account_signups.pop(
                 signup_token,
@@ -648,7 +644,7 @@ class AccountRuntime:
     # PERSISTENCE
     # =====================================================
     def _should_save_to_disk(self) -> bool:
-        now = time.time()
+        now = datetime.now(timezone.utc).timestamp()
 
         time_since_save = now - self._last_save_time
 
@@ -680,12 +676,43 @@ class AccountRuntime:
         - encrypted persistence only
         """
 
+        from core.mode_lock import SystemModeLock        
+
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            try:
+                from core.database import db_engine
+                async with db_engine.pool.connection() as conn:
+                    async with conn.transaction():
+                        # Clear the old snapshot state inside the database transaction
+                        await conn.execute("TRUNCATE TABLE app.accounts;")
+                        # Insert current memory state back down as a bundle
+                        for uid, u in self._accounts_snapshot.items():
+                            await conn.execute(
+                                """
+                                INSERT INTO app.accounts (user_id, username, password_hash, totp_secret_encrypted, role, created_at)
+                                VALUES (%s, %s, %s, %s, %s, %s)
+                                ON CONFLICT (user_id) 
+                                DO UPDATE SET 
+                                    password_hash = EXCLUDED.password_hash,
+                                    totp_secret_encrypted = EXCLUDED.totp_secret_encrypted,
+                                    role = EXCLUDED.role;
+                                """,
+                                # Pass all arguments as a single tuple
+                                (uid, u["username"], u["password_hash"], u["totp_secret_encrypted"], u["role"], u["created_at"])
+                            )
+                logger.info("[AccountRuntime] Safely synchronized account snapshot to database.")
+                return # Skip local file writing
+            except Exception as db_err:
+                logger.warning("[AccountRuntime] Failed to persist accounts to database: %s", db_err)
+                raise db_err
+
         ACCOUNT_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
         serialized_account_data = json.dumps(
             self._accounts_snapshot,
             ensure_ascii=False,
-            indent=2
+            indent=2,
+            default=lambda x: x.isoformat() # datetime.now is much more flexible than time.time, but JSON doesn't like datetime.now
         )
 
         encrypted_payload = encrypt_value(serialized_account_data)
@@ -717,7 +744,47 @@ class AccountRuntime:
         """
         Load encrypted accounts into memory.
         """
+        # Intercept for Database Mode
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            try:
+                from core.database import db_engine
+                
+                # 1. Acquire connection from pool
+                async with db_engine.pool.connection() as conn:
+                    async with conn.cursor() as cur:
+                        await cur.execute("SELECT user_id, username, password_hash, totp_secret_encrypted, role, created_at FROM app.accounts;")
+                        rows = await cur.fetchall()
+                                
+                        self._accounts_snapshot = {}
+                        for row in rows:
+                            """
+                            # Explicitly cast the user_id to a string to match the format 
+                            # used by the rest of the system (and an internet browser's session cookies).
+                            # Otherwise, middleware and browser cookies get unhappy that 
+                            # they can't parse UUID which is a python object.
+                            """
+                            user_id_str = str(row["user_id"])
 
+                            # Assign using the string key
+                            self._accounts_snapshot[user_id_str] = {
+                                "user_id": user_id_str,
+                                "username": row["username"],
+                                "password_hash": row["password_hash"],
+                                "totp_secret_encrypted": row["totp_secret_encrypted"],
+                                "role": row["role"],
+                                "created_at": self._ensure_datetime(row["created_at"])
+                            }
+                        logger.info("[AccountRuntime] Loaded all accounts from database bundle.")
+                        return # Skip the file reading code completely
+
+            except Exception as db_err:
+                logger.error("[AccountRuntime] Database account load failed: %s", db_err)
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    raise db_err
+                logger.warning("[AccountRuntime] Falling back to local encrypted file.")
+
+    # ... Existing flat-file local loading loop remains safely below ...
         if not os.path.exists(
             ENCRYPTED_ACCOUNT_FILE
         ):
@@ -747,6 +814,13 @@ class AccountRuntime:
             loaded_accounts = json.loads(
                 decrypted_json
             )
+
+            # calls on idempotent helper to ensure values are datetime objects.
+            for user in loaded_accounts.values():
+                user["created_at"] = self._ensure_datetime(user["created_at"])
+                # If you have an expires_at in the snapshot, fix that too
+                if "expires_at" in user:
+                    user["expires_at"] = self._ensure_datetime(user["expires_at"])
 
         except Exception as error:
 
@@ -828,7 +902,7 @@ class AccountRuntime:
 
     def _cleanup_expired_pending_signups(self):
 
-        current_time = time.time()
+        current_time = datetime.now(timezone.utc)
 
         expired_tokens = []
 
@@ -891,7 +965,7 @@ class AccountRuntime:
         event_type = event.get("type")
 
         if event_type == CREATE_ACCOUNT_EVENT:
-            user_id = secrets.token_hex(32)
+            user_id = str(uuid.uuid4())
 
             username = event["username"]
 
@@ -911,7 +985,7 @@ class AccountRuntime:
                     event["totp_secret"]
                 ),
                 "role": role,
-                "created_at": time.time(),
+                "created_at": datetime.now(timezone.utc),
             }
 
             logger.info(
@@ -950,6 +1024,22 @@ class AccountRuntime:
                 f"Unknown account event type: {event_type}"
             )
 
+    
+    def _ensure_datetime(self, val):
+        if isinstance(val, str):
+            return datetime.fromisoformat(val)
+        return val
+
+    def is_username_taken(self, username: str) -> bool:
+        """
+        Single source of truth for checking if a username is already in use.
+        """
+        # Convert to lowercase here if you want case-insensitive matching later!
+        return any(
+            account.get("username") == username 
+            for account in self._accounts_snapshot.values()
+        )
+
 
 # =========================================================
 # OPTIONAL CONVENIENCE ACCESSORS
@@ -984,5 +1074,4 @@ async def shutdown_account_runtime():
     Flushes pending writes before process exit.
     """
     await account_runtime.shutdown()
-
 

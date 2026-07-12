@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/security_fundamentals.py
-# save-state 2026-06-03T20:52-04:00
+# save-state 2026-07-12T15:02-04:00
 # ==========================================
 
 import os
@@ -11,6 +11,7 @@ import hmac
 import hashlib
 import secrets
 import pyotp
+import uuid
 
 from pathlib import Path
 from argon2 import PasswordHasher
@@ -48,7 +49,11 @@ def create_session(user_id: str) -> str:
         "number_used_once": secrets.token_urlsafe(16)
     }
 
-    raw = json.dumps(session_payload, sort_keys=True)
+    raw = json.dumps(
+        session_payload, 
+        sort_keys=True,
+        default=lambda o: str(o) if isinstance(o, uuid.UUID) else o
+    )
 
     signature = hmac.new(
         AES_KEY,

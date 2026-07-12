@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-07-05T15:23-04:00 (ISO 8601)
+# save-state 2026-07-12T13:09-04:00 (ISO 8601)
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -178,20 +178,20 @@ async def shutdown_sequence():
             await entry_runtime._persist()
             
     except Exception as e:
-        logger.error("Failed to safely flush entry runtime during shutdown: %s", e)
+        logger.warning("Failed to safely flush entry runtime during shutdown: %s", e)
 
     # 2. Shutdown your account runtime tracking
     try:
         await shutdown_account_runtime()
     except Exception as e:
-        logger.error("Failed to shutdown account runtime: %s", e)
+        logger.warning("Failed to shutdown account runtime: %s", e)
 
     # 3. Always drain and close database connection pools safely
     logger.info("Draining database connections...")
     try:
         await close_database()
     except Exception as e:
-        logger.error("Error occurred while closing database engine: %s", e)
+        logger.warning("Error occurred while closing database engine: %s", e)
 
     # 4. Handle file system backup house-cleaning (isolated so it can't block core components)
     """
