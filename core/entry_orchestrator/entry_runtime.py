@@ -1,6 +1,6 @@
 # ==========================================
 # core/entry_orchestrator/entry_runtime.py
-# Save-state: 2026-07-10T15:06-04:00
+# Save-state: 2026-07-12T09:02-04:00
 # ==========================================
 import asyncio
 import copy
@@ -661,7 +661,7 @@ class EntryWritingRuntime:
                 
                 # If the database transaction committed cleanly, lock it in!
                 SystemModeLock.lock_mode_permanently()  # Burns the fuse on first success
-                logger.info("[PERSIST] Central database flush completed. Bypassing disk I/O.")
+                logger.debug("[PERSIST] Central database flush completed. Bypassing disk I/O.")
                 return  # Exit early! Your hard drive never has to spin up.
 
             except Exception as db_err:

@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-07-11T14:58-04:00
+# Save-state: 2026-07-12T09:02-04:00
 # ============================================================================
 import json
 import logging
@@ -298,7 +298,7 @@ class PostgresStorageEngine:
                                 (entry_id, idx, current_vector, current_text, current_flag)
                             )
 
-        logger.info("[DB SYNC] Vector and text window matrices successfully synchronized.")
+        logger.debug("[DB SYNC] Vector and text window matrices successfully synchronized.")
 
 
     async def sync_entries_snapshot(self, memory_entries: list[dict[str, Any]]) -> None:
@@ -392,7 +392,7 @@ class PostgresStorageEngine:
                             )
                         )
 
-                    logger.info(
+                    logger.debug(
                         f"[DB SYNC] Successfully mirrored {len(memory_entries)} entries. "
                         f"Cleaned up orphaned entries and vectors."
                     )

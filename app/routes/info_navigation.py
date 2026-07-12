@@ -82,3 +82,10 @@ async def ways_to_help(request: Request):
     Render the Ways To Help page.
     """
     return templates.TemplateResponse("ways-to-help.html", {"request": request})
+
+@app.get("/using-the-site", response_class=HTMLResponse)
+async def using_the_site(request: Request):
+    """
+    Render the Using The Site page.
+    """
+    return templates.TemplateResponse("using-the-site.html", {"request": request})
