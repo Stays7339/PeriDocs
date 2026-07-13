@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/submission_routing.py
-# save-state 2026-07-05T16:19-04:00
+# save-state 2026-07-13T19:26-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -12,6 +12,7 @@ import numpy as np
 import asyncio
 import hashlib
 import os
+import regex
 import logging
 
 from app.routes import app
@@ -308,6 +309,84 @@ async def submit_success(request: Request, id: str):
 
     # logger.debug("Submit_success function triggered for id=%s", id)
 
+    import copy
+
+    reasoning = copy.deepcopy(entry.get("reasoning"))
+
+    if reasoning:
+        # ---------------- Build concept lookup ----------------
+        concept_lookup = {}
+        from core.mode_lock import SystemModeLock  
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            from core.database import db_engine
+
+            async with db_engine.pool.connection() as conn:
+                cursor = await conn.execute(
+                    "SELECT concept_id AS id, label FROM kb.concepts"
+                )
+                rows = await cursor.fetchall()
+
+            concept_lookup = {
+                concept["id"]: concept["label"]
+                for concept in rows
+            }
+
+            logger.debug(
+                "Loaded %d concept labels. Sample keys: %s",
+                len(concept_lookup),
+                list(concept_lookup.keys())[:5],
+            )
+
+        else:
+            ttl_dir = Path("data/reasoning")
+
+            if ttl_dir.exists():
+                for file in ttl_dir.glob("*.ttl"):
+                    text = file.read_text(encoding="utf-8")
+
+                    urn_match = regex.search(
+                        r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
+                        text
+                    )
+                    label_match = regex.search(
+                        r'rdfs:label\s+"([^"]+)"',
+                        text
+                    )
+
+                    if urn_match and label_match:
+                        concept_lookup[urn_match.group(1)] = label_match.group(1).strip()
+
+        logger.debug(
+            "Reasoning concept IDs: %s",
+            list(reasoning.get("final_concepts", {}).keys()),
+        )
+
+        # ---------------- Replace final_concepts ----------------
+        if "final_concepts" in reasoning:
+            reasoning["final_concepts"] = {
+                concept_lookup.get(cid, cid): score
+                for cid, score in reasoning["final_concepts"].items()
+            }
+
+        # ---------------- Replace receipt ----------------
+        for step in reasoning.get("receipt", []):
+            step["input_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in step.get("input_concepts", [])
+            ]
+
+            step["output_concept"] = concept_lookup.get(
+                step.get("output_concept"),
+                step.get("output_concept"),
+            )
+
+        # ---------------- Replace resource concepts ----------------
+        for resource in reasoning.get("culled_resource_list", []):
+            resource["assigned_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in resource.get("assigned_concepts", [])
+            ]
+
     return templates.TemplateResponse(
         "submit-success.html",
         {
@@ -317,7 +396,7 @@ async def submit_success(request: Request, id: str):
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,
             "delete_token": delete_token,
-            "reasoning": entry.get("reasoning"),
+            "reasoning": reasoning,
         },
     )
 
