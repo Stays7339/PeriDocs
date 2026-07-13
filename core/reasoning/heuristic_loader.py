@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/heuristic_loader.py
-# Save-state: 2026-07-12T17:42-04:00
+# Save-state: 2026-07-13T16:24-04:00
 # ==========================================
 import json
 import os
@@ -24,27 +24,34 @@ class ReasoningRegistryRuntime:
 
         if SystemModeLock.resolve_operational_mode() == "DATABASE":
             try:
-                # Use the connection pattern (fixes your previous AttributeError)
                 async with db_engine.pool.connection() as conn:
                     async with conn.cursor() as cur:
-                        # 1. Load Heuristics
+                        # 1. Load Heuristics (Using string keys for dict_row compatibility)
                         await cur.execute("SELECT heuristic_id, givens, outputs FROM kb.heuristics;")
                         h_rows = await cur.fetchall()
                         self._heuristics = [
-                            {"heuristic_id": r[0], "givens": r[1], "outputs": r[2]}
+                            {
+                                "heuristic_id": r["heuristic_id"], 
+                                "givens": r["givens"], 
+                                "outputs": r["outputs"]
+                            }
                             for r in h_rows
                         ]
 
-                        # 2. Load Concepts
+                        # 2. Load Concepts (Mapping concept_id cleanly to 'id' for UX match)
                         await cur.execute("SELECT concept_id, label, description FROM kb.concepts;")
                         c_rows = await cur.fetchall()
                         self._concepts = [
-                            {"id": r[0], "label": r[1], "description": r[2]}
+                            {
+                                "id": r["concept_id"], 
+                                "label": r["label"], 
+                                "description": r["description"]
+                            }
                             for r in c_rows
                         ]
                 
                 self._initialized = True
-                logger.info("[ReasoningRegistryRuntime] Initialized from DB.")
+                logger.info("[ReasoningRegistryRuntime] Initialized safely from DB.")
                 return
             except Exception as db_err:
                 logger.error("[ReasoningRegistryRuntime] DB Load failed: %s", db_err)

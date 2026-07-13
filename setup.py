@@ -1,7 +1,7 @@
 #!/usr/bin/env sys executable
 # ==========================================
 # PeriDocs/setup.py
-# save-state 2026-07-12T16:34-04:00
+# save-state 2026-07-12T14:49-04:00
 # ==========================================
 import os
 import subprocess
@@ -215,7 +215,7 @@ def initialize_peridocs_database():
                 
                 # Remaining downstream dependencies
                 apply_sql_blueprint(cur, "database_management/schemas/tables/ledger_schema.sql")
-                apply_sql_blueprint(cur, "database_management/schemas/tables/search_schema.sql")
+                apply_sql_blueprint(cur, "database_management/schemas/tables/centroid_schema.sql")
 
                 # =============== Run the declarative auto-differ to apply column updates automatically ===============
                 blueprints = [

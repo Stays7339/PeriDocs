@@ -1,19 +1,20 @@
 -- ====================================================================
 -- PeriDocs RADICLE v0 - Access Control Matrix & Permissions
--- save-state 2026-07-03T21:36-04:00
+-- Location database_management/schemas/03_permissions_init.sql
+-- save-state 2026-07-13T14:49-04:00
 -- ====================================================================
 
 -- Step 1: Wipe default public inheritance parameters on schemas to harden the cluster
 REVOKE ALL ON SCHEMA public FROM PUBLIC;
 
 -- Step 2: Establish the Structural Engineer (migrator) Rights
-GRANT USAGE, CREATE ON SCHEMA content, kb, search, inference, audit, admin, app TO migrator;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA content, kb, search, inference, audit, admin, app TO migrator;
+GRANT USAGE, CREATE ON SCHEMA content, kb, centroid, inference, audit, admin, app TO migrator;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA content, kb, centroid, inference, audit, admin, app TO migrator;
 
 -- Step 3: Establish Content Steward (curator) Limitations
-GRANT USAGE ON SCHEMA content, kb, search, audit TO curator;
+GRANT USAGE ON SCHEMA content, kb, centroid, audit TO curator;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA content, kb TO curator;
-GRANT SELECT ON ALL TABLES IN SCHEMA search, audit TO curator;
+GRANT SELECT ON ALL TABLES IN SCHEMA centroid, audit TO curator;
 
 -- Step 4: Establish Independent Reviewer (auditor) Rights
 GRANT USAGE ON SCHEMA audit, admin, content, kb TO auditor;
@@ -26,9 +27,9 @@ GRANT USAGE ON SCHEMA audit, content, kb, app TO admin;
 GRANT SELECT ON ALL TABLES IN SCHEMA audit, content, kb, app TO admin;
 
 -- Step 6: Secure the FastAPI Application Runtime (peri_app)
-GRANT USAGE ON SCHEMA app, inference, content, kb, search TO peri_app;
+GRANT USAGE ON SCHEMA app, inference, content, kb, centroid TO peri_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app, inference, content TO peri_app;
-GRANT SELECT ON ALL TABLES IN SCHEMA content, kb, search TO peri_app;
+GRANT SELECT ON ALL TABLES IN SCHEMA content, kb, centroid TO peri_app;
 REVOKE ALL ON SCHEMA audit, admin FROM peri_app;
 
 SELECT 'Security profile boundaries locked down under least privilege constraints.' AS status;

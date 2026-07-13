@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-07-12T16:59-04:00
+## Canonical Project Directory as of 2026-07-13T14:44-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -573,7 +573,7 @@ PeriDocs/                         # Root project folder
 │   │          ├─ content_schema.sql # Stores the main user data. the raw text entries, their AI vector math, and those Creative Commons/public domain outlinks you mentioned.
 │   │          ├─ kb_schema.sql # Stores the moderation logic. the 500 approved concepts and the rules connecting those concepts to the outlinks.
 │   │          ├─ ledger_schema.sql # A historical logbook that tracks changes (great for backups and audit trails).
-│   │          └─ search_schema.sql # Vector Index & Cluster Optimization Storage
+│   │          └─ centroid_schema.sql # Averaged Vector Index & Storage for clusters / centroids
 │   │
 │   ├─ storage_engines/
 │   │     ├─ __init__.py            # Exposes the factory/bootloader

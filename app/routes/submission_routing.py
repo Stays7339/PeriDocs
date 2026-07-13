@@ -393,7 +393,7 @@ async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
         from core.database import db_engine
         try:
             async with db_engine.pool.connection() as conn:
-                rows = await conn.fetch(
+                rows = await conn.execute(
                     """
                     SELECT DISTINCT er.title, er.url, er.description 
                     FROM kb.external_resources er

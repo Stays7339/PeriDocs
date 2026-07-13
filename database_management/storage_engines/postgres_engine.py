@@ -1,6 +1,6 @@
 # ============================================================================
 # database_management/storage_engines/postgres_engine.py
-# Save-state: 2026-07-12T09:02-04:00
+# Save-state: 2026-07-13T15:11-04:00
 # ============================================================================
 import json
 import logging
@@ -403,23 +403,23 @@ class PostgresStorageEngine:
                     raise e
 
     # ------------------------------------------------------------------------
-    # CENTROIDS STORAGE COMPONENT (search_schema.sql Alignment)
+    # CENTROIDS STORAGE COMPONENT (centroid_schema.sql Alignment)
     # ------------------------------------------------------------------------
     async def load_centroids_bundle(self) -> Dict[str, Any]:
         """
         Rehydrates all centroids and precentroids from relational storage.
-        Transforms flat database rows from the search schema into the specialized 
+        Transforms flat database rows from the centroid schema into the specialized 
         nested dictionary structure expected by core/map/centroids.py.
         """
         centroids_map = {}
 
         async with self.pool.connection() as conn:
             async with conn.cursor() as cur:
-                # 1. Fetch core centroid metadata definitions from the search schema
+                # 1. Fetch core centroid metadata definitions from the centroid schema
                 await cur.execute(
                     """
                     SELECT centroid_id, title_from_human_moderator, description_from_human_moderator
-                    FROM search.centroids;
+                    FROM centroid.centroids;
                     """
                 )
                 for row in await cur.fetchall():
@@ -443,7 +443,7 @@ class PostgresStorageEngine:
                 await cur.execute(
                     """
                     SELECT centroid_id, event_index, entry_ids, vector, metadata
-                    FROM search.centroid_states
+                    FROM centroid.centroid_states
                     ORDER BY centroid_id, event_index ASC;
                     """
                 )
@@ -485,7 +485,7 @@ class PostgresStorageEngine:
     ) -> None:
         """
         Commits or updates a single centroid definition and its complete 
-        chronological state history array objects into search schema storage.
+        chronological state history array objects into centroid schema storage.
         Accepts parameters directly from core/map/centroids.py's database branch.
         """
         title = summary_payload.get("title_from_human_moderator")
@@ -505,7 +505,7 @@ class PostgresStorageEngine:
                     # 1. Upsert the master centroid metadata registry row
                     await cur.execute(
                         """
-                        INSERT INTO search.centroids (
+                        INSERT INTO centroid.centroids (
                             centroid_id, 
                             title_from_human_moderator, 
                             description_from_human_moderator
@@ -519,7 +519,7 @@ class PostgresStorageEngine:
 
                     # 2. Clear existing historical state rows ONLY for this specific cluster ID
                     await cur.execute(
-                        "DELETE FROM search.centroid_states WHERE centroid_id = %s;",
+                        "DELETE FROM centroid.centroid_states WHERE centroid_id = %s;",
                         (centroid_id,)
                     )
 
@@ -539,7 +539,7 @@ class PostgresStorageEngine:
 
                         await cur.execute(
                             """
-                            INSERT INTO search.centroid_states (
+                            INSERT INTO centroid.centroid_states (
                                 centroid_id, event_index, entry_ids, vector, metadata
                             ) VALUES (%s, %s, %s, %s, %s::jsonb);
                             """,
@@ -551,3 +551,21 @@ class PostgresStorageEngine:
                                 metadata_string
                             )
                         )
+
+    async def update_centroid_identifier(self, old_id: str, new_id: str) -> None:
+        """
+        Executes an authoritative primary key update on the master centroids table.
+        This triggers ON UPDATE CASCADE across all dependent relational tables.
+        """
+        async with self.pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    logger.debug("[DB ENGINE] Executing cascading ID update from %s to %s", old_id, new_id)
+                    await cur.execute(
+                        """
+                        UPDATE centroid.centroids
+                        SET centroid_id = %s
+                        WHERE centroid_id = %s;
+                        """,
+                        (new_id, old_id)
+                    )
