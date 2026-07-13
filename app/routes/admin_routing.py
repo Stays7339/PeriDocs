@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-13T16:13-04:00
+# save-state 2026-07-13T17:59-04:00
 # ==========================================
 import os
 import json
@@ -244,12 +244,14 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         extracted_id = extract_concept_id(raw_concept)
         extracted_label = regex.sub(r"\s*\([^)]+\)$", "", raw_concept).strip()
 
-        # Find or create concept logic
+        # Find or create concept logic (Safe from KeyErrors)
         matched_concept = next(
             (c for c in existing_concepts 
-             if c["concept_id"].lower() == extracted_id.lower() or c["label"].lower() == extracted_label.lower()), 
+             if str(c.get("concept_id") or c.get("id") or "").lower() == extracted_id.lower() 
+             or str(c.get("label") or "").lower() == extracted_label.lower()), 
             None
         )
+
 
         if matched_concept:
             concept_val = matched_concept["concept_id"]
@@ -274,7 +276,8 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         output_meta.append({"is_new": is_new, "file_id": file_id_part, "label": label_val})
 
     heuristic = {
-        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
+        # Changed slice from [:12] to [:10] to fit VARCHAR(12) database constraints
+        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:10]}",
         "givens": cleaned_givens,
         "outputs": cleaned_outputs
     }
@@ -287,6 +290,16 @@ async def create_heuristic(payload: CreateHeuristicPayload):
         
         async with db_engine.pool.connection() as conn:
             async with conn.transaction():
+
+                # Target Fix: Automatically seed the missing release to satisfy the foreign key constraint
+                await conn.execute(
+                    """
+                    INSERT INTO admin.release_information (release_id, release_version, build_target)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (release_id) DO NOTHING
+                    """,
+                    (DEFAULT_RELEASE_ID, "0.3.0", "local-dev")
+                )
                 # A. Register any brand-new concepts first
                 for i, meta in enumerate(output_meta):
                     if meta["is_new"]:
@@ -382,21 +395,12 @@ async def get_concepts():
 
 @router.post("/create-resource")
 async def create_resource(payload: CreateResourcePayload):
-    """
-    Ingests an outlink resource, cleanses the data, and persists it 
-    via either Database (Postgres) or Flat-File (JSON) storage.
-    """
-    
-    # 1. PARSING & SANITIZATION (The "Preparation" phase)
-    # ---------------------------------------------------
-    # Clean concept identifiers
-    cleaned_concepts = [c.strip() for c in payload.assigned_concepts if c.strip()]
+    # Target Fix 1: Extract the clean ID from composite format 'Label (id)'
+    cleaned_concepts = [extract_concept_id(c.strip()) for c in payload.assigned_concepts if c.strip()]
     if not cleaned_concepts:
         raise HTTPException(status_code=400, detail="Resource must be linked to at least one valid concept.")
 
     url_clean = payload.url.strip()
-    
-    # Generate deterministic ID (UUIDv5) to prevent duplicates at the architectural level
     deterministic_id = str(uuid.uuid5(uuid.NAMESPACE_URL, url_clean))
 
     new_resource = {
@@ -409,57 +413,67 @@ async def create_resource(payload: CreateResourcePayload):
         "created_at": datetime.now(timezone.utc).isoformat()
     }
 
-    # 2. PERSISTENCE BRANCHING (The "Storage" phase)
-    # ---------------------------------------------------
     mode = SystemModeLock.resolve_operational_mode()
 
     # --- CASE A: DATABASE MODE ---
     if mode == "DATABASE":
         from core.database import db_engine
+        from psycopg.rows import dict_row
         try:
             async with db_engine.pool.connection() as conn:
                 async with conn.transaction():
-                    # 1. Persist the main record in 'content.resources'
-                    # Uses resource_url as the uniqueness constraint
+                    
+                    # Target Fix 2: Pre-seed unknown concepts to fulfill downstream Foreign Keys
+                    for concept in cleaned_concepts:
+                        # Extract a fallback label from raw concept if it was created dynamically
+                        inferred_label = regex.sub(r"\s*\([^)]+\)$", "", concept).strip()
+                        await conn.execute(
+                            """
+                            INSERT INTO kb.concepts (concept_id, label, description)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (concept_id) DO NOTHING;
+                            """,
+                            (concept, inferred_label, "Auto-registered during resource curation link")
+                        )
+
+                    # 1. Insert or update primary resource block
                     await conn.execute(
                         """
                         INSERT INTO content.resources (resource_id, title, resource_url, resource_type, description)
                         VALUES (%s, %s, %s, %s, %s) 
                         ON CONFLICT (resource_url) DO UPDATE 
-                        SET title = %s, resource_type = %s, description = %s;
+                        SET title = EXCLUDED.title, resource_type = EXCLUDED.resource_type, description = EXCLUDED.description;
                         """,
                         (
                             uuid.UUID(new_resource["resource_id"]), 
                             new_resource["title"], 
                             new_resource["url"], 
                             new_resource["resource_type"], 
-                            new_resource["description"],
-                            new_resource["title"], 
-                            new_resource["resource_type"], 
                             new_resource["description"]
                         )
                     )
                     
-                    # 2. Retrieve the ID (in case of update, ensuring we have the canonical DB UUID)
-                    cursor = await conn.execute(
-                        "SELECT resource_id FROM content.resources WHERE resource_url = %s;", 
-                        (new_resource["url"],)
-                    )
-                    row = await cursor.fetchone()
-                    r_id = row["resource_id"] if row else None
+                    # 2. Safely capture the correct primary UUID reference
+                    async with conn.cursor(row_factory=dict_row) as cursor:
+                        await cursor.execute(
+                            "SELECT resource_id FROM content.resources WHERE resource_url = %s;", 
+                            (new_resource["url"],)
+                        )
+                        row = await cursor.fetchone()
+                        r_id = row["resource_id"] if row else uuid.UUID(new_resource["resource_id"])
 
-                    # 3. Bind concepts to 'kb.resource_concept_mappings'
+                    # 3. Establish the safe concept mapping links
                     for concept in cleaned_concepts:
                         await conn.execute(
                             """
                             INSERT INTO kb.resource_concept_mappings (resource_id, concept_id)
-                            VALUES ($1, $2) ON CONFLICT (resource_id, concept_id) DO NOTHING;
+                            VALUES (%s, %s) ON CONFLICT (resource_id, concept_id) DO NOTHING;
                             """,
-                            r_id, concept
+                            (r_id, concept)
                         )
             return {"status": "success", "mode": "database", "resource_id": deterministic_id}
-
         except Exception as e:
+            logger.error(f"Resource creation failed: {e}")
             raise HTTPException(status_code=500, detail=f"Database persistence failure: {str(e)}")
 
     # --- CASE B: FLAT-FILE MODE ---
@@ -467,14 +481,12 @@ async def create_resource(payload: CreateResourcePayload):
         try:
             os.makedirs(os.path.dirname(RESOURCES_JSON_FILE), exist_ok=True)
             
-            # Load existing records if available
             if os.path.exists(RESOURCES_JSON_FILE):
                 loop = asyncio.get_event_loop()
                 resources_list = await loop.run_in_executor(None, lambda: json.load(open(RESOURCES_JSON_FILE, "r")))
             else:
                 resources_list = []
 
-            # Check for URL collision and perform in-place update or append
             existing_record = next((r for r in resources_list if r["url"] == new_resource["url"]), None)
             
             if existing_record:
@@ -487,11 +499,9 @@ async def create_resource(payload: CreateResourcePayload):
             else:
                 resources_list.append(new_resource)
 
-            # Atomic write
             with open(RESOURCES_JSON_FILE, "w", encoding="utf-8") as f:
                 json.dump(resources_list, f, indent=2)
                 
             return {"status": "success", "mode": "flat-file", "resource_id": deterministic_id}
-
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"Flat-file JSON persistence failure: {str(e)}")
