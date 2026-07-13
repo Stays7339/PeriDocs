@@ -396,8 +396,8 @@ async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
                 rows = await conn.fetch(
                     """
                     SELECT DISTINCT er.title, er.url, er.description 
-                    FROM kb_schema.external_resources er
-                    JOIN kb_schema.resource_concept_mappings rcm ON er.resource_id = rcm.resource_id
+                    FROM kb.external_resources er
+                    JOIN kb.resource_concept_mappings rcm ON er.resource_id = rcm.resource_id
                     WHERE rcm.concept_id = ANY($1);
                     """,
                     deduced_tags

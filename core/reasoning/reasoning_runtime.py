@@ -92,8 +92,8 @@ async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
                     query = """
                         SELECT r.resource_id, r.title, r.url, r.resource_type, r.description, r.created_at,
                                array_agg(m.concept_id) as assigned_concepts
-                        FROM kb_schema.external_resources r
-                        JOIN kb_schema.resource_concept_mappings m ON r.resource_id = m.resource_id
+                        FROM kb.external_resources r
+                        JOIN kb.resource_concept_mappings m ON r.resource_id = m.resource_id
                         WHERE m.concept_id = ANY($1)
                         GROUP BY r.resource_id;
                     """

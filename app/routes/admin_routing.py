@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-07T10:51-04:00
+# save-state 2026-07-13T12:56-04:00
 # ==========================================
 import os
 import json
@@ -136,15 +136,31 @@ async def load_entries_index() -> List[Dict]:
     if ENTRIES_INDEX:
         return ENTRIES_INDEX
 
-    try:
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
-        if isinstance(data, list):
-            ENTRIES_INDEX = data
-        else:
+    from core.mode_lock import SystemModeLock
+    
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        try:
+            from core.database import db_engine
+            async with db_engine.pool.connection() as conn:
+                rows = await conn.execute("SELECT * FROM content.entries")
+                entries = []
+                async for row in rows:
+                    # Convert row to dictionary/dict-like structure
+                    entries.append(dict(row)) 
+                ENTRIES_INDEX = entries
+        except Exception as e:
+            logger.error(f"Failed to load entries from Database: {e}")
             ENTRIES_INDEX = []
-    except Exception:
-        ENTRIES_INDEX = []
+    else:
+        try:
+            loop = asyncio.get_event_loop()
+            data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
+            if isinstance(data, list):
+                ENTRIES_INDEX = data
+            else:
+                ENTRIES_INDEX = []
+        except Exception:
+            ENTRIES_INDEX = []
 
     return ENTRIES_INDEX
 
@@ -424,7 +440,7 @@ async def create_resource(payload: CreateResourcePayload):
                     # Insert Master Resource Record with the alpha-ready schema extensions
                     await conn.execute(
                         """
-                        INSERT INTO kb_schema.external_resources (resource_id, title, url, resource_type, description)
+                        INSERT INTO kb.external_resources (resource_id, title, url, resource_type, description)
                         VALUES ($1, $2, $3, $4, $5) 
                         ON CONFLICT (url) DO UPDATE SET title = $2, resource_type = $4, description = $5;
                         """,
@@ -435,13 +451,13 @@ async def create_resource(payload: CreateResourcePayload):
                         new_resource["description"]
                     )
                     
-                    r_id = await conn.fetchval("SELECT resource_id FROM kb_schema.external_resources WHERE url = $1;", new_resource["url"])
+                    r_id = await conn.fetchval("SELECT resource_id FROM kb.external_resources WHERE url = $1;", new_resource["url"])
 
                     # Bind concepts to relationship mapping table
                     for concept in cleaned_concepts:
                         await conn.execute(
                             """
-                            INSERT INTO kb_schema.resource_concept_mappings (resource_id, concept_id)
+                            INSERT INTO kb.resource_concept_mappings (resource_id, concept_id)
                             VALUES ($1, $2) ON CONFLICT (resource_id, concept_id) DO NOTHING;
                             """,
                             r_id, concept
