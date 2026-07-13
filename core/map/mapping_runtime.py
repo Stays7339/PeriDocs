@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/mapping_runtime.py
-# Save-state: 2026-07-05T15:23-04:00
+# Save-state: 2026-07-13T11:48-04:00
 # mapping_runtime.py itself acting as the singleton namespace + lifecycle manager.
 # ==========================================
 import os
@@ -62,7 +62,7 @@ def is_runtime_ready() -> bool:
         _runtime_ready,
         datetime.utcnow().isoformat()
     )
-    logger.warning("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
+    logger.debug("PID=%s THREAD=%s", os.getpid(), threading.get_ident())
     return _runtime_ready
 
 def is_runtime_starting() -> bool:
@@ -99,24 +99,19 @@ async def initialize_runtime(force_reload: bool = False, verify: bool = False) -
 
     _boot_in_progress = True
 
-    logger.info("MAPPING_RUNTIME FILE LOADED FROM: %s", __file__)
-    logger.info("INITIALIZE_RUNTIME ENTERED")
-    logger.info("MAPPING_RUNTIME MODULE ID = %s", id(sys.modules[__name__]))
+    logger.debug("MAPPING_RUNTIME MODULE ID = %s", id(sys.modules[__name__]))
 
     # Load ledger into memory
-    logger.info("BOOT START")
     await ledger.load()
-    logger.info("LEDGER LOADED")
 
     # entries should always load before centroids, since centroids are derived from entries
     await entry_runtime.initialize()
-    logger.info("ENTRY RUNTIME READY")
+    
     await entry_runtime._verify_integrity_on_startup()
     logger.debug("ENTRY_RUNTIME TYPE: %s", type(entry_runtime))
-    logger.info("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
+    logger.debug("ENTRY_RUNTIME INIT FUNC: %s", getattr(entry_runtime, 'initialize', None))
 
     await centroid_system.load_state()
-    logger.info("CENTROID SYSTEM LOADED")
 
     await ledger.verify_runtime_state(centroid_system)
 

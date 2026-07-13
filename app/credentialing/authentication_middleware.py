@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/authentication_middleware.py
-# save-state 2026-06-05T19:30-04:00
+# save-state 2026-07-13T11:28-04:00
 # ==========================================
 
 from fastapi import Request
@@ -140,7 +140,7 @@ async def security_headers_middleware(request: Request, call_next):
             key="csrf_token",
             value=fresh_token,
             httponly=False,
-            secure=request.app.state.production_mode,
+            secure=request.app.state.enforce_https_cookies,
             samesite="lax",
             path="/",
         )

@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/reasoning_runtime.py
-# Save-state: 2026-07-12T16:18-04:00
+# Save-state: 2026-07-12T17:29-04:00
 # ==========================================
 
 import os
@@ -9,7 +9,7 @@ import asyncio
 from typing import Dict, Any, List
 
 
-from core.database import db_engine
+from core import database
 from core.mode_lock import SystemModeLock  # Enforces DB vs Flat-File runtime constraint
 from .build_evaluation_group import build_initial_evaluation_group
 from .heuristic_loader import registry
@@ -27,7 +27,7 @@ RESOURCES_JSON_FILE = os.path.join("data", "reasoning", "resources.json")
 async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
     # 1. ALWAYS initialize the registry before accessing data
     if not registry._initialized:
-        await registry.initialize(db_engine)
+        await registry.initialize(database.db_engine)
 
     pool_of_active_concepts: Dict[str, ConceptSignal] = build_initial_evaluation_group(entry)
     
@@ -85,7 +85,6 @@ async def run_reasoning(entry: Dict[str, Any]) -> Dict[str, Any]:
         
         # CASE A: POSTGRESQL ENGINE MODE
         if SystemModeLock.resolve_operational_mode() == "DATABASE":
-            from core.database import db_engine
             try:
                 active_concept_ids = list(final_concepts.keys())
                 async with db_engine.pool.connection() as conn:

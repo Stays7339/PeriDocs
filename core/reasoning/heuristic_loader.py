@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/heuristic_loader.py
-# Save-state: 2026-07-12T16:18-04:00
+# Save-state: 2026-07-12T17:42-04:00
 # ==========================================
 import json
 import os
@@ -28,7 +28,7 @@ class ReasoningRegistryRuntime:
                 async with db_engine.pool.connection() as conn:
                     async with conn.cursor() as cur:
                         # 1. Load Heuristics
-                        await cur.execute("SELECT heuristic_id, givens, outputs FROM kb_schema.heuristics;")
+                        await cur.execute("SELECT heuristic_id, givens, outputs FROM kb.heuristics;")
                         h_rows = await cur.fetchall()
                         self._heuristics = [
                             {"heuristic_id": r[0], "givens": r[1], "outputs": r[2]}
@@ -36,7 +36,7 @@ class ReasoningRegistryRuntime:
                         ]
 
                         # 2. Load Concepts
-                        await cur.execute("SELECT concept_id, label, description FROM kb_schema.concepts;")
+                        await cur.execute("SELECT concept_id, label, description FROM kb.concepts;")
                         c_rows = await cur.fetchall()
                         self._concepts = [
                             {"id": r[0], "label": r[1], "description": r[2]}

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # ==========================================
 # PeriDocs/core/database.py
-# save-state 2026-07-10T12:24-04:00
+# save-state 2026-07-13T11:48-04:00
 # ==========================================
 import os
+import logging
 import contextlib
 from typing import AsyncGenerator
 from fastapi import FastAPI
@@ -12,6 +13,8 @@ from psycopg.rows import dict_row
 from dotenv import load_dotenv
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Explicitly read our structural environment gatekeeper
 DATABASE_MODE = os.getenv("DATABASE_MODE", "OFFLINE_MOCK").upper()
@@ -48,7 +51,7 @@ async def initialize_database():
         from psycopg_pool import AsyncConnectionPool
         from psycopg.rows import dict_row
 
-        print(f"[STARTUP] [{DATABASE_MODE}] Connecting async pool to cluster...")
+        logger.info(f"[Database mode: {DATABASE_MODE}] Connecting async pool to cluster...")
         db_pool = AsyncConnectionPool(
             conninfo=ASYNC_CONN_INFO,
             min_size=2,
@@ -57,7 +60,7 @@ async def initialize_database():
             open=False
         )
         await db_pool.open()
-        print(f"[STARTUP] [{DATABASE_MODE}] Database pipeline successfully bound.")
+        logger.info(f"[Database mode: {DATABASE_MODE}] Database pipeline successfully bound.")
         
         # --- NEW ADDITION: BIND THE LIVE RELATIONAL STORAGE ENGINE ---
         try:
@@ -66,7 +69,7 @@ async def initialize_database():
                 engine_type="POSTGRES", 
                 connection_pool=db_pool
             )
-            print(f"[STARTUP] [{DATABASE_MODE}] Storage engine facade safely bound to pool.")
+            logger.debug(f"[DATABASE MODE: {DATABASE_MODE}] Storage engine facade safely bound to pool.")
         except ImportError:
             print("[WARNING] Could not import StorageEngineFactory. Verify python path mappings.")
             raise
@@ -75,24 +78,16 @@ async def initialize_database():
         print(" [WARNING] APPLICATION INITIALIZING IN LOCAL OFFLINE MOCK MODE      ")
         print("====================================================================\n")
         
-        # --- NEW ADDITION: BIND FLAT FILE STORAGE IMPLEMENTATION FOR OFFLINE COMPLIANCE ---
-        try:
-            from database_management.storage_engines import StorageEngineFactory
-            db_engine = StorageEngineFactory.get_engine(engine_type="FLAT_FILE")
-            print("[STARTUP] Flat File local storage engine provider bound for OFFLINE_MOCK.")
-        except ImportError:
-            print("[WARNING] StorageEngineFactory unavailable. Core ledger tracking will use internal fallbacks.")
-
 
 async def close_database():
     """Explicitly called during the app's shutdown sequence."""
     global db_pool
     if DATABASE_MODE in ("PRODUCTION", "SANDBOX"):
-        print(f"[SHUTDOWN] [{DATABASE_MODE}] Draining connection pool...")
+        logger.info(f"[Database Mode: {DATABASE_MODE}] Draining connection pool...")
         if db_pool:
             await db_pool.close()
     else:
-        print("[SHUTDOWN] Local mock database lifecycle concluded.")
+        logger.info("[Database Mode: Local mock database lifecycle concluded.")
 
 
 async def get_db() -> AsyncGenerator:
@@ -106,7 +101,7 @@ async def get_db() -> AsyncGenerator:
     else:
         class LocalMockConnection:
             async def execute(self, query: str, params: tuple = None):
-                print(f"[SANDBOX LOCAL MOCK SQL] Executing statement context: {query}")
+                logger.info(f"[SANDBOX LOCAL MOCK SQL] Executing statement context: {query}")
                 
                 class MockCursor:
                     async def fetchone(self):

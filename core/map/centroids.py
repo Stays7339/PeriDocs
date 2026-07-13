@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-07-10T12:50-04:00
+# Save-state: 2026-07-13T11:06-04:00
 # ==========================================
 
 import os
@@ -464,7 +464,7 @@ class CentroidSystem:
                             c.states.append(centroid_state)
                             
                         self._centroids[c.centroid_id] = c
-                        logger.info("[load_state] Loaded centroid %s from DB with %d states", c.centroid_id, len(c.states))
+                        logger.debug("[load_state] Loaded centroid %s from DB with %d states", c.centroid_id, len(c.states))
                 
                 logger.info("[CentroidSystem] Online knowledge base rehydration complete.")
                 return # Exit early, avoiding disk file parsing loop

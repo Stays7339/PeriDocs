@@ -1,13 +1,13 @@
 # ==========================================
 # app/routes/info_navigation.py
 # routes to /create-entry, /about , /privacy-policy , /terms-of-service and renders the homepage
-# save-state 2026-07-10T15:39-04:00 (YYYYMMDDhhmm)
+# save-state 2026-07-13T11:12-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 from fastapi import Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.routes import app, ProductionMode  # FastAPI instance from __init__.py
+from app.routes import app, PreventNewEntries  # FastAPI instance from __init__.py
 from psycopg import AsyncConnection
 from core.database import get_db
 
@@ -50,7 +50,7 @@ async def about(request: Request):
     """
     Render the Create Entry page.
     """
-    return templates.TemplateResponse("create-entry.html", {"request": request, "ProductionMode": ProductionMode,})
+    return templates.TemplateResponse("create-entry.html", {"request": request, "PreventNewEntries": PreventNewEntries,})
 
 
 @app.get("/about", response_class=HTMLResponse)

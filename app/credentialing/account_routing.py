@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-07-12T15:43-04:00
+# save-state 2026-07-13T12:17-04:00
 # ==========================================
 
 import io
@@ -107,17 +107,20 @@ async def account_signup_complete(
         key="session",
         value=result["session_token"],
         httponly=True,
-        secure=request.app.state.production_mode,
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
     )
 
+    # csrf_token cookie appears the moment the user loads the page, even in an incognito window,
+    # so it's important to notify them that we're using cookies for account security.
+
     response.set_cookie(
         key="csrf_token",
         value=result["csrf_token"],
         httponly=False,
-        secure=request.app.state.production_mode,
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
@@ -227,17 +230,25 @@ async def signin(request: Request, data: SigninRequest):
         key="session",
         value=session_token,
         httponly=True, # httponly=True JavaScript cannot read the cookie at all.
-        secure=request.app.state.production_mode,
-        samesite="Strict", # Prevents cookie interception on unencrypted networks. The cookie is ONLY sent over HTTPS, never HTTP.
+        # The 'secure' flag is what forces HTTPS-only transmission.
+        secure=request.app.state.enforce_https_cookies,
+        # 'samesite' protects against CSRF (Cross-Site Request Forgery), 
+        # NOT interception on unencrypted networks
+        samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
     )
 
+
+
+    # csrf_token cookie appears the moment the user loads the page, even in an incognito window,
+    # so it's important to notify them that we're using cookies for account security.
+
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
-        httponly=False,  # allow JS access for X-CSRF-Token header injection
-        secure=request.app.state.production_mode,
+        httponly=False,  # httponly = false allow JS access for X-CSRF-Token header injection
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,

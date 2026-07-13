@@ -1,6 +1,6 @@
 <!--
 PeriDocs/app/templates/base.html
-save-state 2026-05-27T13:34:00-04:00
+save-state 2026-07-13T12:17-04:00
 -->
 
 <!doctype html>
@@ -22,9 +22,7 @@ save-state 2026-05-27T13:34:00-04:00
 
 
 
-
-
-<body data-production-mode="{{ 'true' if ProductionMode else 'false' }}">
+<body data-prevent-new-entries="{{ 'true' if PreventNewEntries else 'false' }}">
 
   <!-- ADDED: mobile menu overlay -->
 <div class="mobile-menu-overlay" id="mobileMenuOverlay">

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-07-12T13:09-04:00 (ISO 8601)
+# save-state 2026-07-12T12:06-04:00
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -33,12 +33,22 @@ from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
 from core.database import initialize_database, close_database
 
+# Load environment variables immediately
+load_dotenv()
+
+# Setup Logging
+# Retrieve from .env, default to INFO if not set, and ensure it is uppercase
+log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# Convert the string to the actual logging constant (e.g., 'DEBUG' -> logging.DEBUG)
+# If an invalid string is provided, it defaults to logging.INFO
+log_level = getattr(logging, log_level_str, logging.INFO)
 
 
 # ------------------- logging setup -------------------
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
@@ -63,13 +73,16 @@ logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 # ==========================================
 
 load_dotenv()
-ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
+PreventNewEntries = os.getenv("PreventNewEntries", "false").strip().lower() == "true"
+Enforce_HTTPS_Cookies = os.getenv("Enforce_HTTPS_Cookies", "true").strip().lower() == "true"
 
-logger.warning("ProductionMode=%s", ProductionMode)
+logger.warning("PreventNewEntries=%s", PreventNewEntries)
+logger.warning("Enforce_HTTPS_Cookies=%s", Enforce_HTTPS_Cookies)
 
-app.state.production_mode = ProductionMode
+app.state.PreventNewEntries = PreventNewEntries
+app.state.enforce_https_cookies = Enforce_HTTPS_Cookies
 templates = Jinja2Templates(directory="app/templates")
-templates.env.globals["ProductionMode"] = ProductionMode
+templates.env.globals["PreventNewEntries"] = PreventNewEntries
 
 
 # ---------------- Static Files ----------------
