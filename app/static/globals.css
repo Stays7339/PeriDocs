@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2027-07-10T11:01-04:00
+save-state 2027-07-13T21:57-04:00
 */
 
 /* =========================
@@ -189,6 +189,15 @@ button:focus-visible {
 
 .general-button:hover {
   filter: brightness(1.05);
+}
+
+/* ADD THIS NEW BLOCK BELOW TO HANDLE THE GREY DISABLED STATE */
+.general-button:disabled {
+  background-color: #cccccc !important; /* Neutral slate grey */
+  color: #777777 !important;            /* Muted grey text */
+  cursor: not-allowed;                  /* Changes mouse cursor on hover */
+  box-shadow: none;                     /* Removes active button shadow depth */
+  filter: none;                         /* Disables brightness hover changes */
 }
 
 
@@ -790,36 +799,35 @@ The next mention is to control the width as button are added and removed from th
 
 
 
-
 /* =========================
    Entry Wrapper / Overlay
 ========================= */
-.entry-wrapper { position: relative; overflow:hidden; border-radius: var(--radius-card); }
+.entry-wrapper { 
+  position: relative; 
+  overflow: hidden; 
+  border-radius: var(--radius-card); 
+}
+
 .entry-wrapper textarea {
-  width:100%; resize:vertical; position:relative; z-index:1; background:inherit;
-  padding: var(--space-2); border: var(--border-input); border-radius: var(--radius-card);
-  font-size:1rem; line-height:1.4;
+  width: 100%; 
+  resize: vertical; 
+  position: relative; 
+  z-index: 1; 
+  background: inherit;
+  padding: var(--space-2); 
+  border: var(--border-input); 
+  border-radius: var(--radius-card);
+  font-size: 1rem; 
+  line-height: 1.4;
+  transition: filter 0.3s ease, opacity 0.3s ease;
 }
-.entry-overlay {
-  position:absolute; inset:0; z-index:10; pointer-events:none;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background-color: rgba(255,255,255,var(--overlay-opacity));
-  backdrop-filter: blur(var(--streaks-blur)) saturate(120%);
-  border-radius:inherit; border:1px solid rgba(255,255,255,0.15);
-  opacity:0; transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
-  overflow-y: auto;
+
+/* Double-layer protection: Soft blur directly onto the textbox when locked */
+.entry-wrapper[data-locked="true"] textarea {
+  filter: blur(0.8px);
+  opacity: 0.35; /* Dims the gray placeholder text way down */
 }
-.entry-wrapper[data-locked="true"] .entry-overlay { opacity:1; pointer-events:auto; }
-.entry-overlay-streaks {
-  position:absolute; inset:0; z-index:7; pointer-events:none; border-radius:inherit;
-  filter: blur(var(--streaks-blur)); background: var(--streaks-bg);
-  mask-image: var(--streaks-mask); -webkit-mask-image: var(--streaks-mask);
-  mask-repeat:repeat; -webkit-mask-repeat:repeat; opacity:0;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-}
-.entry-wrapper[data-locked="true"] .entry-overlay-streaks {
-  opacity:1; visibility:visible; transition: opacity 0.6s ease, visibility 0s;
-}
+
 
 .overlay-content { overflow-y: auto;}
 

@@ -399,7 +399,7 @@ You should automatically get connected to HTTPS without having to specify it in 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-07-13T14:44-04:00
+## Canonical Project Directory as of 2026-07-13T20:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -452,6 +452,7 @@ PeriDocs/                         # Root project folder
 │  │  ├─ peridocs-logo-workmark-2026-05-05.svg
 │  │  ├─ peridocs-misc-ux.js                  # handles many things including but not limited to: theme toggle (light mode / dark mode), cooldowns...
 │  │  ├─ peridocs-wordmark-and-logo-v2.png 
+│  │  ├─ persistence-opt-in.js                # front-end script that allows the user to choose whether they want their entry to be permanently saved in the database.
 │  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
 │  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
 │  │  ├─ toast-ui.js 

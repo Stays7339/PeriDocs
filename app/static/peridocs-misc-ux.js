@@ -1,5 +1,5 @@
 // peridocs-misc-ux.js — unified UI state: theme, cooldowns, toasts, feedback/entry, privacy toast 
-// save-state 2026-07-13T12:14-04:00
+// save-state 2026-07-13T22:30-04:00
 // ==========================================
 
 
@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
       consentToggle.setAttribute("data-state", granted ? "on" : "off");
       consentToggle.setAttribute("aria-checked", granted ? "true" : "false");
       const label = consentToggle.querySelector(".toggle-label");
-      if (label) label.textContent = granted ? " Consent Given" : "Consent Requested";
+      if (label) label.textContent = granted ? "Current Setting: Yes" : "Current Setting: No";
     }
 
     // Persist consent

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/submission_routing.py
-# save-state 2026-07-13T19:26-04:00
+# save-state 2026-07-13T22:28-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -44,7 +44,16 @@ delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_t
 # ---------------- Active WebSocket connections ----------------
 active_ws_connections: dict[str, WebSocket] = {}
 
-async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,  user_id: str | None = None,):
+# ---------------- Storage block for unpersisted transient submissions ----------------
+ephemeral_entries: dict[str, dict] = {}
+
+async def process_entry_background(
+    entry_text: str, 
+    user_ip: str, 
+    entry_id: str,  
+    user_id: str | None = None,
+    opt_in: bool = False # <--- Pass flag down from endpoint
+):
     logger.debug(
         "[BACKGROUND] user_id=%r",
         user_id
@@ -59,44 +68,29 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
     def wrapped_progress(fraction: float):
         progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
 
+    # Pass opt_in down to NLP module
     entry, delete_token = await process_entry_async(
         entry_text,
         user_ip=user_ip,
         user_id=user_id,
-        progress_callback=wrapped_progress
-    )
-
-    logger.debug(
-        "process_entry_async returned user_id=%r",
-        entry.get("user_id")
-    )
-
-    await entry_runtime.append_entry(entry)
-
-    
-
-    logger.debug(f"process_entry_async returned raw order: {list(entry.keys())}")
-
-    logger.debug(
-        "Entry runtime contains id after processing? %s",
-        entry_runtime.get_entry_by_id(
-            entry["entry_id"]
-        ) is not None
-    )
-
-    logger.debug(
-        "Entry count immediately after processing: %d",
-        len(entry_runtime.get_all_entries())
-    )
-
-    logger.debug(
-        "Returned entry_id=%s",
-        entry.get("entry_id")
+        progress_callback=wrapped_progress,
+        opt_in=opt_in
     )
 
     real_entry_id = entry["entry_id"]
 
-    delete_tokens_memory[entry["entry_id"]] = delete_token
+    # Target Fix: Conditionally save data based on opt-in request
+    if opt_in:
+        await entry_runtime.append_entry(entry)
+        delete_tokens_memory[real_entry_id] = delete_token
+
+        # Wrap the directory setup and flush request safely inside the opt_in check
+        os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
+        await entry_runtime.request_flush() 
+    else:
+        # Cache memory references directly to handle UI responses without writes
+        ephemeral_entries[real_entry_id] = entry
+        delete_tokens_memory[real_entry_id] = None  # Ephemeral records don't track deletion tokens
 
     # ---------------- Option A: push crisis immediately ----------------
     if entry.get("crisis_flag"):
@@ -109,25 +103,13 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
                     "real_id": entry["entry_id"]
                 })
             except WebSocketDisconnect:
-                # client already closed, safe to ignore
                 pass
 
     # ---------------- Map temp ID → real entry_id ----------------
     temp_to_real_entry_id[entry_id] = entry["entry_id"]
 
 
-    os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
     logger.info("Entries in memory: %d", len(entry_runtime.get_all_entries()))
-
-
-    logger.debug(
-        "Entries before flush: %d",
-        len(entry_runtime.get_all_entries())
-    )
-
-
-    await entry_runtime.request_flush()
-
     
 
     # by using request_flush, rather than anything else, 
@@ -150,6 +132,7 @@ async def debug_all_requests(request: Request, call_next):
 async def submit_entry(
     request: Request,
     entry_text: str | None = Form(None),
+    opt_in: str | bool = Form(False), # Changed to accept raw string input from HTML
     background_tasks: BackgroundTasks = None
 ):
     
@@ -157,6 +140,16 @@ async def submit_entry(
     if "application/json" in request.headers.get("content-type", ""):
         data = await request.json()
         entry_text = data.get("entry_text", "")
+        opt_in = data.get("opt_in", False)
+
+    # ============================================================
+    # STRING-TO-BOOLEAN SANITIZATION
+    # ============================================================
+    if isinstance(opt_in, str):
+        opt_in = opt_in.strip().lower() == "true"
+    else:
+        opt_in = bool(opt_in)
+    # ============================================================
 
     if not entry_text:
         return JSONResponse({"status": "error", "message": "No entry provided"}, status_code=400)
@@ -170,7 +163,14 @@ async def submit_entry(
     progress_dict[temp_entry_id] = 0.0  # ensure initial progress is 0
 
     # ---------------- Start background processing ----------------
-    background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id, user_id)
+    background_tasks.add_task(
+        process_entry_background, 
+        entry_text, 
+        client_host, 
+        temp_entry_id, 
+        user_id, 
+        opt_in
+    )
 
     logger.debug(
         "Submit function triggered for temp_id=%s user_id=%s",
@@ -200,9 +200,10 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
             entry = entry_runtime.get_entry_by_id(real_id)
 
             if entry is None:
-                crisis_flag = None  # unknown state, not False
-            else:
-                crisis_flag = entry.get("crisis_flag")
+                entry = ephemeral_entries.get(real_id) # Fallback to transient storage block
+
+            # Unify extraction so crisis flags are captured from both storage variants
+            crisis_flag = entry.get("crisis_flag") if entry else None
 
             # --- MINIMAL OPTION A: push crisis immediately ---
             if crisis_flag and not crisis_triggered:
@@ -245,6 +246,8 @@ async def submit_success(request: Request, id: str):
     id = temp_to_real_entry_id.get(id, id)
         
     entry = entry_runtime.get_entry_by_id(id)
+    if not entry:
+        entry = ephemeral_entries.get(id) # <--- Fallback reference resolution
 
     logger.debug(
         "submit_success entry=%r",
@@ -275,6 +278,11 @@ async def submit_success(request: Request, id: str):
     entry_vec = embeddings.get(entry_id)
 
     scored_entries = []
+
+    # Target Fix: If vector doesn't exist globally, draw it out from our hidden transport key
+    entry_vec = embeddings.get(entry_id)
+    if entry_vec is None and "_tmp_embedding" in entry:
+        entry_vec = entry["_tmp_embedding"]
 
     if entry_vec is not None:
         for eid, vec in embeddings.items():

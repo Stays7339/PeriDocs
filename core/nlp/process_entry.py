@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-07-12T16:39-04:00
+# save-state 2026-07-13T20:21-04:00
 # ==========================================
 
 
@@ -40,8 +40,9 @@ async def process_entry_async(
     user_ip: str,
     user_id: str | None = None,
     max_words_in_window_of_clauses: int = 66,
-    progress_callback: Callable[[float], None] | None = None
-) -> Dict[str, Any]:
+    progress_callback: Callable[[float], None] | None = None,
+    opt_in: bool = False, # <--- 1. Add opt-in switch with safe default
+) -> tuple[Dict[str, Any], str | None]:
     if not text.strip():
         raise ValueError("Empty or whitespace-only entry.")
 
@@ -192,12 +193,12 @@ async def process_entry_async(
         append_crisis_record(entry)
         report_progress()  # 6 / total_steps
         # Return immediately so we skip embeddings/centroids
-        return entry
+        return entry, None  # Added None to satisfy the 2-tuple unpacking requirement
 
     report_progress()  # 6 / total_steps
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
-    if not crisis_msg:
+    if not crisis_msg and opt_in: # <--- 2. Gate runtime embedding writes
         await entry_runtime.set_runtime_bundle(
             entry["entry_id"],
             embedding=entry.get("embedding"),
@@ -209,30 +210,28 @@ async def process_entry_async(
     report_progress()  # 7 / total_steps
 
     # ---------------- CENTROID / PRECENTROID ASSIGNMENT ----------------
-    applied = await entry_membership_sequencer.link_entry(entry["entry_id"])
+    if opt_in: # <--- 3. Gate structural categorization links
+        applied = await entry_membership_sequencer.link_entry(entry["entry_id"])
 
-    if applied:
-        # Sort defensively by similarity descending (link_entry already does this,
-        # but we do not assume ordering across future changes)
-        applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
-
-        centroid_links = []
-
-        for cid, similarity, event_index in applied_sorted:
-            centroid_links.append({
-                "centroid_id": cid,
-                "similarity": similarity,
-                "event_index": event_index
-            })
-
-        entry["centroids"] = centroid_links
+        if applied:
+            applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+            centroid_links = []
+            for cid, similarity, event_index in applied_sorted:
+                centroid_links.append({
+                    "centroid_id": cid,
+                    "similarity": similarity,
+                    "event_index": event_index
+                })
+            entry["centroids"] = centroid_links
+    else:
+        entry["centroids"] = [] # Ephemeral submission is unlinked
 
     report_progress()  # 8 / total_steps
 
     # ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
     reasoning_result = None
     try:
-        reasoning_result = await run_reasoning(entry)
+        reasoning_result = await run_reasoning(entry) # Always runs for receipt view
     except Exception as e:
         logger.exception("Reasoning pipeline failed; continuing without it.")
 
@@ -274,6 +273,10 @@ async def process_entry_async(
 
     # 2. Inject the ephemeral reasoning results solely for the in-memory runtime cache
     formatted_entry["reasoning"] = reasoning_result
+
+    # For who do not choose to opt-in into saving their entry into our system,
+    # Attach raw vector temporarily for fallback similarity matching
+    formatted_entry["_tmp_embedding"] = doc_embedding
 
     # 3. Return the exact 2-tuple the background routing expects
     return formatted_entry, delete_token
