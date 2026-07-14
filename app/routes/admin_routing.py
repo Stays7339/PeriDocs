@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-07-13T17:59-04:00
+# save-state 2026-07-14T15:43-04:00
 # ==========================================
 import os
 import json
@@ -120,53 +120,32 @@ async def reject_precentroid(payload: RejectPrecentroidPayload):
     )
     return {"status": "ok"}
 
-
-
-
-
 # -----------------------------
 # Entry Safe Text Fetch (async + caching)
 # -----------------------------
-ENTRIES_FILE = os.path.join("data", "entries", "entries.json")
 ENTRIES_INDEX: List[Dict] = []
 
 
 async def load_entries_index() -> List[Dict]:
     """
-    Async load all entries from JSON file into memory.
-    Returns list of dicts (entries).
+    Reads directly from the active in-memory runtime engine authority managed
+    by the public mapping_runtime orchestrator alias namespace.
     """
     global ENTRIES_INDEX
-    if ENTRIES_INDEX:
+    try:
+        from core.map.mapping_runtime import entry_runtime, is_initialized, initialize_runtime
+        
+        if not is_initialized():
+            logger.info("Mapping runtime not initialized yet. Running orchestrator boot flow...")
+            await initialize_runtime()
+            
+        # Synchronize the module-level variable for any external imports
+        ENTRIES_INDEX = entry_runtime.get_all_entries()
         return ENTRIES_INDEX
-
-    from core.mode_lock import SystemModeLock
-    
-    if SystemModeLock.resolve_operational_mode() == "DATABASE":
-        try:
-            from core.database import db_engine
-            async with db_engine.pool.connection() as conn:
-                rows = await conn.execute("SELECT * FROM content.entries")
-                entries = []
-                async for row in rows:
-                    # Convert row to dictionary/dict-like structure
-                    entries.append(dict(row)) 
-                ENTRIES_INDEX = entries
-        except Exception as e:
-            logger.error(f"Failed to load entries from Database: {e}")
-            ENTRIES_INDEX = []
-    else:
-        try:
-            loop = asyncio.get_event_loop()
-            data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
-            if isinstance(data, list):
-                ENTRIES_INDEX = data
-            else:
-                ENTRIES_INDEX = []
-        except Exception:
-            ENTRIES_INDEX = []
-
-    return ENTRIES_INDEX
+        
+    except Exception as runtime_err:
+        logger.error(f"Failed to pull live state from EntryWritingRuntime authority: {runtime_err}")
+        return ENTRIES_INDEX  # Returns the last known populated state safely
 
 
 async def find_entry_by_id(entry_id: str) -> Dict:
