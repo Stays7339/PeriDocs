@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-06-11T15:22-04:00
+# Save-state: 2026-07-14T07:36-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -359,3 +359,33 @@ async def reconcile_centroid_membership_after_approval(
         await entry_runtime.request_flush()
     else:
         logger.debug("[reconcile] no-op (no matching precentroid entries)")
+
+
+async def match_embedding_ephemerally(doc_embedding: np.ndarray) -> list[tuple[str, float, int]]:
+    """
+    Scores a temporary document embedding against all existing active centroids in memory.
+    Returns a list of 3-tuples: (centroid_id, similarity, event_index)
+    Bypasses state mutations, member array appends, and disk flushes completely.
+    """
+    matches = []
+    
+    # Safely iterate through the authoritative in-memory centroids
+    for centroid_id, centroid in centroid_system._centroids.items():
+        try:
+            # Resolve the active state tracking layout (maps to centroid_states table)
+            active_state = centroid.current
+            centroid_embedding = active_state.vector
+            event_index = active_state.event_index
+        except (RuntimeError, AttributeError):
+            # Fallback handle if a centroid is temporarily initialized without states
+            continue
+
+        if centroid_embedding is not None:
+            # Compute cosine similarity between the ephemeral text and the cluster center
+            sim = cosine_similarity(doc_embedding, centroid_embedding)
+            
+            # Check against your global MINIMUM_SIMILARITY_THRESHOLD
+            if sim >= MINIMUM_SIMILARITY_THRESHOLD:
+                matches.append((centroid_id, float(sim), event_index))
+                
+    return matches

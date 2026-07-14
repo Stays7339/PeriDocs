@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-07-13T20:21-04:00
+# save-state 2026-07-13T23:19-04:00
 # ==========================================
 
 
@@ -224,16 +224,37 @@ async def process_entry_async(
                 })
             entry["centroids"] = centroid_links
     else:
-        entry["centroids"] = [] # Ephemeral submission is unlinked
+        # Ephemeral Pathway: Read-only match using the raw doc_embedding calculated earlier.
+        # This populates the context structure bidirectionally without permanent links.
+        applied = await entry_membership_sequencer.match_embedding_ephemerally(doc_embedding)
+
+        if applied:
+            applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+            centroid_links = []
+            for cid, similarity, event_index in applied_sorted:
+                centroid_links.append({
+                    "centroid_id": cid,
+                    "similarity": similarity,
+                    "event_index": event_index
+                })
+            entry["centroids"] = centroid_links
+        else:
+            entry["centroids"] = [] # Bypassed cleanly if no threshold is met
 
     report_progress()  # 8 / total_steps
-
-    # ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
+# ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
     reasoning_result = None
     try:
-        reasoning_result = await run_reasoning(entry) # Always runs for receipt view
+        # Opt-in (True): run_reasoning reads normally via database / runtime caches using entry_id
+        # Opt-out (False): run_reasoning reads the _tmp fallback properties attached above
+        reasoning_result = await run_reasoning(entry)
     except Exception as e:
         logger.exception("Reasoning pipeline failed; continuing without it.")
+    finally:
+        # Memory Hygiene: Drop large numpy references immediately after reasoning finishes
+        if not opt_in:
+            entry.pop("_tmp_window_embeddings", None)
+            entry.pop("_tmp_window_text", None)
 
     report_progress()  # 9 / total_steps
 
