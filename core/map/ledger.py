@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/ledger.py
-# Save-state: 2026-04-19T14:38:27-04:00
+# Save-state: 2026-07-10T14:54-04:00
 # ==========================================
 
 """
@@ -14,12 +14,16 @@ Sole authority for:
 """
 
 import os
+import copy
 import json
 import logging
 import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from pathlib import Path
+
+from core.database import DATABASE_MODE, db_pool
+from database_management.storage_engines.postgres_engine import PostgresStorageEngine
 
 
 DATA_DIR = Path(os.getenv("PERIDOCS_DATA_DIR", "data"))
@@ -41,20 +45,40 @@ def _initial_ledger() -> Dict[str, Any]:
 
 async def _load() -> Dict[str, Any]:
     """
-    Load ledger.json from disk.
-    If missing:
-        - Prompt human if centroids exist in STATE_DIR.
-        - If user agrees, create initial ledger.
-        - If user declines, raise RuntimeError.
+    Load ledger data from the database or fall back to ledger.json from disk.
     """
     global _ledger_cache
     if _ledger_cache is not None:
         return _ledger_cache
+    # --------------------------------------------------------
+    # ONLINE MODE INTERCEPTION
+    # --------------------------------------------------------
+    from core.mode_lock import SystemModeLock
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        try:
+            # Import the parent module itself rather than copying the engine variable pointer
+            import core.database
+            
+            if core.database.db_engine is None:
+                raise RuntimeError(
+                    "[ledger_init] core.database.db_engine is uninitialized. "
+                    "Ensure the database startup lifecycle runs before ledger rehydration."
+                )
 
+            _ledger_cache = await core.database.db_engine.load_ledger_bundle()
+            logger.info("[ledger_init] Authoritative database ledger rehydrated into cache.")
+            return _ledger_cache
+        except Exception as db_err:
+            logger.error("[ledger_init] Database rehydration crashed: %s", db_err)
+            if SystemModeLock.is_lock_file_present_on_disk():
+                raise db_err 
+            logger.warning("[ledger_init] System unburned. Falling back to parsing ledger.json on disk.")
+    # --------------------------------------------------------
+    # ORIGINAL LOCAL STORAGE FALLBACK PIPELINE (Unchanged)
+    # --------------------------------------------------------
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
     if not os.path.exists(LEDGER_PATH):
-        # Check if centroids exist on disk
         centroids_exist = any(
             fname.endswith("_summary.json") for fname in os.listdir(os.path.join(DATA_DIR, "centroids"))
         )
@@ -63,7 +87,7 @@ async def _load() -> Dict[str, Any]:
             raise RuntimeError("Startup aborted: ledger.json missing while centroids exist")
 
         _ledger_cache = _initial_ledger()
-        await _save(_ledger_cache)  # safe write to disk
+        await _save(_ledger_cache)
     else:
         with open(LEDGER_PATH, "r", encoding="utf-8") as f:
             _ledger_cache = json.load(f)
@@ -72,6 +96,21 @@ async def _load() -> Dict[str, Any]:
 
 
 async def _save(state: Dict[str, Any]) -> None:
+    """
+    Saves the state payload back to the current active storage engine layer.
+    """
+    # --------------------------------------------------------
+    # ONLINE MODE INTERCEPTION
+    # --------------------------------------------------------
+    from core.mode_lock import SystemModeLock
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        from core.database import db_engine
+        await db_engine.save_ledger_bundle(state)
+        return
+
+    # --------------------------------------------------------
+    # ORIGINAL LOCAL STORAGE FALLBACK PIPELINE (Unchanged)
+    # --------------------------------------------------------
     tmp = LEDGER_PATH.with_suffix(LEDGER_PATH.suffix + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2, sort_keys=True)
@@ -237,7 +276,7 @@ class IdentifierLedger:
 
     async def snapshot(self) -> Dict[str, Any]:
         async with _ledger_lock:
-            return json.loads(json.dumps(await _load()))
+            return copy.deepcopy(await _load())
 
     async def is_loaded(self) -> bool:
         return _ledger_cache is not None

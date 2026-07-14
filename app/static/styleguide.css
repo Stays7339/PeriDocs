@@ -1,0 +1,72 @@
+/* 
+PeriDocs/app/static/styleguide.css
+save-state 2026-05-05T12:58:15-04:00
+*/
+
+:root {
+  --brandcarbon-blackcarbon-black-001: rgba(109, 109, 109, 1);
+  --brandcarbon-blackcarbon-black-002: rgba(93, 93, 93, 1);
+  --brandcarbon-blackcarbon-black-003: rgba(77, 77, 77, 1);
+  --brandcarbon-blackcarbon-black-004: rgba(44, 44, 44, 1);
+  --brandcarbon-blackcarbon-black-005: rgba(27, 27, 27, 1);
+  --brandcarbon-blackcarbon-black-006: rgba(20, 20, 20, 1);
+  --brandmauve-shadowmauve-shadow-001: rgba(143, 95, 120, 1);
+  --brandmauve-shadowmauve-shadow-002: rgba(128, 85, 107, 1);
+  --brandmauve-shadowmauve-shadow-003: rgba(113, 75, 95, 1);
+  --brandmauve-shadowmauve-shadow-004: rgba(97, 64, 81, 1);
+  --brandmauve-shadowmauve-shadow-005: rgba(84, 56, 70, 1);
+  --brandmauve-shadowmauve-shadow-006: rgba(70, 47, 59, 1);
+  --brandmauve-shadowmauve-shadow-007: rgba(56, 37, 47, 1);
+  --brandmauve-shadowmauve-shadow-008: rgba(49, 33, 41, 1);
+  --brandeggshelleggshell-001: rgba(245, 243, 237, 1);
+  --brandeggshelleggshell-002: rgba(235, 230, 219, 1);
+  --brandeggshelleggshell-003: rgba(225, 218, 201, 1);
+  --brandeggshelleggshell-004: rgba(215, 206, 183, 1);
+  --brandeggshelleggshell-005: rgba(205, 193, 165, 1);
+  --branddusty-olivedusty-olive-001: rgba(182, 193, 169, 1);
+  --branddusty-olivedusty-olive-002: rgba(172, 184, 157, 1);
+  --branddusty-olivedusty-olive-003: rgba(151, 166, 132, 1);
+  --branddusty-olivedusty-olive-004: rgba(120, 136, 99, 1);
+  --branddusty-olivedusty-olive-005: rgba(108, 124, 89, 1);
+  --branddusty-olivedusty-olive-006: rgba(93, 106, 77, 1); /* menu bar color */
+  --branddusty-olivedusty-olive-006-translucent: rgba(93, 106, 77, 0.3); /* header background color */
+  --branddusty-olivedusty-olive-007: rgba(78, 89, 64, 1);
+  --branddusty-olivedusty-olive-008: rgba(70, 80, 58, 1);
+  --branddusty-olivedusty-olive-009: rgba(54, 62, 45, 1);
+  --brandbright-periwinklebright-periwinkle-001: rgba(233, 233, 255, 1);
+  --brandbright-periwinklebright-periwinkle-002: rgba(219, 219, 255, 1);
+  --brandbright-periwinklebright-periwinkle-003: rgba(204, 204, 255, 1);
+  --brandbright-periwinklebright-periwinkle-004: rgba(171, 171, 255, 1);
+  --brandbright-periwinklebright-periwinkle-005: rgba(153, 153, 255, 1);
+  --brandbright-periwinklebright-periwinkle-006: rgba(138, 138, 255, 1);
+  --brandmuted-periwinklemuted-periwinkle-001: rgba(209, 209, 228, 1);
+  --brandmuted-periwinklemuted-periwinkle-002: rgba(169, 169, 204, 1);
+  --brandmuted-periwinklemuted-periwinkle-003: rgba(129, 129, 180, 1);
+  --brandmuted-periwinklemuted-periwinkle-004: rgba(109, 109, 164, 1);
+  --brandmuted-periwinklemuted-periwinkle-005: rgba(92, 92, 153, 1); /* Action Button */
+  --brandmuted-periwinklemuted-periwinkle-006: rgba(75, 75, 102, 1);
+
+  /* {font weight} {font size}/{line height} {italics (oblique) / normal} */
+  --styles-bodyxl: 500 18px/160% normal;
+  --styles-bodyxl-letter-spacing: 0.54px;
+
+  --variable-collection-height: 20px;
+  --variable-collection-number: 0px;
+  --variable-collection-width: var(--variable-collection-height);
+  --variable-collection-sizing-logo-size: 24px;
+  --variable-collection-sizing-logo-frame: 44px;
+  --variable-collection-sizing-desktop-width: 1440px;
+  --variable-collection-brand-overlays-mauve-shadow-overlay-001: rgba(
+    84,
+    56,
+    70,
+    0.75
+  );
+  --variable-collection-secondary-button-color: rgba(75, 75, 102, 1);
+  --variable-collection-primary-button-color: rgba(109, 109, 164, 1);
+  --variable-collection-carbon-black-001: rgb(0, 0, 0);
+
+
+
+  --box-shadow-typical: 0px 4px 4px #00000080;
+}

@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/embeddings.py
-# save-state updated 2026-04-05T14:01:45-04:00
+# save-state updated 2026-06-01T16:01:20-04:00
 # ------------------------------------------
 
 from __future__ import annotations

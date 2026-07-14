@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/centroids.py
-# Save-state: 2026-04-29T02:55:20-04:00
+# Save-state: 2026-07-13T15:53-04:00
 # ==========================================
 
 import os
@@ -10,6 +10,7 @@ import asyncio
 import functools
 import logging
 import re
+import sys
 from datetime import datetime, timezone
 from typing import Dict, List
 import numpy as np
@@ -248,6 +249,17 @@ class CentroidSystem:
 
         await self._assert_ledger_ready()
 
+        # ============================================================
+        # CONTEXT-AWARE MODE ADAPTION
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            logger.info(
+                "[CentroidSystem] Database mode active. In-memory state safely rehydrated "
+                "from relational schemas. Bypassing flat-file disk validation."
+            )
+            return  # Authoritative DB states exist; bypass legacy shard file checks
+
         missing_files = []
         invalid_vectors = []
         empty_states = []
@@ -417,6 +429,52 @@ class CentroidSystem:
         if not hasattr(self, "entry_runtime") or self.entry_runtime is None:
             raise RuntimeError("CentroidSystem missing entry_runtime dependency during load_state")
         await self._assert_ledger_ready()
+
+        # ============================================================
+        # INTERCEPTION BOUNDARY: Online Cluster Rehydration
+        # ============================================================
+        from core.mode_lock import SystemModeLock
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            try:
+                from core.database import db_engine
+                raw_centroids = await db_engine.load_centroids_bundle()
+                
+                async with self._lock:
+                    self._centroids.clear()
+                    
+                    for cid, c_data in raw_centroids.items():
+                        c = Centroid(c_data["centroid_id"])
+                        await self._check_if_identifier_is_consistent_with_ledger(c.centroid_id)
+                        c.title_from_human_moderator = c_data["title_from_human_moderator"]
+                        c.description_from_human_moderator = c_data["description_from_human_moderator"]
+                        
+                        # Reconstruct chronological state history array objects
+                        for ev_idx in sorted(c_data["states"].keys()):
+                            s_data = c_data["states"][ev_idx]
+                            
+                            # Enforce event index sequence order
+                            self._assert_event_order(c, s_data["event_index"])
+                            
+                            centroid_state = CentroidState(
+                                event_index=s_data["event_index"],
+                                entry_ids=s_data["entry_ids"],
+                                vector=s_data["vector"],
+                                metadata=s_data["metadata"]
+                            )
+                            c.states.append(centroid_state)
+                            
+                        self._centroids[c.centroid_id] = c
+                        logger.debug("[load_state] Loaded centroid %s from DB with %d states", c.centroid_id, len(c.states))
+                
+                logger.info("[CentroidSystem] Online knowledge base rehydration complete.")
+                return # Exit early, avoiding disk file parsing loop
+                
+            except Exception as db_err:
+                logger.error("[CentroidSystem] Database cluster bootstrap failed: %s", db_err)
+                if SystemModeLock.is_lock_file_present_on_disk():
+                    raise db_err
+                logger.warning("[CentroidSystem] Falling back to scanning local centroid directories.")
+                
         async with self._lock:
             self._centroids.clear()
             if not os.path.isdir(STATE_DIR):
@@ -522,58 +580,112 @@ class CentroidSystem:
                 self._centroids[c.centroid_id] = c
                 logger.info("[load_state] Loaded centroid %s with %d states", c.centroid_id, len(c.states))
 
+    async def persist_centroid_data(self, centroid: Centroid, old_centroid_id: str | None = None) -> None:
+            os.makedirs(STATE_DIR, exist_ok=True)
 
-    async def persist_centroid_data(self, centroid: Centroid) -> None:
-        os.makedirs(STATE_DIR, exist_ok=True)
+            npz_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}.npz")
+            json_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}_summary.json")
+            tmp_npz = npz_path.replace(".npz", ".tmp.npz")
+            tmp_json = json_path + ".tmp"
 
-        npz_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}.npz")
-        json_path = os.path.join(STATE_DIR, f"{centroid.centroid_id}_summary.json")
-        tmp_npz = npz_path.replace(".npz", ".tmp.npz")
-        tmp_json = json_path + ".tmp"
+            # ============================================================
+            # STEP 1: RESOLVE THE OPERATIONAL MODE
+            # ============================================================
+            from core.mode_lock import SystemModeLock
+            operational_mode = SystemModeLock.resolve_operational_mode()
 
-        # Only store one vector per state (mean/cached)
-        npz_dump = {}
-        for state_idx, state in enumerate(centroid.states):
-            if state.vector is None or not isinstance(state.vector, np.ndarray):
-                raise RuntimeError("[persist_centroid_data] State %d in %s has invalid vector", state_idx, centroid.centroid_id)
-            else:
-                state_vector = state.vector
+            if operational_mode == "DATABASE":
+                try:
+                    logger.debug("[CENTROID PERSIST] Routing centroid %s to database engine...", centroid.centroid_id)
+                    
+                    # --------------------------------------------------------
+                    # RELATIONAL IDENTITY MIGRATION HOOK
+                    # --------------------------------------------------------
+                    if old_centroid_id and old_centroid_id != centroid.centroid_id:
+                        from core.database import db_engine
+                        logger.info(
+                            "[CENTROID PERSIST] Renaming primary identifier from %s to %s to fire cascade rules.",
+                            old_centroid_id,
+                            centroid.centroid_id
+                        )
+                        await db_engine.update_centroid_identifier(old_id=old_centroid_id, new_id=centroid.centroid_id)
 
-            # Use single key per state
-            key = f"{centroid.centroid_id}_state{state_idx}" 
-            npz_dump[key] = state_vector 
+                    # Extract payloads using your existing validation logic
+                    summary_payload = centroid.serialize()
+                    npz_dump = {}
+                    for state_idx, state in enumerate(centroid.states):
+                        if state.vector is None or not isinstance(state.vector, np.ndarray):
+                            raise RuntimeError(f"State {state_idx} in {centroid.centroid_id} has invalid vector")
+                        npz_dump[f"{centroid.centroid_id}_state{state_idx}"] = state.vector
 
-        if not npz_dump:
-            raise RuntimeError ("[persist_centroid_data] Centroid %s has no valid vectors", centroid.centroid_id)
+                    # --------------------------------------------------------
+                    # INTERFACE BOUNDARY: The Centroid Database Handshake (ACTIVE)
+                    # --------------------------------------------------------
+                    from core.database import db_engine
+                    
+                    await db_engine.save_centroid_bundle(
+                        centroid_id=centroid.centroid_id,
+                        summary_payload=summary_payload,
+                        npz_dump=npz_dump
+                    )
+                    # --------------------------------------------------------
+                    
+                    SystemModeLock.lock_mode_permanently() # Safe, idempotent fuse burn
+                    logger.debug("[CENTROID PERSIST] Centroid %s successfully committed to database.", centroid.centroid_id)
+                    return # Exit early, avoiding creation of local .json and .npz files
 
-        # --- Save NPZ safely ---
-        try:
-            np.savez_compressed(tmp_npz, **npz_dump)
-            if not os.path.exists(tmp_npz):
-                raise RuntimeError(f"NPZ tmp file {tmp_npz} was not created!")
-            os.replace(tmp_npz, npz_path)
-            logger.debug("[persist_centroid_data] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
-        except Exception as e:
-            logger.error("[persist_centroid_data] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
-            raise
+                except Exception as db_err:
+                    logger.error("[CENTROID PERSIST] Failed to save centroid %s to DB: %s", centroid.centroid_id, db_err)
+                    if SystemModeLock.is_lock_file_present_on_disk():
+                        raise db_err # Refuse to write to local disk if we are a confirmed database app
+                    logger.warning("[CENTROID PERSIST] Falling back to generating local files for centroid %s", centroid.centroid_id)
 
-        # --- JSON summary ---
-        summary_payload = centroid.serialize()
-        for s_idx, s in enumerate(summary_payload["states"]):
-            s["metadata"] = dict(s.get("metadata", {}))
-            s["vector"] = f"{npz_path} (state_index={s_idx})"  # persist NPZ path instead of per-entry vector
+            # ============================================================
+            # STEP 2: ORIGINAL LOCAL STORAGE PIPELINE (100% UNCHANGED)
+            # ============================================================
+            # Only store one vector per state (mean/cached)
+            npz_dump = {}
+            for state_idx, state in enumerate(centroid.states):
+                if state.vector is None or not isinstance(state.vector, np.ndarray):
+                    raise RuntimeError("[persist_centroid_data] State %d in %s has invalid vector", state_idx, centroid.centroid_id)
+                else:
+                    state_vector = state.vector
 
-        try:
-            with open(tmp_json, "w", encoding="utf-8") as f:
-                json.dump(summary_payload, f, indent=2)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp_json, json_path)
-            logger.debug("[persist_centroid_data] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
-        except Exception as e:
-            logger.error("[persist_centroid_data] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
-            raise
-            
+                # Use single key per state
+                key = f"{centroid.centroid_id}_state{state_idx}" 
+                npz_dump[key] = state_vector 
+
+            if not npz_dump:
+                raise RuntimeError ("[persist_centroid_data] Centroid %s has no valid vectors", centroid.centroid_id)
+
+            # --- Save NPZ safely ---
+            try:
+                np.savez_compressed(tmp_npz, **npz_dump)
+                if not os.path.exists(tmp_npz):
+                    raise RuntimeError(f"NPZ tmp file {tmp_npz} was not created!")
+                os.replace(tmp_npz, npz_path)
+                logger.debug("[persist_centroid_data] Saved NPZ for centroid %s at %s", centroid.centroid_id, npz_path)
+            except Exception as e:
+                logger.error("[persist_centroid_data] Failed to save NPZ for centroid %s: %s", centroid.centroid_id, e)
+                raise
+
+            # --- JSON summary ---
+            summary_payload = centroid.serialize()
+            for s_idx, s in enumerate(summary_payload["states"]):
+                s["metadata"] = dict(s.get("metadata", {}))
+                s["vector"] = f"{npz_path} (state_index={s_idx})"  # persist NPZ path instead of per-entry vector
+
+            try:
+                with open(tmp_json, "w", encoding="utf-8") as f:
+                    json.dump(summary_payload, f, indent=2)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp_json, json_path)
+                logger.debug("[persist_centroid_data] Saved JSON summary for centroid %s at %s", centroid.centroid_id, json_path)
+            except Exception as e:
+                logger.error("[persist_centroid_data] Failed to save JSON summary for centroid %s: %s", centroid.centroid_id, e)
+                raise
+                
     async def create_precentroid(self, entry_ids: List[str]) -> str:
         """
         Yeild to suggest_precentroid_for_entry
@@ -581,8 +693,20 @@ class CentroidSystem:
         - Enforces SAAJE cannot exist yet
         - Adds default metadata for admin review
         """
-        from core.map.mapping_runtime import is_runtime_ready
-        if not is_runtime_ready():
+        import sys
+        import core.map.mapping_runtime as mr
+
+        logger.debug("RUNTIME STATE CHECK:")
+        logger.debug("_initialized = %s", mr._initialized)
+        logger.debug("_runtime_ready = %s", mr._runtime_ready)
+        logger.debug("_boot_in_progress = %s", mr._boot_in_progress)
+        logger.debug("CENTROID MODULE ID = %s", id(mr))
+        logger.debug("CENTROID READY (mr) = %s", mr.is_runtime_ready())
+        logger.debug("CENTROID READY (local import) = %s", mr.is_runtime_ready())
+        logger.debug("CENTROID sys.modules ID = %s", id(sys.modules["core.map.mapping_runtime"]))
+        
+
+        if not mr.is_runtime_ready():
             raise RuntimeError("CentroidSystem called before runtime is ready")
         logger.debug(f"[CREATE_PRECENTROID] Called with entry_ids={entry_ids}")
         await self._assert_ledger_ready()
@@ -696,7 +820,11 @@ class CentroidSystem:
             ))
 
             self._centroids[new_id] = c
-            await self.persist_centroid_data(c)
+            
+            # ------------------------------------------------------------
+            # PASS THE OLD ID CONTEXT DOWN TO THE REWRITE BRANCH
+            # ------------------------------------------------------------
+            await self.persist_centroid_data(c, old_centroid_id=precentroid_id)
 
             # ------------------------------------------------------------
             # reasoning_file projection (post-persistence, snapshot-only)
@@ -713,6 +841,33 @@ class CentroidSystem:
             await persist_reasoning_data(new_id, reasoning_file_turtle)
             # ------------------------------------------------------------
 
+            # ============================================================
+            # KNOWLEDGE BASE SYNCHRONIZATION BOUNDARY (DATABASE MODE)
+            # ============================================================
+            from core.mode_lock import SystemModeLock
+            if SystemModeLock.resolve_operational_mode() == "DATABASE":
+                try:
+                    from core.database import db_engine
+                    async with db_engine.pool.connection() as conn:
+                        # Normalize ID nomenclature to match flat-file parsing ("centroid:centroid_X")
+                        concept_urn_id = f"centroid:{new_id}"
+                        
+                        # Note: Swap '%s' for '$1, $2, $3' if your active driver is strictly asyncpg
+                        await conn.execute(
+                            """
+                            INSERT INTO kb.concepts (concept_id, label, description)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (concept_id) 
+                            DO UPDATE SET 
+                                label = EXCLUDED.label, 
+                                description = EXCLUDED.description;
+                            """,
+                            (concept_urn_id, title_from_human_moderator, description_from_human_moderator)
+                        )
+                    logger.info(f"[DATABASE] Relational concept sync complete for {concept_urn_id} inside kb.concepts.")
+                except Exception as db_err:
+                    logger.error(f"[DATABASE] Relational concept sync failed for {new_id}: {db_err}")
+
             logging.info("Reconcile entries metadata nomenclature start")
             # Reconcile entries.json with approved centroid
             from core.map.entry_membership_sequencer import reconcile_centroid_membership_after_approval
@@ -722,21 +877,28 @@ class CentroidSystem:
                 event_index=event_index,
                 summary_entries=[{"entry_id": eid} for eid in c.current.entry_ids]
             )
+            # ============================================================
+            # CONDITIONAL FLAT-FILE ARCHIVE CLEANUP
+            # ============================================================
+            from core.mode_lock import SystemModeLock
+            if SystemModeLock.resolve_operational_mode() != "DATABASE":
+                logging.info("Archive previous centroid type 'shed skin' start")
+                
+                # archive precentroid JSON safely
+                precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
+                try:
+                    os.remove(precentroid_path)
+                except FileNotFoundError:
+                    logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
 
-            logging.info("Archive previous centroid type 'shed skin' start")
-            # archive precentroid JSON safely
-            precentroid_path = os.path.join(STATE_DIR, f"{precentroid_id}_summary.json")
-            try:
-                os.remove(precentroid_path)
-            except FileNotFoundError:
-                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
-
-            # archive precentroid JSON safely
-            precentroid_path_for_npz = os.path.join(STATE_DIR, f"{precentroid_id}.npz")
-            try:
-                os.remove(precentroid_path_for_npz)
-            except FileNotFoundError:
-                logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
+                # archive precentroid NPZ safely
+                precentroid_path_for_npz = os.path.join(STATE_DIR, f"{precentroid_id}.npz")
+                try:
+                    os.remove(precentroid_path_for_npz)
+                except FileNotFoundError:
+                    logging.warning("File for shed precentroid could not be found, so deletion didn't take place.")
+            else:
+                logging.debug("[CENTROID APPROVE] Skipping flat-file archival cleanup; operational mode is DATABASE.")
 
             return new_id
 

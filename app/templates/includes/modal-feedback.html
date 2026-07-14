@@ -1,9 +1,15 @@
-{# PeriDocs-code/app/templates/includes/modal-feedback.html — save-state 202512241713 #}
+{# PeriDocs-code/app/templates/includes/modal-feedback.html — save-state 2026-05-27T13:40:15-04:00 #}
 <!-- feedback modal include -->
-<div id="feedback-modal" class="feedback-modal" role="dialog" aria-modal="true" aria-labelledby="feedback-heading">
+<div
+  id="feedback-modal"
+  class="modal feedback-modal"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="feedback-heading"
+>
   <div class="feedback-modal-content">
     <h2 id="feedback-heading">Send feedback</h2>
-    <form id="feedback-form" action="/feedback" method="POST" onsubmit="return false;">
+    <form id="feedback-form" action="/feedback" method="POST">
       <textarea 
         name="feedback_text" 
         placeholder="Let us know what worked or what went wrong..."
@@ -19,45 +25,3 @@
     </form>
   </div>
 </div>
-
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const form = document.getElementById("feedback-form");
-  if (!form) return;
-
-  form.setAttribute("novalidate", "true");
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const textarea = form.querySelector("textarea[name='feedback_text']");
-    if (!textarea) return;
-
-    const feedbackText = textarea.value.trim();
-    if (!feedbackText) return;
-
-    const payload = {
-      feedback_text: feedbackText,
-      type: "feedback"  // match server expectations
-    };
-
-    try {
-      await fetch("/feedback", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    } catch (err) {
-      console.error("Feedback submission error:", err);
-    }
-
-    form.reset();
-  });
-
-  // Cancel button closes modal
-  const cancelBtn = document.getElementById("cancel-feedback");
-  cancelBtn.addEventListener("click", () => {
-    const modal = document.getElementById("feedback-modal");
-    modal.style.display = "none";
-  });
-});
-</script>

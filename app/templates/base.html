@@ -1,53 +1,122 @@
-<!-- PeriDocs-code/app/templates/base.html save-state 2026-04-24T12:06:00-04:00 -->
+<!--
+PeriDocs/app/templates/base.html
+save-state 2026-07-14T08:10-04:00
+-->
+
 <!doctype html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="icon" href="/static/peridocs-logo-v2.png" type="image/png">
+  <link rel="preload" as="image" href="/static/peridocs-wordmark-and-logo-v2.png">
+  <link rel="preload" as="image" href="/static/museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
   <title>{% block title %}PeriDocs{% endblock %}</title>
-  <link rel="stylesheet" href="/static/style.css">
-  <link rel="stylesheet" href="/static/admin-typeahead.css">
+
+  <!-- Global styles (must be loaded first) -->
+  <link rel="stylesheet" href="/static/globals.css" />
+  <link rel="stylesheet" href="/static/styleguide.css" />
+  <link rel="stylesheet" href="/static/stylesheet.css" />
+  <link rel="stylesheet" href="/static/custom-styled-text-field.css" />
 </head>
 
-<body>
-  <header class="header-bar">
-    <a href="/" class="brand-link">
-      <img src="/static/peridocs-wordmark-and-logo-202602261328.png"
-          alt="PeriDocs logo"
-          class="brand-logo">
-    </a>
 
-    <p>v0.2.0</p>
 
-    <nav class="header-menu">
-      <a class="btn primary" href="/">Home</a>
-      <a class="btn primary" href="/about">About & Contact</a>
-      <a class="btn primary" href="/terms-of-service">Terms of Service</a>
-      <a class="btn primary" href="/privacy-policy">Privacy Policy</a>
-      <a class="btn primary" href="/delete">Deletion</a>
-      <a class="btn primary" href="https://donate.stripe.com/dRmbJ2fdH94MckI9Mhe7m00">Donation</a>
+<body data-prevent-new-entries="{{ 'true' if PreventNewEntries else 'false' }}">
+
+  <!-- ADDED: mobile menu overlay -->
+<div class="mobile-menu-overlay" id="mobileMenuOverlay">
+  <nav class="mobile-menu-panel" aria-label="Mobile navigation">
+    <!-- we reuse the SAME menu HTML via JS clone -->
+  </nav>
+</div>
+
+<!-- required for peridocs-misc-ux.js toast system -->
+<div id="general-toast-container"></div>
+<div id="privacy-toast"></div>
+  <!-- =========================
+       HEADER (fixed, translucent, always present)
+  ========================== -->
+  <header>
+
+    <!-- LEFT: LOGO -->
+    <div class="header-left">
+      <a class="header-logo" href="/">
+        <img src="/static/peridocs-wordmark-and-logo-v2.png" alt="PeriDocs Logo" height="40"/>
+      </a>
+
+      <p class="header-version">v0.3.0</p>
+    </div>
+
+    <!-- CENTER: MENU BAR -->
+    <nav class="header-center" aria-label="Primary navigation">
+        <div class="header-center-inner">
+
+      <div class="menu-group-left">
+        <a class="menu-button" href="/about">About</a>
+        <a class="menu-button" href="https://github.com/Stays7339/PeriDocs" target="_blank" rel="noopener noreferrer">Open Source</a>
+        <a class="menu-button" href="/terms-of-service">Terms of Service</a>
+        </div>
+
+    <div class="header-center-spine"></div>
+
+      <div class="menu-group-right">
+        <a class="menu-button" href="/privacy-policy">Privacy Policy</a>
+        <a class="menu-button" href="/delete">Deletion</a>
+        <a class="menu-button" href="/#donate">Donate to PeriDocs</a>
+      </div>
+
+      </div>
+
     </nav>
 
-    <button id="menu-toggle-btn" class="btn primary" aria-label="Toggle menu">☰</button>
+    <!-- RIGHT: ACTION AREA -->
+<div class="header-right">
+
+  <button class="header-hamburger-button" aria-label="Menu">
+    <span class="header-hamburger-icon">☰</span>
+  </button>
+
+  <div class="header-action-group">
+
+    <a class="header-action-button" href="/account" aria-label="Account">
+      <img src="/static/user-icon.svg" alt="" />
+    </a>
+
+    <a class="header-action-button" href="/create-entry" aria-label="Create Entry">
+      <img src="/static/fi-rr-search-alt.svg" alt="" />
+    </a>
+
+  </div>
+
+</div>
+
   </header>
 
 
-  <div class="wrap {% block layout %}layout-single{% endblock %}">
-  {% block content %}{% endblock %}
-  </div>
-
-  <button id="theme-toggle-btn" aria-label="Toggle theme" class="btn primary">Dark Mode</button>
-  <button id="feedback-btn" aria-label="Give feedback" class="btn primary">Feedback</button>
+  <!-- =========================
+       PAGE CONTENT SLOT
+       (sits under fixed translucent header)
+  ========================== -->
+  <main class="page-content">
+    {% block content %}{% endblock %}
+  </main>
 
   {% include 'includes/modal-feedback.html' %}
   {% include 'includes/modal-crisis.html' %}
 
-  <div id="general-toast-container"></div>
-  <div id="privacy-toast"></div>
+<!-- brings in existing UI system-->
+<script src="/static/base-html-responsiveness.js"></script>
+<script src="/static/toast-ui.js"></script>
+<script src="/static/modal-ui.js"></script>
+<script src="/static/peridocs-misc-ux.js"></script>
+<script src="/static/feedback-ui.js"></script>
+<script src="/static/entry-frontend.js"></script>
+<script src="/static/donation-ui.js"></script>
+<script src="/static/account_authentication.js"></script>
+<script src="/static/persistence-opt-in.js"></script>
 
-  <script src="/static/peridocs-ui.js" defer></script>
 
-  <canvas id="snow-canvas" style="position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:10000;display:none;"></canvas>
+  {% block page_scripts %}{% endblock %}
 </body>
 </html>

@@ -1,0 +1,511 @@
+# ==========================================
+# app/routes/submission_routing.py
+# save-state 2026-07-13T22:28-04:00
+# ==========================================
+from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.templating import Jinja2Templates
+from pathlib import Path
+from glob import glob
+import json
+import numpy as np
+import asyncio
+import hashlib
+import os
+import regex
+import logging
+
+from app.routes import app
+from core.entry_orchestrator.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
+from app.helpers.json_safe import json_safe
+from core.nlp.process_entry import process_entry_async
+from core.map.deletion import DeletionManager
+from core.map.mapping_runtime import ledger, centroid_system , entry_runtime
+
+
+
+
+templates = Jinja2Templates(directory="app/templates")
+
+logger = logging.getLogger(__name__)
+
+
+
+
+# ---------------- In-memory progress tracker ----------------
+progress_dict: dict[str, float] = {}  # key: entry_id, value: 0.0-1.0
+
+# ---------------- Temp ID → real entry_id mapping ----------------
+temp_to_real_entry_id: dict[str, str] = {}  # key: temp_id, value: real entry_id
+
+# ---------------- In-memory delete token store ----------------
+delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_token
+
+# ---------------- Active WebSocket connections ----------------
+active_ws_connections: dict[str, WebSocket] = {}
+
+# ---------------- Storage block for unpersisted transient submissions ----------------
+ephemeral_entries: dict[str, dict] = {}
+
+async def process_entry_background(
+    entry_text: str, 
+    user_ip: str, 
+    entry_id: str,  
+    user_id: str | None = None,
+    opt_in: bool = False # <--- Pass flag down from endpoint
+):
+    logger.debug(
+        "[BACKGROUND] user_id=%r",
+        user_id
+    )
+
+    logger.debug(
+        "[PROCESS_ENTRY_ASYNC] user_id=%r",
+        user_id
+    )
+    
+    # ---------------- Wrap progress callback per entry_id ----------------
+    def wrapped_progress(fraction: float):
+        progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
+
+    # Pass opt_in down to NLP module
+    entry, delete_token = await process_entry_async(
+        entry_text,
+        user_ip=user_ip,
+        user_id=user_id,
+        progress_callback=wrapped_progress,
+        opt_in=opt_in
+    )
+
+    real_entry_id = entry["entry_id"]
+
+    # Target Fix: Conditionally save data based on opt-in request
+    if opt_in:
+        await entry_runtime.append_entry(entry)
+        delete_tokens_memory[real_entry_id] = delete_token
+
+        # Wrap the directory setup and flush request safely inside the opt_in check
+        os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
+        await entry_runtime.request_flush() 
+    else:
+        # Cache memory references directly to handle UI responses without writes
+        ephemeral_entries[real_entry_id] = entry
+        delete_tokens_memory[real_entry_id] = None  # Ephemeral records don't track deletion tokens
+
+    # ---------------- Option A: push crisis immediately ----------------
+    if entry.get("crisis_flag"):
+        ws = active_ws_connections.get(entry_id)
+        if ws:
+            try:
+                await ws.send_json({
+                    "type": "crisis",
+                    "crisis_flag": True,
+                    "real_id": entry["entry_id"]
+                })
+            except WebSocketDisconnect:
+                pass
+
+    # ---------------- Map temp ID → real entry_id ----------------
+    temp_to_real_entry_id[entry_id] = entry["entry_id"]
+
+
+    logger.info("Entries in memory: %d", len(entry_runtime.get_all_entries()))
+    
+
+    # by using request_flush, rather than anything else, 
+    # all prior mutations are applied before the flush actualy happens.
+    # this is to try to make it so that flushes are always up-to-date when they're completed.
+    # it also helps to avoid multiple direct flush actions from multiple requests from multiple users,
+    # which could result in corrupted data; that would be bad since we're prioritizing auditability.
+
+    # ---------------- Mark progress as complete ----------------
+    progress_dict[entry_id] = 1.0
+
+
+@app.middleware("http")
+async def debug_all_requests(request: Request, call_next):
+    response = await call_next(request)
+    return response
+
+# ---------- Submit entry ----------
+@app.post("/submit", response_class=HTMLResponse)
+async def submit_entry(
+    request: Request,
+    entry_text: str | None = Form(None),
+    opt_in: str | bool = Form(False), # Changed to accept raw string input from HTML
+    background_tasks: BackgroundTasks = None
+):
+    
+    # Detect JSON
+    if "application/json" in request.headers.get("content-type", ""):
+        data = await request.json()
+        entry_text = data.get("entry_text", "")
+        opt_in = data.get("opt_in", False)
+
+    # ============================================================
+    # STRING-TO-BOOLEAN SANITIZATION
+    # ============================================================
+    if isinstance(opt_in, str):
+        opt_in = opt_in.strip().lower() == "true"
+    else:
+        opt_in = bool(opt_in)
+    # ============================================================
+
+    if not entry_text:
+        return JSONResponse({"status": "error", "message": "No entry provided"}, status_code=400)
+
+    client_host = request.client.host if request.client else "127.0.0.1"
+    user_id = request.state.user_id
+    username = request.state.username
+
+    # generate temporary entry_id for progress tracking
+    temp_entry_id = f"pending_{np.random.randint(1_000_000, 9_999_999)}"
+    progress_dict[temp_entry_id] = 0.0  # ensure initial progress is 0
+
+    # ---------------- Start background processing ----------------
+    background_tasks.add_task(
+        process_entry_background, 
+        entry_text, 
+        client_host, 
+        temp_entry_id, 
+        user_id, 
+        opt_in
+    )
+
+    logger.debug(
+        "Submit function triggered for temp_id=%s user_id=%s",
+        temp_entry_id,
+        user_id
+    )
+
+    # Immediate response for the user (entry submitted toast)
+    return JSONResponse({
+        "status": "ok",
+        "entry_id": temp_entry_id
+    })
+
+# ---------- WebSocket for Progress Updates ----------
+@app.websocket("/ws/progress/{entry_id}")
+async def entry_progress_ws(websocket: WebSocket, entry_id: str):
+    await websocket.accept()
+    active_ws_connections[entry_id] = websocket
+    try:
+        crisis_triggered = False
+        while True:
+            await asyncio.sleep(0.5)
+            real_id = temp_to_real_entry_id.get(entry_id, entry_id)
+            progress = progress_dict.get(entry_id, 0.0)
+
+            # Fetch entry if needed (real_id for this specific circumstance)
+            entry = entry_runtime.get_entry_by_id(real_id)
+
+            if entry is None:
+                entry = ephemeral_entries.get(real_id) # Fallback to transient storage block
+
+            # Unify extraction so crisis flags are captured from both storage variants
+            crisis_flag = entry.get("crisis_flag") if entry else None
+
+            # --- MINIMAL OPTION A: push crisis immediately ---
+            if crisis_flag and not crisis_triggered:
+                crisis_triggered = True
+                try:
+                    await websocket.send_json({
+                        "type": "crisis",
+                        "crisis_flag": True,
+                        "real_id": real_id,
+                        "progress": progress
+                    })
+                except WebSocketDisconnect:
+                    pass  # safe to ignore, client already closed
+                continue  # skip normal progress message this iteration
+
+            # Compose normal progress message
+            message = {
+                "progress": progress,
+                "real_id": real_id,
+                "crisis_flag": crisis_flag
+            }
+
+            
+            # Send progress message only if crisis not yet triggered
+            if not crisis_triggered:
+                try:
+                    await websocket.send_json(message)
+                except WebSocketDisconnect:
+                    break  # exit loop safely if client disconnected
+
+            if progress >= 1.0:
+                break
+    finally:
+        active_ws_connections.pop(entry_id, None)
+
+# ---------- Submit Success ----------
+@app.get("/submit-success", response_class=HTMLResponse)
+async def submit_success(request: Request, id: str):
+    # ---------------- Resolve temp ID → real entry_id ----------------
+    id = temp_to_real_entry_id.get(id, id)
+        
+    entry = entry_runtime.get_entry_by_id(id)
+    if not entry:
+        entry = ephemeral_entries.get(id) # <--- Fallback reference resolution
+
+    logger.debug(
+        "submit_success entry=%r",
+        entry
+    )
+    if entry.get("deleted"):
+        return templates.TemplateResponse(
+            "submit-success.html",
+            {
+                "request": request,
+                "entry_nickname": None,
+                "entry_id": entry_id,
+                "safe_text": "",
+                "top_matches": [],
+                "delete_token": None,
+                "reasoning": None,
+            },
+        )
+    if not entry:
+        return templates.TemplateResponse(
+            "submit-success.html", {"request": request, "error": "Entry not found."}
+        )
+
+    # ---------------- Similarity search (runtime-backed) ----------------
+    embeddings = await entry_runtime.get_all_embeddings()
+
+    entry_id = entry.get("entry_id") or entry.get("id")
+    entry_vec = embeddings.get(entry_id)
+
+    scored_entries = []
+
+    # Target Fix: If vector doesn't exist globally, draw it out from our hidden transport key
+    entry_vec = embeddings.get(entry_id)
+    if entry_vec is None and "_tmp_embedding" in entry:
+        entry_vec = entry["_tmp_embedding"]
+
+    if entry_vec is not None:
+        for eid, vec in embeddings.items():
+            if eid == entry_id:
+                continue
+
+            sim = cosine_similarity(entry_vec, vec)
+
+            match_entry = entry_runtime.get_entry_by_id(eid)
+
+            if match_entry:
+                scored_entries.append({
+                    "entry": match_entry,
+                    "score": sim
+                })
+
+    top_matches_formatted = [
+        {
+            "entry_nickname": e["entry"].get("entry_nickname"),
+            "entry_id": json_safe(e["entry"].get("entry_id", e["entry"].get("id"))),
+            "excerpt": json_safe(e["entry"].get("safe_text", ""))[:200],
+            "similarity_pct": round(max(min(e["score"], 1.0), 0.0) * 100, 1),
+        }
+        for e in sorted(scored_entries, key=lambda x: x["score"], reverse=True)[:20]
+    ]
+
+    
+
+    delete_token = delete_tokens_memory.pop(id, None)
+    # delete_tokens_memory is generally required to keep the raw token separate from the entry-metadata object, 
+    # especially considering background task produces token after HTTP response already happened.
+
+    # logger.debug("Submit_success function triggered for id=%s", id)
+
+    import copy
+
+    reasoning = copy.deepcopy(entry.get("reasoning"))
+
+    if reasoning:
+        # ---------------- Build concept lookup ----------------
+        concept_lookup = {}
+        from core.mode_lock import SystemModeLock  
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            from core.database import db_engine
+
+            async with db_engine.pool.connection() as conn:
+                cursor = await conn.execute(
+                    "SELECT concept_id AS id, label FROM kb.concepts"
+                )
+                rows = await cursor.fetchall()
+
+            concept_lookup = {
+                concept["id"]: concept["label"]
+                for concept in rows
+            }
+
+            logger.debug(
+                "Loaded %d concept labels. Sample keys: %s",
+                len(concept_lookup),
+                list(concept_lookup.keys())[:5],
+            )
+
+        else:
+            ttl_dir = Path("data/reasoning")
+
+            if ttl_dir.exists():
+                for file in ttl_dir.glob("*.ttl"):
+                    text = file.read_text(encoding="utf-8")
+
+                    urn_match = regex.search(
+                        r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
+                        text
+                    )
+                    label_match = regex.search(
+                        r'rdfs:label\s+"([^"]+)"',
+                        text
+                    )
+
+                    if urn_match and label_match:
+                        concept_lookup[urn_match.group(1)] = label_match.group(1).strip()
+
+        logger.debug(
+            "Reasoning concept IDs: %s",
+            list(reasoning.get("final_concepts", {}).keys()),
+        )
+
+        # ---------------- Replace final_concepts ----------------
+        if "final_concepts" in reasoning:
+            reasoning["final_concepts"] = {
+                concept_lookup.get(cid, cid): score
+                for cid, score in reasoning["final_concepts"].items()
+            }
+
+        # ---------------- Replace receipt ----------------
+        for step in reasoning.get("receipt", []):
+            step["input_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in step.get("input_concepts", [])
+            ]
+
+            step["output_concept"] = concept_lookup.get(
+                step.get("output_concept"),
+                step.get("output_concept"),
+            )
+
+        # ---------------- Replace resource concepts ----------------
+        for resource in reasoning.get("culled_resource_list", []):
+            resource["assigned_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in resource.get("assigned_concepts", [])
+            ]
+
+    return templates.TemplateResponse(
+        "submit-success.html",
+        {
+            "request": request,
+            "entry_nickname": entry.get("entry_nickname"),
+            "entry_id": entry.get("entry_id", entry.get("id")),
+            "safe_text": entry.get("safe_text"),
+            "top_matches": top_matches_formatted,
+            "delete_token": delete_token,
+            "reasoning": reasoning,
+        },
+    )
+
+
+# GET -> render delete page
+@app.get("/delete", response_class=HTMLResponse)
+async def delete_entry_page(request: Request):
+    return templates.TemplateResponse(
+        "delete.html",
+        {"request": request}
+    )
+
+# POST -> process delete token
+@app.post("/delete", response_class=HTMLResponse)
+async def delete_entry_api(request: Request, delete_token: str = Form(...)):
+    token_hash = hashlib.sha256(delete_token.encode()).hexdigest()
+
+    
+
+    entry = entry_runtime.get_entry_by_token_hash(token_hash)
+
+    if not entry:
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
+        )
+
+    entry_id = entry.get("entry_id") or entry.get("id")
+
+    try:
+        # This is an injection, which helps specify which exact instance to use; 
+        # even if it is a singleton, this one works like handing someone an exact physical object,
+        # rather than describing the unique details of an exact physical object for them to find on their own.
+        # Injection is different from importing, and requires attributes to be passed from function to function,
+        # rather than from module to module.
+        dm = DeletionManager(   
+            ledger=ledger,
+            centroids=centroid_system,
+            entry_runtime=entry_runtime
+        )
+        await dm.delete_entry(
+            entry_id=entry_id,
+            token_hash=token_hash,
+            data_dir=os.getenv("PERIDOCS_DATA_DIR", "data")
+        )
+        # This is a *permutation* not a combination!
+        # It's important to remember that the ordering matters everywhere else from here for the deletion pipline downstream.
+        # In other words, the deletion token that the user copies must be as follows:
+        # [_insert_entry_id_here].[insert_timestamp_here].[insert_the_originally_assigned_ranomized_string_here]
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "message": "If the entry exists and the token is valid, is has been permanently marked for deletion and will be removed from active records as soon as possible."}
+        )
+    except Exception as e:
+        # Log the full exception server-side
+        logger.exception(f"Deletion failed for entry {entry_id}")
+        # Return a generic error page to the user
+        return templates.TemplateResponse(
+            "delete.html",
+            {"request": request, "error": "Deletion requests are currently not working. Please contact support."}
+        )
+
+async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
+    """
+    Unified read abstraction to gather resources for submit-success formatting.
+    Works seamlessly with both Postgres and Flat-File JSON configurations.
+    """
+    if not deduced_tags:
+        return []
+
+    # CASE A: POSTGRESQL ENGINE MODE
+    if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
+        from core.database import db_engine
+        try:
+            async with db_engine.pool.connection() as conn:
+                rows = await conn.execute(
+                    """
+                    SELECT DISTINCT er.title, er.url, er.description 
+                    FROM kb.external_resources er
+                    JOIN kb.resource_concept_mappings rcm ON er.resource_id = rcm.resource_id
+                    WHERE rcm.concept_id = ANY($1);
+                    """,
+                    deduced_tags
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []  # Fallback gracefully to empty list on database hiccups
+
+    # CASE B: FLAT-FILE MODE (JSON/NPZ)
+    else:
+        if not os.path.exists(RESOURCES_JSON_FILE):
+            return []
+        try:
+            with open(RESOURCES_JSON_FILE, "r", encoding="utf-8") as f:
+                all_res = json.load(f)
+            
+            # Intersection match: pull resources that share at least one tag
+            return [
+                {"title": r["title"], "url": r["url"], "description": r["description"]}
+                for r in all_res 
+                if len(set(r.get("assigned_concepts", [])) & set(deduced_tags)) > 0
+            ]
+        except Exception:
+            return []

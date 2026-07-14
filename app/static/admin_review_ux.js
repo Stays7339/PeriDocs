@@ -1,5 +1,5 @@
 // admin_review_ux.js
-// save-state 2026-04-26T16:31:05-04:00
+// save-state 2026-07-06T21:58-04:00
 // ==========================================
 
 const reviewListContainer = document.getElementById("review-list");
@@ -9,42 +9,34 @@ let reviewQueue = [];
 // REVIEW QUEUE
 // -----------------------------
 async function fetchQueue() {
-  const res = await fetch("/admin/review-queue");
+  const res = await authFetch("/admin/review-queue");
   reviewQueue = await res.json();
   renderQueue();
 
   const params = new URLSearchParams(window.location.search);
   const pid = params.get("precentroid");
-  if (pid) openPrecentroid(pid);
+
 }
 
 function renderQueue() {
   reviewListContainer.innerHTML = "";
 
+  const template = document.getElementById("review-item-template");
+
   reviewQueue.forEach(item => {
-    const el = document.createElement("div");
-    el.className = "excerpt";
+    const el = template.content.cloneNode(true).firstElementChild;
+
     el.dataset.id = item.id;
 
-    el.innerHTML = `
-      <strong class="clickable">${item.id}</strong><br>
-      ${item.summary}<br>
-      Entries: ${item.meta.entry_count}
-      <div style="margin-top:10px;">
-        <button class="btn primary expand-btn">View Entries</button>
-        <button class="btn primary approve-btn">Approve</button>
-        <button class="btn ghost reject-btn">Reject</button>
-      </div>
-      <div class="entries-container" style="display:none; margin-top:10px;"></div>
-    `;
+    el.querySelector(".clickable").textContent = item.id;
+    el.querySelector(".summary").textContent = item.summary;
+    el.querySelector(".entry-count").textContent = item.meta.entry_count;
 
     const expandBtn = el.querySelector(".expand-btn");
     const approveBtn = el.querySelector(".approve-btn");
     const rejectBtn = el.querySelector(".reject-btn");
-    const clickableTitle = el.querySelector(".clickable");
 
     expandBtn.addEventListener("click", () => toggleEntries(item.id));
-    clickableTitle.addEventListener("click", () => openPrecentroid(item.id));
 
     approveBtn.addEventListener("click", async () => {
       const description_from_human_moderator =
@@ -54,9 +46,8 @@ function renderQueue() {
 
       if (!description_from_human_moderator || !title_from_human_moderator) return;
 
-      await fetch("/admin/approve-precentroid", {
+      await authFetch("/admin/approve-precentroid", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           id: item.id,
           description_from_human_moderator,
@@ -69,9 +60,8 @@ function renderQueue() {
     });
 
     rejectBtn.addEventListener("click", async () => {
-      await fetch("/admin/reject-precentroid", {
+      await authFetch("/admin/reject-precentroid", {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ id: item.id })
       });
 
@@ -101,17 +91,24 @@ async function toggleEntries(precentroidId) {
   const entryIds =
     reviewQueue.find(p => p.id === precentroidId)?.meta.entry_ids || [];
 
-  const res = await fetch("/admin/entries-safe-text", {
+  const res = await authFetch("/admin/entries-safe-text", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ entry_ids: entryIds })
   });
 
   const data = await res.json();
 
-  entriesContainer.innerHTML = data.entries
-    .map(e => `<p class="matched-snippet">${e.safe_text}</p>`)
-    .join("");
+  entriesContainer.innerHTML = "";
+
+  for (const e of data.entries) {
+    // DIAGNOSTIC LOG: See exactly what keys and values JavaScript is receiving
+    console.log("Rendering entry data object:", e);
+
+    const p = document.createElement("p");
+    p.className = "matched-snippet";
+    p.textContent = e.safe_text;
+    entriesContainer.appendChild(p);
+  }
 
   entriesContainer.style.display = "block";
   el.scrollIntoView({ behavior: "smooth" });
@@ -128,7 +125,7 @@ window.addEventListener("popstate", event => {
   const pid = event.state?.precentroid;
 
   if (pid) {
-    openPrecentroid(pid);
+  
   } else {
     reviewQueue.forEach(item => {
       const el = [...reviewListContainer.children]
@@ -141,10 +138,8 @@ window.addEventListener("popstate", event => {
   }
 });
 
-fetchQueue();
-
 // =====================================================
-// HEURISTICS + TYPEAHEAD SYSTEM (RESTORED FULL UX)
+// HEURISTICS + TYPEAHEAD SYSTEM
 // =====================================================
 
 const givensContainer = document.getElementById("givens-container");
@@ -152,6 +147,56 @@ const outputsContainer = document.getElementById("outputs-container");
 
 let CONCEPTS = [];
 let activeIndex = -1;
+
+const resourceConceptsContainer = document.getElementById("resource-concepts-container");
+
+function addResourceConcept(value = "") {
+  const div = document.createElement("div");
+  div.style.marginGroup = "6px 0";
+  div.innerHTML = `
+    <input class="input resource-concept-input" placeholder="Search concept or cluster tag..." value="${value}" style="width:100%; margin-top:4px;">
+  `;
+  resourceConceptsContainer.appendChild(div);
+  
+  // Directly bind into your existing Typeahead system
+  attachTypeahead(div.querySelector(".resource-concept-input"));
+}
+
+async function submitResource() {
+  const title = document.getElementById("resource-title").value.trim();
+  const url = document.getElementById("resource-url").value.trim();
+  const description = document.getElementById("resource-desc").value.trim();
+  
+  const assigned_concepts = [...resourceConceptsContainer.querySelectorAll("input")]
+    .map(i => i.value.trim())
+    .filter(Boolean);
+
+  if (!title || !url || assigned_concepts.length === 0) {
+    alert("Please populate Title, URL, and at least one linked concept match.");
+    return;
+  }
+
+  try {
+    const res = await authFetch("/admin/create-resource", {
+      method: "POST",
+      body: JSON.stringify({ title, url, description, assigned_concepts })
+    });
+    
+    const result = await res.json();
+    if (res.ok) {
+      alert("External resource mapped and synchronized successfully.");
+      // Clear inputs safely
+      document.getElementById("resource-title").value = "";
+      document.getElementById("resource-url").value = "";
+      document.getElementById("resource-desc").value = "";
+      resourceConceptsContainer.innerHTML = "";
+    } else {
+      alert(`Provision error: ${result.detail || "Server rejected submission."}`);
+    }
+  } catch (err) {
+    alert(`Network transmission failure: ${err.message}`);
+  }
+}
 
 // -----------------------------
 // INPUT CREATION
@@ -169,7 +214,7 @@ function addOutput(concept = "", likelihood = "") {
   const div = document.createElement("div");
   div.innerHTML = `
     <input class="input concept-input" placeholder="Output concept..." value="${concept}">
-    <input class="input" placeholder="Likelihood (0-1 or %)" value="${likelihood}">
+    <input class="input" placeholder="Likelihood (0-1 decimal or out of 100 integer)" value="${likelihood}">
   `;
 
   outputsContainer.appendChild(div);
@@ -195,9 +240,8 @@ async function submitHeuristic() {
     })
     .filter(o => o.concept);
 
-  const res = await fetch("/admin/create-heuristic", {
+  const res = await authFetch("/admin/create-heuristic", {
     method: "POST",
-    headers: {"Content-Type": "application/json"},
     body: JSON.stringify({ givens, outputs })
   });
 
@@ -212,7 +256,7 @@ async function submitHeuristic() {
 // LOAD CONCEPTS (backend source of truth)
 // -----------------------------
 async function loadConceptList() {
-  const res = await fetch("/admin/concepts");
+  const res = await authFetch("/admin/concepts");
   const data = await res.json();
   CONCEPTS = data.concepts;
 }
@@ -220,7 +264,7 @@ async function loadConceptList() {
 loadConceptList();
 
 // =====================================================
-// TYPEAHEAD SYSTEM (FULL RESTORED UX)
+// TYPEAHEAD SYSTEM
 // =====================================================
 
 function conceptMatches(input, concept) {
@@ -292,11 +336,101 @@ function attachTypeahead(inputEl) {
   });
 }
 
-// FIXED: correct index scoping
+// correct index scoping
 function updateActive(items, index) {
   items.forEach(el => el.classList.remove("active"));
 
   if (items[index]) {
     items[index].classList.add("active");
+  }
+}
+
+// =====================================================
+// SAFE WIRING LAYER (NEW)
+// =====================================================
+
+document.addEventListener("DOMContentLoaded", () => {
+  // signout
+  const signoutBtn = document.getElementById("signout-btn");
+  if (signoutBtn) {
+    signoutBtn.addEventListener("click", () => signout());
+  }
+
+  // heuristics buttons
+  const addGivenBtn = document.getElementById("add-given-btn");
+  if (addGivenBtn) {
+    addGivenBtn.addEventListener("click", () => addGiven());
+  }
+
+  const addOutputBtn = document.getElementById("add-output-btn");
+  if (addOutputBtn) {
+    addOutputBtn.addEventListener("click", () => addOutput());
+  }
+
+  const submitBtn = document.getElementById("submit-heuristic-btn");
+  if (submitBtn) {
+    submitBtn.addEventListener("click", () => submitHeuristic());
+  }
+
+  document.getElementById("add-resource-concept-btn")?.addEventListener("click", () => addResourceConcept());
+  document.getElementById("submit-resource-btn")?.addEventListener("click", () => submitResource());
+
+  // initial load
+  fetchQueue();
+});
+
+// =====================================================
+// EXTERNAL RESOURCES SUBSYSTEM
+// =====================================================
+
+// resourceConceptsContainer is already imported earlier in the script
+
+function addResourceConcept(value = "") {
+  const div = document.createElement("div");
+  div.style.margin = "6px 0";
+  div.innerHTML = `
+    <input class="input resource-concept-input" placeholder="Search concept or cluster tag..." value="${value}" style="width:100%; margin-top:4px;">
+  `;
+  resourceConceptsContainer.appendChild(div);
+  
+  // Directly bind into your existing Typeahead system
+  attachTypeahead(div.querySelector(".resource-concept-input"));
+}
+
+async function submitResource() {
+  const title = document.getElementById("resource-title").value.trim();
+  const url = document.getElementById("resource-url").value.trim();
+  const resource_type = document.getElementById("resource-type").value.trim();
+  const description = document.getElementById("resource-desc").value.trim();
+  
+  const assigned_concepts = [...resourceConceptsContainer.querySelectorAll("input")]
+    .map(i => i.value.trim())
+    .filter(Boolean);
+
+  if (!title || !url || !resource_type || assigned_concepts.length === 0) {
+    alert("Please populate Title, URL, Type, and at least one linked concept match.");
+    return;
+  }
+
+  try {
+    const res = await authFetch("/admin/create-resource", {
+      method: "POST",
+      body: JSON.stringify({ title, url, resource_type, description, assigned_concepts })
+    });
+    
+    const result = await res.json();
+    if (res.ok) {
+      alert("External resource mapped and synchronized successfully.");
+      // Clear inputs safely
+      document.getElementById("resource-title").value = "";
+      document.getElementById("resource-url").value = "";
+      document.getElementById("resource-type").value = "";
+      document.getElementById("resource-desc").value = "";
+      resourceConceptsContainer.innerHTML = "";
+    } else {
+      alert(`Provision error: ${result.detail || "Server rejected submission."}`);
+    }
+  } catch (err) {
+    alert(`Network transmission failure: ${err.message}`);
   }
 }

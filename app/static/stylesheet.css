@@ -1,0 +1,624 @@
+/* ---------------------- 
+PeriDocs/app/static/stylesheet.css 
+save-state 2026-07-14T08:09-04:00 
+---------------------- */
+/* ======= Viasuals for Front Page Landing Hero =========*/
+
+.front-page-hero {
+  position: relative;
+  align-self: stretch;
+  justify-content: center;
+  text-align: center;
+  width: 100%;
+  padding-left: 10vw;
+  padding-right: 10vw;
+}
+
+.hero-paragraph {
+  font-family: "Montserrat Alternates", Helvetica, sans-serif;
+  font-weight: 600;
+  font-size: 40px;
+  line-height: 110%;
+}
+
+.hero-paragraph.purple {
+  color: var( --brandmuted-periwinklemuted-periwinkle-004);
+}
+
+.hero-paragraph.black {
+  color: var(--brandcarbon-blackcarbon-black-005);
+}
+
+.hero-paragraph.italics {
+  font-style: italic;
+}
+
+.hero-paragraph.small {
+  font-size: 20px;
+}
+
+.hero-paragraph.XL {
+  font-size: 55px;
+}
+
+.hero-paragraph.accented-shape {
+  font-family: "Metal";
+  font-weight: 400;
+}
+
+.arrow-for-hero-positioning
+{
+  position: relative;
+  translate: 110px -90px;
+
+  /* compress height of arrow to ~90% of original height */
+  transform: scaleY(0.9);
+  transform-origin: top;
+}
+
+
+.button-for-hero-positioning
+{
+  position: relative;
+  translate: 0px 20px;
+  z-index: 3;
+}
+
+/* ======= Visuals for the info card area ========*/
+.info-card-article {
+  width: 100%;
+  padding: 40px 3%;
+}
+
+/* governs desktop row vs mobile stack behavior */
+.info-card-layout {
+  display: flex;
+  flex-wrap: wrap;
+
+  justify-content: center;
+
+  gap: clamp(14px, 2vw, 30px);
+}
+
+/* outer visual card shell */
+.info-card {
+  position: relative;
+
+  width: 300px;
+  flex: 0 1 300px;
+
+  height: 400px;
+}
+
+/* decorative frame image */
+.info-card-border {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* internal card content positioning */
+.info-card-inner {
+  position: absolute;
+  top: 25px;
+  left: 40px;
+
+  width: 220px;
+  height: 350px;
+
+  display: flex;
+  flex-direction: column;
+
+  /* space-between does not work (it breaks anchored layout logic) */
+  justify-content: flex-start;
+
+  /* keeps everything centered horizontally */
+  align-items: center;
+
+  /*  defines vertical rhythm between sections */
+  gap: 10px; /* tweak 8–16px depending on visual density */
+}
+
+/* upper content grouping */
+.info-card-content-group {
+  width: 100%;
+
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  
+}
+
+/* image viewport / crop frame */
+.info-card-image-feather-frame {
+  position: relative;
+
+  width: 100%;
+  height: 125px;
+
+  overflow: hidden;
+}
+
+/* soft edge overlay */
+.info-card-image-frame::after {
+  content: "";
+
+  position: absolute;
+  inset: 0;
+
+  pointer-events: none;
+
+  box-shadow:
+    inset 0 0 18px rgba(245,243,237,0.65);
+}
+
+/* image area */
+.info-card-image {
+
+  --feather-start: 05%;
+  --feather-end: 95%;
+
+  width: 100%;
+  height: 125px;
+
+  padding: 0;              /* important: padding fights cropping control */
+  object-fit: cover;       /* key: crops instead of squishing */
+
+  object-position: center; /* default framing */
+
+  display: block;
+
+  -webkit-mask-image:
+    linear-gradient(to right,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%),
+
+    linear-gradient(to bottom,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%);
+
+  -webkit-mask-composite: source-in;
+
+  mask-image:
+    linear-gradient(to right,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%),
+
+    linear-gradient(to bottom,
+      transparent 0%,
+      black var(--feather-start),
+      black var(--feather-end),
+      transparent 100%);
+
+  mask-composite: intersect;
+}
+
+
+
+/* text grouping */
+.info-card-text-group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 10px;
+}
+
+/* headline */
+.info-card-title {
+  text-align: center;
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+
+  font-size: 24px;
+  font-family: "Montserrat Alternates";
+  font-weight: 600;
+  line-height: 33.6px;
+  letter-spacing: 0.24px;
+
+
+}
+
+/* supporting paragraph */
+.info-card-description {
+  text-align: center;
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+
+  font-size: 14px;
+  font-family: "Lexend";
+  font-weight: 400;
+  letter-spacing: 0.42px;
+  margin: 0;
+  margin-top: 6px;
+}
+
+/* button region */
+.info-card-actions {
+  width: 100%;
+
+  display: flex;
+  justify-content: center;
+
+  margin-top: auto;
+  padding-bottom: 10px;
+}
+
+/* actual button should use general button from globals.css*/
+
+
+
+/* ======= Visuals for banner-1 Section =========*/
+.banner-1-banner {
+  position: relative;
+  align-self: stretch;
+  width: 100%;
+  min-height: 400px;
+  background-color: var(--variable-collection-brand-overlays-mauve-shadow-overlay-001);
+  box-shadow: var(--box-shadow-typical); 
+  padding-top: 1%;
+}
+
+.card-paragraph-small-white {
+  position: relative;
+  align-self: stretch;
+
+  
+  font: var(--styles-bodyxl);
+  font-family: "Montserrat Alternates";
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+}
+
+.colored-text-white {
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+}
+
+.banner-1-box-flex-container-1,
+.banner-1-box-flex-container-2 {
+  position: relative; 
+  width: 100%;
+  height: auto;
+}
+
+
+.container-for-pair-of-banner-1-boxes {
+  display: flex; /* enables CSS setting called 'gap' and 'justify content', which helps prevent awkward vertical stacking.*/          
+  gap: 25px; /* spaces the elements so they're not awkardly bunched up*/
+  flex-wrap: wrap; /* Required for going between single line and multi-line for different window sizes.
+
+  position: relative;  /* not really useful unless we do an element with an absolute position*/
+  flex-direction: row; /* technically a default value, but to be safe, it stays*/  
+  top: auto;    /* technically a default value, but to be safe, it stays*/   
+  right: auto; /* technically a default value, but to be safe, it stays*/   
+}
+
+.banner-1-link-narrow-outer {
+  position: relative;
+  width: 300px;
+  flex: 0 1 300px;           /* can grow (first '0') or shrink (second '1'), but not below comfort (min-width) */
+  min-width: 280px;          /* prevents collapsing in on itself */
+  height: 250px;
+  background-color: var(--branddusty-olivedusty-olive-003);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.banner-1-link-narrow-inner {
+  position: relative;
+  top: 12px;
+  left: 13px;
+  width: 275px;
+  height: 225px;
+  background-color: var(--branddusty-olivedusty-olive-002);
+  border-radius: 5px;
+  box-shadow: var(--box-shadow-typical); 
+}
+
+.banner-1-link-wide-outer {
+  position: relative;
+  width: 350px;
+  flex: 0 1 350px; /* can grow (first '0') or shrink (second '1'), but not below comfort (min-width) */
+  min-width: 320px; /* prevents collapsing in on itself */
+  height: 250px;
+  background-color: var(--branddusty-olivedusty-olive-003);
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--box-shadow-typical); 
+}
+
+.banner-1-link-wide-inner {
+  position: relative;
+  top: 12px;
+  left: 12px;
+  width: 325px;
+  height: 225px;
+  background-color: var(--branddusty-olivedusty-olive-002);
+  border-radius: 5px;
+  box-shadow: var(--box-shadow-typical); 
+}
+
+.banner-1-ribbon {
+  position: relative;
+  width: min(900px, 92vw);
+  height: 66px;
+  display: flex;
+  background-color: var(--brandmauve-shadowmauve-shadow-006);
+  border-radius: 0px 10px 10px 0px;
+  box-shadow: var(--box-shadow-typical); 
+}
+
+.banner-1s-card-header {
+  margin-top: 15px;
+  width: 194px;
+  height: 36px;
+  margin-left: 25px;
+
+  font-family: "Lexend"; 
+  font-weight: 600;
+
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+
+  font-size: 36px;
+  text-align: center;
+  line-height: 36px;
+  white-space: nowrap;
+}
+
+.banner-1-link-narrow-inner,
+.banner-1-link-wide-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;  
+  gap: 12px;
+}
+
+.banner-1-input {
+  width: 100%;
+  height: 38px;
+  box-sizing: border-box;
+
+  background-color: var(--brandeggshelleggshell-002);
+  border: none;
+  border-radius: 6px;
+
+  padding: 6px 10px;
+  padding-left: 22px; /* makes room for the $ sign */
+
+  font-size: 16px;
+  font-family: "Lexend";
+
+  color: var(--brandcarbon-blackcarbon-black-006);
+  box-shadow: var(--box-shadow-typical);
+}
+
+.banner-1-input-wrapper {
+  position: relative;
+  width: 90%;
+}
+
+
+.banner-1-currency {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+
+  color: var(--brandcarbon-blackcarbon-black-006);
+  opacity: 0.8;
+  pointer-events: none;
+  font-family: "Lexend";
+}
+
+.banner-1-input:focus {
+  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-005);
+}
+
+.banner-1-button {
+  margin-top: 15px;
+  width: 90%;
+  height: 40px;
+
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-005);
+  border: none;
+  border-radius: 6px;
+
+  font-family: "Lexend";
+  font-weight: 600;
+  font-size: 14px;
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+
+  cursor: pointer;
+  box-shadow: var(--box-shadow-typical);
+}
+
+.banner-1-button:hover {
+  filter: brightness(1.05);
+}
+
+
+.banner-1-label {
+  font-family: "Lexend";
+  font-weight: 700;
+  font-size: 16px;
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+}
+
+/* =========================
+   banner-1 LAYOUT SYSTEM
+   (replaces absolute positioning logic)
+========================= */
+
+/* root section layout container */
+.banner-1-layout {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* governs desktop vs mobile layout switching */
+.banner-1-content {
+  display: flex;
+  flex-direction: column; /* default = mobile-first (safe baseline) */
+  gap: 24px;
+  padding: 2% 3%;
+}
+
+/* text grouping becomes flow-based instead of absolute */
+.banner-1-text-columns {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  max-width: 1400px;
+  flex: 1 1 250px;
+}
+
+/* Give a recessed-look to the interior of the banner*/
+
+.banner-1-banner::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 20px; /* controls how gradual the fade is */
+
+  background: linear-gradient(
+    to bottom,
+    var(--variable-collection-brand-overlays-mauve-shadow-overlay-001),
+    transparent
+  );
+
+  pointer-events: none;
+}
+
+
+
+/* =========================
+   DESKTOP OVERRIDE
+========================= */
+
+@media (min-aspect-ratio: 175/100) {
+
+  /* ADDED: desktop row layout */
+  .banner-1-content {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  /* ADDED: restore horizontal columns on wide screens */
+  .banner-1-text-columns {
+    flex-direction: row;
+    max-width: 700px;
+  }
+
+  .container-for-pair-of-banner-1-boxes {
+    flex-direction: row;
+  }
+}
+
+/* =========================
+   MOBILE OVERRIDE
+========================= */
+
+@media (max-aspect-ratio: 175/100) {
+   /* center content once the screen is small enough */
+  section > * {
+    margin-left: auto;     
+    margin-right: auto;    
+    text-align: center; 
+  }
+
+  /* ADDED: mobile collapse behavior */
+  .banner-1-text-columns {
+    flex-direction: column;
+  }
+
+  .container-for-pair-of-banner-1-boxes {
+    justify-content: center;
+  }
+
+}
+
+/* ====================================================================
+   Unified Layout Anchors (Desktop/Universal Rules)
+   ==================================================================== */
+
+/* Standard layout wrapper for your toggles inside card articles */
+.toggle-container-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+}
+
+/* Keeps text layout blocks predictable when nested next to buttons */
+.opt-in-message-block,
+.consent-message-block {
+    flex: 1;
+}
+
+
+/* ====================================================================
+   Responsive Alignment — Matches Your App's Breakpoint (<= 850px)
+   ==================================================================== */
+@media (max-width: 850px) {
+    
+    /* 1. Cookie Notice Layout Pivot */
+    #privacy-toast {
+        flex-direction: column;         /* Switch row sequence to a vertical y-height flow */
+        align-items: center;            /* Center elements horizontally inside the banner */
+        text-align: center;             /* Keep text elements neatly uniform */
+        width: calc(100% - 32px);       /* Fit full width while maintaining structural margins */
+        max-width: 480px;               /* Prevent it from becoming excessively wide on small tablets */
+        height: auto;                   /* Allow elastic adjustments to content size */
+        padding: 20px 16px;
+    }
+
+    /* Counteract the desktop auto-margin pushing the close option out of alignment */
+    #privacy-toast button {
+        margin: 12px 0 0 0;             /* Center cleanly and add spacing below message text */
+    }
+
+    /* 2. Form Toggles Mobile Pivot */
+    .toggle-container-row {
+        flex-direction: column;         /* Stack the toggle above the explanation */
+        align-items: flex-start;        /* Keep toggle switches neatly left-aligned */
+        gap: 12px;                      /* Compact gaps appropriate for form inputs */
+    }
+}
+
+/* ====================================================================
+   Header Left Brand Layout Rules
+   ==================================================================== */
+
+.header-left {
+    display: flex;
+    flex-direction: column;    /* Stack contents vertically (Logo top, text bottom) */
+    align-items: flex-start;   /* Align both items flush to the left edge */
+    justify-content: center;   /* Keep container vertically centered in header space */
+    gap: 2px;                  /* Tight micro-spacing between logo and version text */
+}
+
+/* Version subtitle configuration */
+.header-left .header-version {
+    font-size: 10px;           /* Crisp, lightweight compact text size */
+    font-weight: 500;
+    line-height: 1;            /* Eliminates invisible bounding box line padding */
+    margin: 0;                 /* Strips away default browser paragraph margin-blowout */
+    padding: 0;
+    color: rgba(0, 0, 0, 0.4); /* Subdued gray ink color so it remains unobtrusive */
+    letter-spacing: 0.02em;    /* Enhances readability for microscopic characters */
+}

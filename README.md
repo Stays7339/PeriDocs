@@ -143,7 +143,21 @@ Create a `.env` file in the project root with your local keys:
 PERIDOCS_AES_KEY=your-secret-key
 ```
 
+To crate a new key, open a bash (Born Again Shell) terminal or a zsh terminal(Z shell),
+then past the following command and press the enter/return button on your keyboard:
+
+Should work with Linux, MacOS, and Windows
+```
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+
+
+IMPORTANT! 
 > Do **not** commit `.env` to GitHub.
+
+
+
 
 For collaborators, you can store secrets in GitHub **Settings > Secrets and Variables** if using CI/CD pipelines, but never expose them in the repository.
 
@@ -254,6 +268,35 @@ app/static/CabineyGrotesk_Complete/*
 
 ### Step 5. Run the App Locally
 
+FIRST, run these commands in terminal so that HTTPS (encrypted web connection) is working properly
+
+```bash
+uvicorn app.routes:app \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --proxy-headers \
+  --forwarded-allow-ips="*"
+```
+
+(or add them into systemd if you're running a server on Liunx)
+
+```bash
+ExecStart=/path/to/venv/bin/uvicorn app.routes:app \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --proxy-headers \
+  --forwarded-allow-ips=127.0.0.1
+  ```
+
+then for nginx configuration file
+
+```
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+THEN, AFTER you're done with that first command,
+
+
 Run this command inside the project folder:
 
 ```bash
@@ -265,6 +308,11 @@ You should see output similar to:
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
+
+(or for an already configured server)
+
+git pull && sudo systemctl restart peridocs
+
 
 ---
 
@@ -280,6 +328,12 @@ You now have PeriDocs running locally.
 
 ---
 
+For public servers AFTER thoroughly configuring firewalld, nginx, let's encrypt, FastAPI, and systemctl 
+
+go to: {yourChosenName}.yourTopLevelDomain
+
+You should automatically get connected to HTTPS without having to specify it in your browser.
+
 ### Step 7. (Optional) Developer Tooling Setup
 
 #### VS Code Recommended Setup
@@ -290,11 +344,62 @@ You now have PeriDocs running locally.
 
 ---
 
+## The Dynamic Process Workflow
+```
+[ Raw User Submission ]
+          │
+          ▼
+┌───────────────────┐
+│    app/routes     │  <--- Establishes the connection & captures payload
+└───────────────────┘
+          │
+          ▼
+┌───────────────────┐
+│    core/nlp/pii   │  <--- ACTION: Runs regex patterns
+└───────────────────┘
+          │
+          ▼  (State Change: Text is now sanitized/anonymous)
+          │
+┌───────────────────┐
+│ core/nlp/clauses  │  <--- ACTION: Breaks text into sentence-level chunks
+└───────────────────┘
+          │
+          ▼
+┌───────────────────────────┐
+│ core/nlp/crisis_detector  │
+└───────────────────────────┘
+          │
+          ├── [ IF CRISIS TRIGGERED ] ──► core/nlp/crisis_recorder ──► [ Encrypted Isolation Lockfile ]
+          │
+          └── [ IF CLEAR ] 
+                  │
+                  ▼
+      ┌───────────────────────┐
+      │  core/nlp/embeddings  │  <--- ACTION: Passes clean text to RoBERTa model
+      └───────────────────────┘
+                  │
+                  ▼  (State Change: Text becomes a 1024-dimension vector float)
+                  │
+      ┌───────────────────────────────┐
+      │ core/map/membership_sequencer │  <--- ACTION: Evaluates mathematical cluster overlap
+      └───────────────────────────────┘
+                  │
+                  ▼
+      ┌───────────────────────┐
+      │    core/map/ledger    │  <--- ACTION: Registers the event in numerical order
+      └───────────────────────┘
+                  │
+                  ▼  (Final State: Persisted to disk)
+                  │
+         [ data/entries.json ]
+
+```
+
 # Canonical Project Directory 
 
 <details>
 <summary>Click to expand canonical project directory</summary>
-## Canonical Project Directory as of 2026-04-29T01:57:10-04:00
+## Canonical Project Directory as of 2026-07-13T20:40-04:00
 **Important Note**: *While the software developers of PeriDocs try their best to keep the following project directory updated as best as they can, there may be some old filenames, old filepaths, and unused or obsolete files that are effectively no longer in use. The original intention is for this Canonical Project Directory to be as reliable as possible, but during the throws of development, details tend to get updated in some places but not others each moment.*
 
 ```
@@ -302,52 +407,74 @@ PeriDocs/                         # Root project folder
 │
 ├─ app/                                # Backend + frontend application code
 │  │
+│  ├─ credentialing/
+│  │  ├─ account_routing.py
+│  │  ├─ account_runtime.py       
+│  │  ├─ authentication_middleware.py    
+│  │  ├─ security_fundamentals.py 
+│  │  └─ __pycache__/  
 │  ├─ helpers/
 │  │  ├─ __init__.py                   # FastAPI app startup, embedding preloading, centroid loading, static mounting, route inclusion.
-│  │  ├─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
-│  │  ├─ entry_writing_runtime.py      # This file is being created to at some point replace file_ops.py
-│  │  ├─ file_ops.py                   # load_data, save_data, ensure_feedback_file
+│  │  ├─ file_ops.py                  # Thin script to persist short plaintext strings of feedback to the backend in an isolated dumb json file.
 │  │  ├─ json_safe.py                  # Convert NumPy and other non-JSON-native types into JSON-serializable Python primitives.
-│  │  ├─ top_matches.py                # API-ready top matches + JSON-safe outputs
 │  │  └─ __pycache__/  
 │  │
 │  │
 ├─ routes/
 │  │  ├─ __init__.py                   # Imports and attaches all route modules to the main FastAPI app
 │  │  ├─ admin_routing.py              # "/admin*"
-│  │  ├─ entry.py                      # "/submit", "/submit-success"
+│  │  ├─ donation.py                   # Provides routing to Stripe Checkout page for the amount and frequency that user opts-in to.
 │  │  ├─ feedback.py                   # "/feedback"
 │  │  ├─ info_navigation.py            # "/", "/about", "/privacy-policy", "/terms-of-service"
+│  │  ├─ submission_routing.py                      # "/submit", "/submit-success"
 │  │  └─ __pycache__/                
 │  │
-│  ├─ static/                            # Frontend static files
+│  ├─ static/                            # raw files served directly to browser unchanged
+│  │  ├─ account_authentication.js       # We're currently considering moving this into PeriDocs/app/credentialing  
+│  │  ├─ account-signin-responsiveness.js  
+│  │  ├─ account-signup-responsiveness.js  
 │  │  ├─ admin_review_ux.js              # Logic for getting the information from the client webpage to the actual server.
-│  │  ├─ admin-typeahead.css             # autocomplete dropdown for text fields on webpages
+│  │  ├─ arrow.svg                        # Adds some fun flair for the hero on the landing page.
+│  │  ├─ base-html-responsiveness.js      # this is the part of the code that helps us do custom widths on the header's navigation bar without us having to hardcode position and width in that nav bar.
 │  │  ├─ cookies-icon-by-trinh-ho-from-flaticon-dot-com.png  #icon for privacy notice about local storage
-│  │  ├─ favicon.png
-│  │  ├─ peridocs-logo-v1-white.png
-│  │  ├─ peridocs-logo-v1.png
-│  │  ├─ peridocs-logo-v2.png
-│  │  ├─ peridocs-ui.js                  # unified localStorage UI state: theme, cooldowns, modals, toasts, feedback/entry 
-│  │  ├─ peridocs-wordmark-202602232127.svg
-│  │  ├─ peridocs-wordmark-and-logo-202602232100.png
-│  │  ├─ peridocs-wordmark-and-logo-202602232133.png
-│  │  ├─ peridocs-wordmark-and-logo-202602232133.svg
-│  │  ├─ [a few more as the logo has been marginally iterated upon]
-│  │  ├─ santa-hat-free-icon-by-surang-from-flaticon-dot-com #icon to display for users who's local time is set to Deccember 25 of any year
-│  │  ├─ style.css                       # Main stylesheet
+│  │  ├─ custom-styled-text-field.css     # autocomplete dropdown for text fields on webpages
+│  │  ├─ donation-ui.js                   # Provides toast messages and redirects to assiting in routing to Stripe Checkout page for the amount and frequency that user opts-in to.
+│  │  ├─ entry-frontend.js                # controls the javascript for transporting the entry from the page to the server while being sure CSRF is enabled. Also calls on the toast system and websocket
+│  │  ├─ feedback-ui.js                   # controls the transportation of feedback from the page to the server. This file also uses CSRF.
+│  │  ├─ fi-rr-search-alt.svg             # icon for the button leading to the create-entry page
+│  │  ├─ globals.css                      # webpage styling that should be applied everywhere
+│  │  ├─ info-card-border.png             # decorative framing for landing page content
+│  │  ├─ modal-ui.js                      # Controls the behavior of modals (i.e., site-official popups)
+│  │  ├─ myers-reset-2.0.css              # public domain boilerplate code that helps to keep css styling consistent across different web browsers
+│  │  ├─ [... some images from the public domain just for style ...]
+│  │  ├─ peridocs-logo-icon-2026-05-05.svg
+│  │  ├─ peridocs-logo-icon-and-wordmark-2026-05-05.svg
+│  │  ├─ peridocs-logo-workmark-2026-05-05.svg
+│  │  ├─ peridocs-misc-ux.js                  # handles many things including but not limited to: theme toggle (light mode / dark mode), cooldowns...
+│  │  ├─ peridocs-wordmark-and-logo-v2.png 
+│  │  ├─ persistence-opt-in.js                # front-end script that allows the user to choose whether they want their entry to be permanently saved in the database.
+│  │  ├─ styleguide.css                       # Where all the brainstorming for the brand goes
+│  │  ├─ stylesheet.css                       # Where the styling choises are chosen and carried out
+│  │  ├─ toast-ui.js 
+│  │  ├─ user-icon.png
+│  │  ├─ user-icon.svg
 │  │  └─ CabinetGrotesk_Complete/Fonts/WEB/fonts
 │  │
 │  │
-│  └─ templates/                        # Jinja2 HTML templates
-│   ├─ about.html                     # About page template
-│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an emotion, populated by user entries.
-│   ├─ base.html                      # Layout template
+│  └─ templates/                          # server-rendered files processed by Jinja
+│   ├─ about.html                         # About page template
+│   ├─ account-signin.html                
+│   ├─ account-signup.html                
+│   ├─ account.html                       
+│   ├─ admin-review.html              # Dashboard to manage centroids, which are neighborhoods of an common theme populated by user entries.
+│   ├─ base.html                       # The new new more polished looking base (floating header + background)
+│   ├─ create-entry.html 
 │   ├─ delete.html                    # The public facing page where users can go and enter a one-time string generated with their post so that posts can be deleted without an account. Works by hasing that string and matching the hash based on what's within the entries.json file.
-│   ├─ index.html                     # Main homepage template
+│   ├─ index.html                     # Landing page template
 │   ├─ privacy.html                   # Privacy policy page template
 │   ├─ submit-success.html            # Submission success page template
 │   ├─ terms-of-service.html          # Terms of Service page template
+│   ├─ ways-to-help.html          # Terms of Service page template
 │   └─ includes/                      # Partial web-page templates
 │      ├─ modal-crisis.html
 │      └─ modal-feedback.html
@@ -360,9 +487,20 @@ PeriDocs/                         # Root project folder
 │
 │
 ├─ core/
+│   ├─ database.py # as the operational runtime glue that grabs the lower-level environment-agnostic engines and binds them to the live application via web-framework elements (i.e. this imports FastAPI).
+│   ├─ mode_lock.py # forces the app to focus on either only saving to PostgreSQL or only saving only to JSON and NPZ files, but never both of those options.
+│   │
+│   │
+│   ├─ entry-orchestrator/                      
+│   │   ├─ __init__.py              # Exposes EntryRuntime
+│   │   ├─ entry_runtime.py      # Single-event pipeline with rich payload. state manager + persistence authority.
+│   │   └─ entry_similarity.py           # Can handle loading embeddings from disk, raw similarity computations for embeddings, and deterministic mean. Other files may still use their own internal helpers rather than calling this file.
+│   │
+│   │
+│   │
 │   ├─ map/
 │   │   ├─ __init__.py                    # to avoid having to redfine the same value everywhere, this is being used as a config file for this specific package
-│   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced emotion and some (but not all) SAAJE affiliations.
+│   │   ├─ centroids.py                   # The Engine - making centroids / clusters / neighborhoods per nuanced common theme and some (but not all) SAAJE affiliations.
 │   │   ├─ deletion.py                    # The Surgical Pulverizer - if a user wants something removed, it should all go through here.
 │   │   ├─ entry_membership_sequencer.py                       # The Evaluation Layer - controls assignment of Software-auto-added journal entries (SAAJEs). This is so that centroids-math (which is in centroids.py) stays separate from assignment to centroids which stays separate from the admin dashboard for human intervention, which stays separate from the historical ledger for determinism.
 │   │   ├─ ledger.py                      # ==== THE CRITICAL AUTHORITY===== FOR ALL OF PERIDOCS CENTROIDS SYSTEM. Keeps track of thuth via sequence of actions across the system, rather than through the veriability of time, which quietly throws off determinism.
@@ -372,7 +510,7 @@ PeriDocs/                         # Root project folder
 │   │   └─ __pycache__/
 │   │
 │   ├─  nlp/
-│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, emotion, and crisis utilities.
+│   |   ├─ __init__.py                     # Exposes core NLP pipeline, PII, embeddings, common theme, and crisis utilities.
 │   |   ├─ clause_utils.py                 # Splits text into clauses (sentence-level granularity). Optionally merge clauses into windows of ~max_words to avoid too short embeddings.
 │   |   ├─ crisis_detector.py              # Lemma-aware, thresholded detection of crisis-related content.
 │   |   ├─ crisis_recorder.py              # Atomic storage of encrypted crisis records for flagged entries.
@@ -384,35 +522,66 @@ PeriDocs/                         # Root project folder
 │   |   └─ __pycache__/
 │   | 
 │   | 
-│   └─ reasoning/
-│           ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
-│           ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
-│           ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
-│           ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
-│           ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
-│           ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
-│           ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
-│           └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│   ├─ reasoning/
+│   |       ├─ __init__.py # Just there so that its straightforward to call on functions in this filepath.
+│   |       ├─ build_evaluation_group.py # finds which centroids / concepts are in question for the starting point for the context of the inferences being made
+│   |       ├─ damping.py # the purpose of this file, currently, is to make later inferences have less influence than future inferences
+│   |       ├─ evaluator.py # the longest script (as of 2026-04-23) because it does the leg work of using concepts, heuristics, and inferences in one fell swoop. This file heavily relies on types.py .
+│   |       ├─ heuristic_loader.py # tried to make the name as self-explanatory as possible. Ideally, this file would call into memory any heuristic file that contains the concepts / centroids in question.
+│   |       ├─ reasoning_runtime.py # the most important part of this file is to loop the evaluator over and over, up to a set number of times specified within this same file.
+│   |       ├─ receipt_maker.py # responsible for keeping an appended record of what inferences were made from which heuristics, and which heuristics were used based on the relevant concepts.
+│   |       └─ types.py # A class file that sets a template solely for what is and isn't allowed to be used in the inference process. In contrast, dicts don't work because they scatter/spill/sprawl important metadata way too easily. And functions don't let a working idea evolve nearly as easily as an isntance formed from a class.
+│   | 
+│   | 
+│   ├─ database.py # builds the foundations of the bridge between the database and the runtime of the app. Also helps open and close the database when starting and stopping the app.
+│   └─ mode_lock.py  # forces the system to remember whether it started in database mode (PostgreSQL or Flat-file JSON + NPZ) upon the first time setting up the app (bootstrapping) with no data subfolder / a blank database.
 │ 
 │           
 │
 ├─ data/                                  # Local data storage
+│  ├─ accounts/
+│  │   └─accounts.encrypted.json
+│  │
+│  │
 │  ├─ centroids/
 │  │   ├─[centroid/precentroid]_[natural_sort_integer]_summary.json
 │  │   └─[centroid/precentroid]_[natural_sort_integer].npz
 │  ├─ entries/                        # Stored entries
-│  │   ├─ entries_clause_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
-│  │   ├─ entries_mean_embeddings_dump[YYYYMMDD]_[0-3].json file(s) 
-│  │   └─ entries_standout_flags_dump[YYYYMMDD]_[0-3].json file(s) 
+│  │   ├─ entries.json # safe text in plaintext with encrypted raw text. Also important metadata is contained here.
+│  │   ├─ entries_window_embeddings_dump.npz # embedding vectors for thousands of float numbers per every few sentences in each entry.
+│  │   ├─ entries_window_text_dump.npz # plain-text-safe-text is stored for how the windows of the entry were specifically partitioned.
+│  │   ├─ entries_mean_embeddings_dump.npz # embedding vectors for thousands of float numbers per every entry overall.
+│  │   └─ entries_standout_window_flags_dump.npz # true or false as to whether one part of the entry is drastically different from the rest of that same entry
 │  ├─ reasoning_data/                        # Stored entries
 │  │   ├─ heuristics.json
 │  │   └─ [concept files ending in .ttl, beginning with various names, often but not always centroid [x]]
 │  ├─ feedback.json                       # Stored feedback and report inquiries
+│  ├─ .system_mode_lock                   # the actual file that remembers whether the app should be sticking to database mode (including Sandbox mode) or sticking to offline / flat-file mode
 │  ├─ ledger.json                         # Keeps track of which event took place at which step, numbered one at a time in sequence.
 │  ├─ recorded_crises.lock                # For preventing corrupted data in case of crash.
 │  ├─ recorded_crises.npz                 # logs for crises that have been submitted to our servers. NOTE: These should never be entered into the main database.
 │  └─ .gitkeep                            # Shows where the data/ folder is for the sake of being transparent on Github without detailing which files go in there
 │
+│
+├─ database-management/ # aims to be an environment-agnostic infrastructure layer. It holds static SQL schemas, validation utilities, and raw storage drivers
+│   ├─ schemas/
+│   │     ├─00_db_init.sql # initializes the physical catalog storage engine if absent.
+│   │     ├─01_roles_init.sql # loosely defines roles for the postgres instance itself, not for the webapp
+│   │     ├─02_schemas_init.sql # Establish clean structural boundaries to enforce domain separation,
+│   │     ├─03_permissions_init.sql # specifies what each database role can do
+│   │     └─ tables/
+│   │          ├─ app_schema.sql # Current just stores information for webapp end-user accounts.
+│   │          ├─ content_schema.sql # Stores the main user data. the raw text entries, their AI vector math, and those Creative Commons/public domain outlinks you mentioned.
+│   │          ├─ kb_schema.sql # Stores the moderation logic. the 500 approved concepts and the rules connecting those concepts to the outlinks.
+│   │          ├─ ledger_schema.sql # A historical logbook that tracks changes (great for backups and audit trails).
+│   │          └─ centroid_schema.sql # Averaged Vector Index & Storage for clusters / centroids
+│   │
+│   ├─ storage_engines/
+│   │     ├─ __init__.py            # Exposes the factory/bootloader
+│   │     └─ postgres_engine.py    # The actual worker code that takes Python data (like a user's text entry) and translates it into a SQL command to save it.
+│   │
+│   └─ validation/ 
+│      └─ verify_infrastructure.py 
 │
 │
 │
@@ -446,17 +615,16 @@ PeriDocs/                         # Root project folder
 │   └─ .gitkeep                        # avoids pushing the whole pre-trained one-way dataset through GitHub
 │
 │
-│
-│
-│
-├─ venv/                               # No other option but to manually re-create on startup. It's considered data-risky to reupload venv because it is even slightly in communication with .env . So, /venv/ is in .gitignore until further notice.
+├─ venv/                               # Recreated upon system initialization / bootstrap for the whole project, after installing requirements.txt using 'pip install' and after setup_roberta.py.
 │
 ├─ .env                      # Private, proprietary data (never commit)
 ├─ .gitignore                # Files and folders ignored by Git
-├─ README.md                 # Project overview, setup, and usage
+├─ audit_entries_store.py
 ├─ list_the_table_of_contents_for_this_npz_file.py
+├─ README.md                 # Project overview, setup, and usage
 ├─ requirements.txt          # Pinned Python dependencies
-└─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+├─ setup_roberta.py          # Setup file to run in terminal to be sure that the FOSS ML model is installed correctly.
+└─ setup.py  # loads in the specific configurations of the database, including specifiying between test sandbox empty dummy vs local actual database vs centralized real production server. Also, runs the setup_roberta.py script mentioned before.
 ```
 </details>
 

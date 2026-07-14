@@ -1,6 +1,6 @@
 # ==========================================
 # core/reasoning/evaluator.py
-# Save-state: 2026-04-22T19:52:40-04:00
+# Save-state: 2026-07-05T15:20-04:00
 # ==========================================
 
 from __future__ import annotations
@@ -18,7 +18,11 @@ from .types import Inference, ConceptSignal
 
 SOFT_OR_TEMPERATURE = 3.0
 PATH_DIVERSITY_WEIGHT = 0.30
-MIN_ACTIVATION_EPS = 1e-9
+MIN_ACTIVATION_EPSILON = 1e-9 #essentially a mathematical seatbelt for logarithmic functions.
+
+# NEW: Controls how many required inputs must be active for a heuristic to fire.
+# 0.70 means 70% of the listed 'givens' must be satisfied to pass the gate.
+MIN_ACTIVATION_RATIO = 0.75 
 
 
 # -----------------------------
@@ -43,29 +47,25 @@ def soft_or(scores: List[float]) -> float:
     # log-sum-exp trick
     total = sum(math.exp((s - m) / SOFT_OR_TEMPERATURE) for s in scores)
 
-    return m + SOFT_OR_TEMPERATURE * math.log(total + MIN_ACTIVATION_EPS)
+    return m + SOFT_OR_TEMPERATURE * math.log(total + MIN_ACTIVATION_EPSILON)
 
 
 # -----------------------------
-# PATH ID GENERATION
+# PATH ID GENERATION (UPDATED FOR STABLE LINEAGE)
 # -----------------------------
 
 def make_path_id(
     heuristic_id: str,
     input_concepts: List[str],
-    output_concept: str,
-    step: int
+    output_concept: str
 ) -> str:
     """
-    Deterministic path identifier for tracing reasoning routes.
+    Deterministic path identifier for tracing stable reasoning routes.
 
-    A path is defined by:
-    - heuristic used
-    - inputs
-    - output
-    - step depth
+    Removed the 'step' parameter to ensure that Steps 1 through 6 of 
+    the exact same logical deduction branch share a stable identity.
     """
-    raw = f"{heuristic_id}|{sorted(input_concepts)}|{output_concept}|{step}"
+    raw = f"{heuristic_id}|{sorted(input_concepts)}|{output_concept}"
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
 
 
@@ -80,10 +80,6 @@ def path_diversity(signal: ConceptSignal) -> float:
     High value = many independent heuristic pathways.
     Low value = repetition of same reasoning source.
     """
-
-    # EXPECTATION:
-    # signal.heuristic_paths: Dict[str, float]
-
     paths = getattr(signal, "heuristic_paths", None)
     if not paths:
         return 0.0
@@ -94,11 +90,10 @@ def path_diversity(signal: ConceptSignal) -> float:
     if total <= 0:
         return 0.0
 
-    # normalized entropy
     entropy = 0.0
     for v in values:
         p = v / total
-        entropy -= p * math.log(p + MIN_ACTIVATION_EPS)
+        entropy -= p * math.log(p + MIN_ACTIVATION_EPSILON)
 
     return entropy
 
@@ -117,10 +112,12 @@ def evaluate_heuristic(
 
     Produces INFERENCES (ephemeral reasoning edges).
     """
-
     heuristic_id = heuristic["heuristic_id"]
     givens = heuristic.get("givens", [])
     outputs = heuristic.get("outputs", [])
+
+    if not givens:
+        return []
 
     # -----------------------------
     # COLLECT INPUT SIGNALS
@@ -136,14 +133,18 @@ def evaluate_heuristic(
         resolved_inputs.append(concept)
         input_scores.append(signal.total_weight())
 
-    if not input_scores:
+    # -----------------------------
+    # RATIO ACTIVATION GATE CHECK
+    # -----------------------------
+    # Protects against semantic drift by verifying the proportion of triggered inputs.
+    match_ratio = len(resolved_inputs) / len(givens)
+    if match_ratio < MIN_ACTIVATION_RATIO:
         return []
 
     # -----------------------------
     # SOFT OR ACTIVATION
     # -----------------------------
     activation = soft_or(input_scores)
-
     results: List[Inference] = []
 
     # -----------------------------
@@ -156,18 +157,16 @@ def evaluate_heuristic(
         if not output_concept:
             continue
 
-        # core signal weight
         raw_weight = activation * base_likelihood
 
         if raw_weight <= 0:
             continue
 
-        # path id (critical for traceability + diversity)
+        # Uses the newly stabilized tracking footprint (omitting step counter)
         path_id = make_path_id(
             heuristic_id=heuristic_id,
             input_concepts=resolved_inputs,
             output_concept=output_concept,
-            step=step,
         )
 
         inference = Inference(
@@ -177,9 +176,6 @@ def evaluate_heuristic(
             heuristic_id=heuristic_id,
             step=step,
             justification=out.get("justification"),
-
-            # EXTENSION FIELD (must exist in types.py):
-            # path_id: str
             path_id=path_id,
         )
 
@@ -196,9 +192,7 @@ def apply_path_diversity_bonus(signal: ConceptSignal, weight: float) -> float:
     """
     Adjust weight based on diversity of reasoning paths.
     """
-
     diversity = path_diversity(signal)
-
     return weight * (1.0 + diversity * PATH_DIVERSITY_WEIGHT)
 
 
@@ -211,48 +205,31 @@ def integrate_inference(
     inference: Inference
 ) -> bool:
     """
-    Inserts inference into pool_of_active_concepts with:
-    - damping
-    - path tracking
-    - diversity weighting
-
-    Returns whether it meaningfully changed pool_of_active_concepts.
+    Inserts inference into pool_of_active_concepts with damping and tracking.
     """
-
     from .damping import apply_damping  # local import to avoid cycles
 
     concept = inference.output_concept
-
     signal = pool_of_active_concepts.setdefault(concept, ConceptSignal(concept))
 
-    # -----------------------------
     # DAMPING (repetition decay)
-    # -----------------------------
     damped = apply_damping(len(signal.inferences), inference.weight)
 
-    # -----------------------------
     # PATH DIVERSITY BONUS
-    # -----------------------------
     adjusted = apply_path_diversity_bonus(signal, damped)
 
     if adjusted <= 0:
         return False
 
     inference.weight = adjusted
-
     signal.add(inference)
 
-    # -----------------------------
-    # PATH TRACKING (REQUIRED EXTENSION)
-    # -----------------------------
-    # EXPECTATION:
-    # signal.heuristic_paths: Dict[str, float]
+    # PATH TRACKING
     if not hasattr(signal, "heuristic_paths"):
         signal.heuristic_paths = {}
 
     signal.heuristic_paths[inference.heuristic_id] = (
-        signal.heuristic_paths.get(inference.heuristic_id, 0.0)
-        + adjusted
+        signal.heuristic_paths.get(inference.heuristic_id, 0.0) + adjusted
     )
 
     return True
@@ -270,7 +247,6 @@ def run_heuristics_step(
     """
     Runs all heuristics for a single step.
     """
-
     all_inferences: List[Inference] = []
 
     for h in heuristics:
@@ -281,7 +257,7 @@ def run_heuristics_step(
 
 
 # -----------------------------
-# FULL REDUCTION PASS (OPTIONAL DRIVER)
+# FULL REDUCTION PASS
 # -----------------------------
 
 def apply_inferences(

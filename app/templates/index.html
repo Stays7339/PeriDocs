@@ -1,56 +1,259 @@
-{# index.html - homepage, extends base.html save-state 2026-03-30T14:46:50-04:00 #}
+{# index.html - homepage, extends base.html save-state 2026-07-11T15:45-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
 
 {% block content %}
-<div class="card">
-  <div class="card-content">
-    <h1>Welcome to PeriDocs !</h1>
-    <h3>We are a safe, transparent way for you to explore what your writing reveals. <br> See our <a href="/about">elaborated philosophy</a> for more.</h3>
 
-    <form id="entry-form" action="/submit" method="post">
+<article class="front-page-hero">
+    <!-- span allows in-line flowing, where as div and p both split the text into individual lines -->
+  <span class="hero-paragraph italics black small">Hello! Welcome to</span> 
+  <span class="hero-paragraph italics purple small">PeriDocs</span>
+  <span class="hero-paragraph italics black small">!</span>
+    <div></div>
+  <span class="hero-paragraph purple large">A library of lived experience</span>
+  <span class="hero-paragraph black large">, collectively written by professionals, scholars, peers, communities, and</span>
+  <div></div>
+  <span class="hero-paragraph XL accented-shape">you.</span>
+    <div></div>
+  <a href="/create-entry" class="button general-button button-for-hero-positioning">Start an Entry</a>
+  <div></div>
+  <img src="/static/arrow.svg" class="arrow-for-hero-positioning" alt="">
 
-      <div id="entry-wrapper" class="entry-wrapper" data-locked="false">
+</article>
 
-        <textarea 
-          name="entry_text" 
-          rows="10"
-          placeholder="We do not share or sell any of your identifiable user data. We're here to listen..."
-          disabled
-        ></textarea>
+<article class="info-card-article">
 
-        <div class="entry-overlay" aria-hidden="true">
-          <div class="overlay-content">
-            <button 
-              type="button"
-              id="consent-toggle"
-              role="switch"
-              aria-checked="false"
-              data-state="off"
-              class="consent-toggle"
-            >
-              <span class="toggle-knob"></span>
-              <span class="toggle-label"></span>
-            </button>
-            <p class="overlay-message">
-            You may use the platform without revealing personal or sensitive information. 
-            <br> PeriDocs is based in the US, but your data will be hosted and processed in Germany (EU). 
-            <br> <br> By continuing, you consent to 1) transfer of your data between Germany and the US, <br> 2) processing of your data in Germany to provide and improve our service, and <br> 3) the safeguards we have in place, including pseudonymization and human oversight. 
-            <br> See our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages for details. 
-            </p>
-          </div>
+    <div class="info-card-layout">
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+                    <div class="info-card-image-feather-frame">
+                    <img
+                    class="info-card-image"
+                    src="/static/pdia-cccbc7da-373b-462b-aea3-0d236bcf21e3 Richard Deakin 1855 Image Sourced from Public Domain Image Archive - Biodiversity Heritage Library - Internet Archive - University of Toronto Libraries.jpg"
+                    alt="Image of flowers, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                    title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: cccbc7da-373b-462b-aea3-0d236bcf21e3 ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                    style="object-position: 0% 22%;"
+                    />
+                    </div>
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            Using the Site
+                        </h2>
+
+                        <p class="info-card-description">
+                            PeriDocs aims to be welcoming to its users, and considerate of the privacy of everyone.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href="/using-the-site"
+                       class="general-button">
+                        See The Process
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+
+                    <img
+                        class="info-card-image"
+                        src="/static/pdia-f8dc3382-2e3d-425d-9009-b929a6c10c7a Richard Deakin 1855 Image sourced from the Public Domain Image Archive - Biodiversity Heritage Library - Internet Archive - University of Toronto Libraries.jpg"
+                        alt="Image of a dilapidated colloseum, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: f8dc3382-2e3d-425d-9009-b929a6c10c7a ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        style="object-position: 50% 0%;"
+                    />
+
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            How it works
+                        </h2>
+
+                        <p class="info-card-description">
+                            The software of PeriDocs is released under the Affero General Public License v3.0.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href="https://github.com/Stays7339/PeriDocs"
+                       class="general-button">
+                        View The Source Code
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+        <section class="info-card">
+
+            <img
+                class="info-card-border"
+                src="/static/info-card-border.png"
+                alt=""
+            />
+
+            <div class="info-card-inner">
+
+                <div class="info-card-content-group">
+
+                    <img
+                        class="info-card-image"
+                        src="/static/pdia-ee457c8d-5a8b-4f79-808b-3ca42e96a70cRichard Deakin 1855 Image Sourced from Public Domain Image Archive - Biodiversity Heritage Library - Internet Archive - University of Toronto Libraries.jpg"
+                        alt="Image of flowers, drawn by hand. Artist: Richard Deakin; Year: 1855; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        title="Artist: Richard Deakin; &#10; Year: 1855; &#10; Original Endpoint for URL: ee457c8d-5a8b-4f79-808b-3ca42e96a70 ; &#10; Image Sourced from Public Domain Image Archive, Biodiversity Heritage Library, Internet Archive, University of Toronto Libraries"
+                        style="object-position: 50% 0%;"
+                    />
+
+                    <div class="info-card-text-group">
+
+                        <h2 class="info-card-title">
+                            Ways to help
+                        </h2>
+
+                        <p class="info-card-description">
+                            There are several different ways that you, specifically, can help support PeriDocs.
+                        </p>
+
+                    </div>
+
+                </div>
+
+                <div class="info-card-actions">
+
+                    <a href="/ways-to-help"
+                       class="general-button">
+                        Help us help others
+                    </a>
+
+                </div>
+
+            </div>
+
+        </section>
+
+    </div>
+
+</article>
+
+<article class="banner-1-banner" id="donate">
+    <!-- layout root wrapper for responsive reflow -->
+    <div class="banner-1-layout">
+
+        
+        <div class="banner-1-ribbon">
+            <h2 class="banner-1s-card-header">
+                <span>Donations</span>
+            </h2>
         </div>
-      <div class="entry-overlay-streaks" aria-hidden="true"></div>
+        
 
-      </div>
+       
+        <div class="banner-1-content">
 
-      <div class="meta" style="margin-top:12px;">
-        <button type="submit" class="btn primary" disabled>Analyze &amp; Search</button>
-      </div>
+            
+            <div class="banner-1-text-columns">
 
-    </form>
+                <div class="banner-1-box-flex-container-1">
+                    <p class="card-paragraph-small-white">
+                        PeriDocs.org is run by a diligent two-person team based in Atlanta, GA. 
+                        We plan to keep PeriDocs free of ads and limited in terms of data collection. If you'd like to help,
+                        spreading the word or donating to PeriDocs LLC are the best options.
+                    </p>
+                </div>
 
-  </div>
-</div>
+                <div class="banner-1-box-flex-container-2">
+                    <p><span class="card-paragraph-small-white">
+                        Some ways that your funding helps the platform:
+                    </span></p>
+                    <p><span class="card-paragraph-small-white">• Running servers to keep PeriDocs online;</span></p>
+                    <p><span class="card-paragraph-small-white">• Curating open-source and public domain media;</span></p>
+                    <p><span class="card-paragraph-small-white">• Eventually, adding on employees to the PeriDocs team!</span></p>
+                </div>
+
+            </div>
+
+            <div class="container-for-pair-of-banner-1-boxes" aria-label="Donation links">
+
+                <div class="banner-1-link-narrow-outer">
+                    <div class="banner-1-link-narrow-inner">
+                        <div class="banner-1-label">One-Time Donation</div>
+
+                        <div class="banner-1-input-wrapper">
+                            <span class="banner-1-currency">$</span>
+                            <input class="banner-1-input" type="number" min="1" step="1"
+                                   placeholder="One-time charge" id="onetime-amount"/>
+                        </div>
+
+                        <button
+                        class="banner-1-button"
+                        type="button"
+                        id="onetime-donation-btn">
+                        Checkout via Stripe
+                        </button>
+                    </div>
+                </div>
+
+                <div class="banner-1-link-wide-outer">
+                    <div class="banner-1-link-wide-inner">
+                        <div class="banner-1-label">Monthly Donation</div>
+
+                        <div class="banner-1-input-wrapper">
+                            <span class="banner-1-currency">$</span>
+                            <input class="banner-1-input" type="number" min="1" step="1"
+                                   placeholder="Recurring monthly charge" id="monthly-amount"/>
+                        </div>
+
+                        <button
+                        class="banner-1-button"
+                        type="button"
+                        id="monthly-donation-btn">
+                        Checkout via Stripe
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div> 
+
+    </div>
+
+</article>
+
 {% endblock %}

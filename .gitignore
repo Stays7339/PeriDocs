@@ -76,6 +76,7 @@ data/*
 !data/.gitkeep
 data/entries.json
 backups-for-the-main-data-folder/*
+recreating-new-look/img/peridocs.org.png
 
 
 # ------------------------------

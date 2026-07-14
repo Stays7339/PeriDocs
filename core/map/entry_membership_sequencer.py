@@ -1,6 +1,6 @@
 # ==========================================
 # core/map/entry_membership_sequencer.py
-# Save-state: 2026-04-29T03:31:55-04:00
+# Save-state: 2026-07-14T07:36-04:00
 # ==========================================
 """
 Entry Membership Sequencer.
@@ -19,7 +19,7 @@ from typing import Dict, List, Tuple
 import logging
 from datetime import datetime, timezone
 
-from app.helpers.entry_similarity import (
+from core.entry_orchestrator.entry_similarity import (
     cosine_similarity, 
     deterministic_mean, 
     safe_load_embedding,
@@ -44,35 +44,12 @@ class CandidateDecision:
 # ---------------- Runtime-backed embedding access ----------------
 
 async def get_embedding_for_entry(entry_id: str) -> np.ndarray:
-    """
-    Runtime-aware embedding fetch.
-
-    Behavior:
-    1. Prefer in-memory embedding (fast path)
-    2. Fallback to safe_load_embedding (full validation path)
-    3. Cache result into runtime for future calls
-
-    Guarantees:
-    - Preserves duplicate detection and validation from safe_load_embedding
-    - Never silently returns None
-    """
-
-    # ---- Step 1: Try runtime (fast path) ----
     emb = await entry_runtime.get_embedding(entry_id)
-    if emb is not None:
-        return emb
 
-    # ---- Step 2: Fallback to canonical loader (disk + validation) ----
-    emb = await centroid_system.run_sync_in_thread(
-        safe_load_embedding,
-        entry_id
-    )
+    if emb is None:
+        raise RuntimeError(f"Runtime missing embedding for entry_id={entry_id}")
 
-    # ---- Step 3: Cache into runtime (so next call is memory-only) ----
-    # This does NOT skip validation, it only memoizes after validation
-    await entry_runtime.set_embedding(entry_id, emb)
-
-    return emb
+    return np.asarray(emb, dtype=np.float32)
 
 async def evaluate_centroid_candidates(
     entry_id: str,
@@ -96,8 +73,8 @@ async def evaluate_centroid_candidates(
         ]
 
     for c in centroids:
-        logger.debug("entry_vec:", type(entry_vec))
-        logger.debug("centroid_vec:", type(c.current.vector))
+        logger.debug(f"entry_vec: {type(entry_vec)}")
+        logger.debug(f"centroid_vec: {type(c.current.vector)}")
         try:
             sim = cosine_similarity(entry_vec, c.current.vector)
         except ValueError:
@@ -274,7 +251,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
         entry_vec = await get_embedding_for_entry(entry_id)
 
         # ---- DEBUG: print entry norm ----
-        logger.debug("ENTRY:", entry_id, "NORM:", np.linalg.norm(entry_vec))
+        logger.debug(f"ENTRY: {entry_id} NORM: {np.linalg.norm(entry_vec)}")
 
         async with system._lock:
             if not system._centroids:
@@ -285,7 +262,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
 
                 # ---- DEBUG: print centroid norm ----
                 centroid_norm = np.linalg.norm(c.current.vector)
-                logger.debug("CENTROID:", c.centroid_id, "NORM:", centroid_norm)
+                logger.debug(f"CENTROID: {c.centroid_id} NORM: {centroid_norm}")
 
                 sim = cosine_similarity(entry_vec, c.current.vector)
 
@@ -306,6 +283,7 @@ async def suggest_precentroid_for_entry(entry_id: str, threshold: float = MINIMU
         logger.error("Error in suggest_precentroid_for_entry: entry=%s err=%s", entry_id, e)
         raise
 
+
 async def reconcile_centroid_membership_after_approval(
     centroid_suffix: str,
     event_index: int,
@@ -317,47 +295,97 @@ async def reconcile_centroid_membership_after_approval(
 
     centroid_suffix: e.g., "10" if precentroid_10 → centroid_10
     event_index: ledger event index for this approval
-    summary_entries: list of entry dicts representing the authoritative snapshot
-                     (already in memory, no disk I/O)
+    summary_entries: authoritative snapshot (already in memory)
     """
-    logger.info(
+
+    logger.debug(
         "[reconcile] start centroid=%s event_index=%s entries=%d",
         centroid_suffix,
         event_index,
         len(entry_runtime._entries),
     )
-    
-    # Extract entry_ids from summary snapshot
-    entry_ids = {e["entry_id"] for e in summary_entries}
+    logger.debug("[RECONCILE runtime id=%s]", id(entry_runtime))
 
     centroid_id = f"centroid_{centroid_suffix}"
     precentroid_id = f"precentroid_{centroid_suffix}"
 
-    # Lock the runtime before mutating entries
-    async with entry_runtime._lock:
-        updated = False
+    # Build deterministic filter set outside mutation loop
+    entry_ids = {e["entry_id"] for e in summary_entries}
 
-        for entry in entry_runtime._entries:
+    updated = False
 
-            logger.info(
-                "[reconcile] inspecting entry=%s centroids=%s",
-                entry.get("entry_id"),
-                len(entry.get("centroids", []))
-            )
-            if entry.get("entry_id") not in entry_ids:
-                continue
+    # ------------------------------------------------------------
+    # IMPORTANT:
+    # No lock here anymore.
+    # entry_runtime is already single-writer serialized via:
+    # - in-memory single asyncio loop execution model
+    # - flush worker + mutation discipline
+    # ------------------------------------------------------------
+    for entry in entry_runtime._entries:
 
-            centroids_list = entry.get("centroids", [])
-            if not isinstance(centroids_list, list):
-                continue
+        if entry.get("entry_id") not in entry_ids:
+            continue
 
-            for c in centroids_list:
-                if c.get("centroid_id") == precentroid_id:
-                    c["centroid_id"] = centroid_id
-                    c["event_index"] = event_index
-                    logger.debug("Just so you know, reconcile_centroid_membership_after_approval ran just now.")
-                    updated = True
+        centroids_list = entry.get("centroids", [])
+        if not isinstance(centroids_list, list):
+            continue
 
-        if updated:
-            logger.info("[reconcile] updated=%s", updated)
-            await entry_runtime._persist()
+        logger.debug(
+            "[reconcile] inspecting entry=%s centroids=%d",
+            entry.get("entry_id"),
+            len(centroids_list),
+        )
+
+        for c in centroids_list:
+            if c.get("centroid_id") == precentroid_id:
+                c["centroid_id"] = centroid_id
+                c["event_index"] = event_index
+                updated = True
+
+                logger.debug(
+                    "[reconcile] remapped entry=%s %s → %s",
+                    entry.get("entry_id"),
+                    precentroid_id,
+                    centroid_id,
+                )
+
+    # ------------------------------------------------------------
+    # Flush only if we actually mutated memory
+    # This respects your design: memory is authoritative,
+    # disk is a delayed batched persistence layer
+    # ------------------------------------------------------------
+    if updated:
+        logger.debug("[reconcile] updated=True; marking dirty and waking the background flush worker")
+        await entry_runtime.request_flush()
+    else:
+        logger.debug("[reconcile] no-op (no matching precentroid entries)")
+
+
+async def match_embedding_ephemerally(doc_embedding: np.ndarray) -> list[tuple[str, float, int]]:
+    """
+    Scores a temporary document embedding against all existing active centroids in memory.
+    Returns a list of 3-tuples: (centroid_id, similarity, event_index)
+    Bypasses state mutations, member array appends, and disk flushes completely.
+    """
+    matches = []
+    
+    # Safely iterate through the authoritative in-memory centroids
+    for centroid_id, centroid in centroid_system._centroids.items():
+        try:
+            # Resolve the active state tracking layout (maps to centroid_states table)
+            active_state = centroid.current
+            centroid_embedding = active_state.vector
+            event_index = active_state.event_index
+        except (RuntimeError, AttributeError):
+            # Fallback handle if a centroid is temporarily initialized without states
+            continue
+
+        if centroid_embedding is not None:
+            # Compute cosine similarity between the ephemeral text and the cluster center
+            sim = cosine_similarity(doc_embedding, centroid_embedding)
+            
+            # Check against your global MINIMUM_SIMILARITY_THRESHOLD
+            if sim >= MINIMUM_SIMILARITY_THRESHOLD:
+                matches.append((centroid_id, float(sim), event_index))
+                
+    return matches

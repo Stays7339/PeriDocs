@@ -1,0 +1,38 @@
+{# PeriDocs/app/templates/account-signin.html save-state 2026-05-20T20:09:30-04:00 #}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="wrap">
+  <div class="card-grid">
+  <div class="card">
+
+    <h1>Account signin</h1>
+
+    <div class="card-content">
+
+      <input class="typeahead-dropdown typeahead-item" id="username" type="text" placeholder="username" />
+      <div style="height:10px"></div>
+
+      <input class="typeahead-dropdown typeahead-item" id="password" type="password" placeholder="password" />
+      <div style="height:10px"></div>
+
+      <input class="typeahead-dropdown typeahead-item" id="totp" type="text" placeholder="TOTP code" />
+
+      <div style="height:20px"></div>
+
+      <button
+        class="general-button"
+        id="signin-button"
+      >
+        signin
+      </button>
+
+    </div>
+
+  </div>
+  </div>
+</div>
+
+<script src="/static/account-signin-responsiveness.js"></script>
+
+{% endblock %}

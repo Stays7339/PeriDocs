@@ -1,0 +1,1042 @@
+/* 
+PeriDocs/app/static/globals.css
+save-state 2027-07-13T21:57-04:00
+*/
+
+/* =========================
+   RESET ASSUMPTIONS PER WEB BROWSER
+========================= */
+
+@import url("/static/myers-reset-2.0.css");
+
+
+/* =========================
+   ROOT LAYOUT FOUNDATION
+========================= */
+
+:root {
+  --app-background-image: url("./museum-of-new-zealand-te-papa-tongarewa-1C7oRRwUkgU-unsplash-lighter.png");
+
+  /* App Header Height is here ere in globals.css since we're trying to keep one file per feature, 
+  rather than sprawling the details of a feature across several different files,
+ and it should to be available globally (in terms of available in each page of the website.) */
+  --app-header-height: 100px;
+  --page-vertical-offset: 20vh;
+
+  /* =========================
+     NEW: DYNAMIC PILL CONTROL (JS WRITES THESE)
+  ========================= */
+  --nav-pill-left: 0px;
+  --nav-pill-width: 0px;
+
+  /* General Toasts is here since we're trying to keep one file per feature, 
+  rather than sprawling the details of a feature across several different files,
+ and it should to be available globally (in terms of available in each page of the website.) */
+  --toast-success-bg: #A3F5B2;
+  --toast-error-bg: #F5A3A3;
+  --toast-neutral-bg: #F5E8A3;
+  --toast-text: #000000;
+  --privacy-toast-bg: var( --brandeggshelleggshell-004);
+  --privacy-toast-text: var(--toast-text);
+  --privacy-toast-link: var(--toast-text);
+  --card: #F0F0EB;
+  --accent: #7F86B0;
+  --text: #111;
+
+  
+}
+
+.page-content {
+  padding-top: var(--page-vertical-offset);
+}
+
+/* =========================
+   BASE ELEMENTS
+========================= */
+
+* {
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding-bottom: 10%;
+}
+
+body {
+  line-height: 1.5;
+}
+
+p {
+  margin-bottom: 1em;
+}
+
+h1 {
+  font-size: 50px;
+  text-align: center;
+}
+
+h2 {
+  font-size: 30px;
+}
+
+h3 {
+  font-size: 18px;
+  text-align: center;
+}
+
+strong {
+  font-weight: 700;
+}
+
+body {
+  font-family: "Lexend", sans-serif;
+  background-color: var(--brandeggshelleggshell-003);
+  background-image: var(--app-background-image);
+  background-size: cover;
+  background-position: center;
+ 
+
+  /* tiled images instead with harsh cutoff */
+  background-repeat: repeat-y;
+  position: relative;
+  z-index: 0;
+}
+
+/* ---------------------- About page paragraph alignment from earlier ---------------------- */
+.about-content p {
+  margin: 0 0 1rem 0; /* space between paragraphs */
+}
+
+p.left { text-align: left; }
+p.center { text-align: center; }
+p.right { text-align: right; }
+/* this part is intentionally redundant, since we set it so that all h1 headers are centered*/
+h1.center {
+  text-align: center;
+}
+
+/* ------------------ prevent auto zoom on mobile when tapping a text box------------------------ */
+input,
+textarea,
+select {
+  font-size: 16px; /* prevents iOS auto-zoom on focus */
+}
+
+/* links */
+a {
+  color: inherit;
+}
+
+/*Really, all buttons should be using general button, but just in case they don't, there's this*/
+button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: none;
+  outline: none;
+  background: none;
+
+  padding: 0;
+  margin: 0;
+
+  font: inherit;
+  color: inherit;
+  text-decoration: none;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--brandmuted-periwinklemuted-periwinkle-004);
+  outline-offset: 2px;
+}
+
+.general-button {
+  appearance: none;
+  -webkit-appearance: none;
+
+  border: none;
+  outline: none;
+  background: none;
+
+  padding: 0;
+  margin: 0;
+
+  font: inherit;
+  color: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 16px 24px;
+
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  border: none;
+  border-radius: 6px;
+
+  font-family: "Lexend";
+  font-weight: 600;
+  font-size: 14px;
+
+  color: var(--brandbright-periwinklebright-periwinkle-001); /* colors the text of the button an off-white*/
+  box-shadow: var(--box-shadow-typical);
+
+  text-decoration: none; /*gets rid of the underline */
+}
+
+.general-button:hover {
+  filter: brightness(1.05);
+}
+
+/* ADD THIS NEW BLOCK BELOW TO HANDLE THE GREY DISABLED STATE */
+.general-button:disabled {
+  background-color: #cccccc !important; /* Neutral slate grey */
+  color: #777777 !important;            /* Muted grey text */
+  cursor: not-allowed;                  /* Changes mouse cursor on hover */
+  box-shadow: none;                     /* Removes active button shadow depth */
+  filter: none;                         /* Disables brightness hover changes */
+}
+
+
+/* =========================
+   HEADER GLOBAL BEHAVIOR
+   (always visible, always pinned)
+========================= */
+
+header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--app-header-height);
+  z-index: 100;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0 3%;
+
+  /* translucent overlay behavior */
+  background: var(--branddusty-olivedusty-olive-006-translucent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: var(--box-shadow-typical);
+
+   /* =========================
+     NEW: allow JS-driven pill positioning context
+  ========================= */
+  position: fixed;
+}
+
+
+/* =========================
+   HEADER SECTIONS
+========================= */
+
+.header-left,
+.header-right {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
+.header-left {
+    justify-self: start;
+}
+
+.header-logo img {
+  width: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.header-right {
+  justify-content: flex-end;
+  gap: 12px;
+  flex: 0 0 auto;
+  justify-self: end;
+}
+
+/* =========================
+   HAMBURGER BUTTON
+========================= */
+
+.header-hamburger-button {
+  display: none;
+
+  width: 60px;
+  height: 60px;
+
+  align-items: center;
+  justify-content: center;
+
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  border-radius: 20px;
+
+  box-shadow: var(--box-shadow-typical);
+
+  color: var(--brandbright-periwinklebright-periwinkle-001);
+
+  font-size: 28px;
+  line-height: 1;
+}
+
+.header-hamburger-icon {
+  transform: translateY(-1px);
+}
+
+/* =========================
+   RIGHT SVG STACKED BUTTON
+========================= */
+
+.header-action-button {
+  width: 60px;
+  height: 60px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  flex: 0 0 auto;
+
+  border-radius: 20px;
+  background-color: var(--brandmuted-periwinklemuted-periwinkle-004);
+  box-shadow: var(--box-shadow-typical);
+}
+
+
+.header-action-group {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.header-action-button img {
+  width: 24px;
+  height: 24px;
+  display: block;
+
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+/* =========================
+LOOK #2 - FOR NARROWED DESKTOP ONLY
+RESPONSIVE STRUCTURAL RULE 
+   ≤ 1.65 ASPECT RATIO = "COMPRESSED LAYOUT MODE"
+========================= */
+
+@media (max-aspect-ratio: 175/100) {
+  /* This is the structural collapse mode trigger */
+
+  header {
+    grid-template-columns: auto 1fr auto auto;
+  }
+
+  /* keep DOM available, only hide visual presentation in header */
+  .header-center {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .header-hamburger-button {
+    display: flex;
+  }
+
+  body {
+    position: inherit; /* keeps layout stable when switching orientation */
+  }
+
+  .layout-horizontal-only {
+    display: none !important;
+  }
+
+  .layout-vertical-only {
+    display: block !important;
+  }
+}
+
+/* =========================
+LOOK #3 - FOR MOBILE DEVICES 
+(Lower aspect ratio does not effectively 
+get around the fractioning / aspect ratio trick)
+========================= */
+
+@media (max-width: 850px) {
+
+  header {
+    padding: 0 16px;
+  }
+
+  .header-logo img {
+    height: 32px;
+  }
+
+  .header-right {
+    gap: 8px;
+  }
+
+  .header-action-group {
+    gap: 8px;
+  }
+
+  .header-action-button,
+  .header-hamburger-button {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+  }
+
+  .header-action-button img {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* =========================
+LOOK-4   
+MOBILE LANDSCAPE
+========================= */
+
+@media (max-width: 900px) and (max-height: 500px) {
+
+  .header-center {
+    visibility: hidden;
+    pointer-events: none;
+    opacity: 0;
+  }
+
+  .header-hamburger-button {
+    display: flex;
+  }
+
+  .page-content {
+    padding-top: calc(var(--app-header-height) + 24px);
+  }
+
+  .mobile-menu-panel {
+    translate: 0px 50px;
+    max-height: 70vh;
+
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* This first mention of header center is necessar for positioning it in the proper horizontal anchor coordinate
+The next mention is to control the width as button are added and removed from the bar */
+
+.header-center {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+
+  display: block;
+
+  background: var(--branddusty-olivedusty-olive-006);
+  padding: 8px 16px;
+
+  white-space: nowrap;
+
+  /* pill becomes visual layer only, 
+  unrelated to the coordinates of the menu links, 
+  since the menu links determine the width */
+  background: transparent;
+}
+
+
+
+/* =========================
+   JS CONTROLLED RESPONSIVE PILL WIDTH
+========================= */
+
+.header-center::before {
+  content: "";
+  position: absolute;
+
+  /* JS controls these */
+  left: var(--nav-pill-left);
+  width: var(--nav-pill-width);
+
+  top: 50%;
+  transform: translateY(-50%);
+
+  height: 44px;
+
+  background: var(--branddusty-olivedusty-olive-006);
+
+  z-index: 0;
+  pointer-events: none;
+  border-radius: 10px;
+  box-shadow: var(--box-shadow-typical);
+}
+
+/* =========================
+   INNER CONTENT
+========================= */
+
+.header-center-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  z-index: 1;
+}
+
+/* =========================
+   GROUPS
+========================= */
+
+.menu-group-left,
+.menu-group-right {
+  display: flex;
+  gap: 12px;
+  position: absolute;
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.menu-group-left {
+  right: 50%;
+  transform: translateX(-8px);
+  justify-content: flex-end;
+}
+
+.menu-group-right {
+  left: 50%;
+  transform: translateX(8px);
+  justify-content: flex-start;
+}
+
+/* spine stays purely logical now */
+.header-center-spine {
+  position: absolute;   
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 1px;
+  height: 60%;
+}
+
+/* =========================
+   BUTTONS
+========================= */
+
+.menu-button {
+  display: inline-flex;
+  white-space: nowrap;
+  padding: 8px 12px;
+  font-family: "Lexend", sans-serif;
+  font-weight: 400;
+  color: var( --brandbright-periwinklebright-periwinkle-001); /* colors the text near-white */
+  align-items: center;
+  width: max-content;
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+
+/* =========================
+  JS REQUIRED for the sliding pill look;
+  this requirement has been bidirectionally confirmed.
+  Both the Javascript within new-new-look/base.html, AND
+  the header-center::before within globalss.css are necessary.
+========================= */
+
+/* =========================
+   MOBILE MENU OVERLAY
+========================= */
+
+.mobile-menu-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(6px);
+  display: none;
+  z-index: 15;
+}
+
+.mobile-menu-overlay.is-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-menu-panel {
+  width: min(90vw, 420px);
+  background: var(--brandeggshelleggshell-005);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: var(--box-shadow-typical);
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mobile-menu-panel .header-center-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* remove desktop positioning logic */
+.mobile-menu-panel .menu-group-left,
+.mobile-menu-panel .menu-group-right {
+  position: static;
+
+  transform: none;
+
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+
+  justify-content: flex-start;
+
+   width: 100%;
+}
+
+/* hide decorative center spine in popup */
+.mobile-menu-panel .header-center-spine {
+  display: none;
+}
+
+/*  make all buttons full-width stacked rows */
+.mobile-menu-panel .menu-button {
+  width: 100%;
+
+  padding: 14px 16px;
+
+  border-radius: 10px;
+
+  background: rgba(255,255,255,0.04);
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+}
+
+
+/* =========================
+   Modals
+========================= */
+.modal { display:none; position:fixed; inset:0; background: var(--modal-overlay-bg); backdrop-filter: blur(var(--modal-backdrop-blur)); justify-content:center; align-items:center; z-index: var(--modal-z); }
+.modal.is-active { display:flex; }
+.modal-content {
+  background: var(--modal-content-bg); border-radius: var(--modal-content-radius);
+  padding: var(--modal-content-padding); width: var(--modal-content-width);
+  max-width: var(--modal-content-max-width); box-shadow: var(--modal-content-shadow);
+}
+.modal-actions { display:flex; justify-content:flex-end; gap: var(--modal-actions-gap); }
+
+/* ---------------------- Feedback Modal ---------------------- */
+.feedback-modal{display:none;position:fixed;inset:0;background:rgba(17,17,17,0.55);backdrop-filter:blur(4px);justify-content:center;align-items:center;z-index:1002;}
+.feedback-modal-content{background:var(--card);border-radius:var(--radius);padding:24px;width:90%;max-width:420px;box-shadow:0 10px 30px rgba(0,0,0,0.25);}
+.feedback-modal-actions{display:flex;justify-content:flex-end;gap:8px;}
+.feedback-modal.is-open {
+  display: flex;
+}
+
+
+
+/* ---------------------- Toasts Animation---------------------- */
+#general-toast-container{position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);display:flex;flex-direction:row;gap:10px;pointer-events:none;z-index:1001;}
+.stacked-toast {
+  background-color:var(--toast-neutral-bg-bg);
+  color:var(--toast-text);padding:10px 15px;
+  border-radius:8px;display:inline-flex;
+  align-items:center;
+  opacity:0;
+  transform:translateY(20px);
+  transition:opacity 0.4s ease, transform 0.4s ease;
+  pointer-events:auto;
+}
+.stacked-toast.show{opacity:1;transform:translateY(0);}
+.stacked-toast.hide{opacity:0;transform:translateY(20px);}
+
+.toast-success {
+  background-color: var(--toast-success-bg);
+}
+
+.toast-error {
+  background-color: var(--toast-error-bg);
+}
+
+.toast-neutral {
+  background-color: var(--toast-neutral-bg);
+}
+
+#privacy-toast{position:fixed;bottom:1rem;left:50%;transform:translateX(-50%) translateY(20px);display:none;flex-direction:row;align-items:center;gap:.75rem;max-width:600px;padding:.75rem 1rem;border-radius:8px;font-size:.9rem;font-weight:500;z-index:10000;box-shadow:0 4px 12px rgba(0,0,0,.25);border:1px solid rgba(0,0,0,.15);background:var(--privacy-toast-bg);color:var(--privacy-toast-text);transition:opacity .4s ease,transform .4s ease;}
+#privacy-toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+#privacy-toast.hide{opacity:0;transform:translateX(-50%) translateY(20px);}
+#privacy-toast a{color:var(--privacy-toast-link);text-decoration:underline;}
+#privacy-toast button{background:transparent;border:none;color:var(--privacy-toast-text);font-size:1.2rem;cursor:pointer;margin-left:auto;opacity:.8;}
+#privacy-toast button:hover{opacity:1;}
+
+/* =========================
+   CARDS
+========================= */
+
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+
+  width: clamp(240px, 30vw, 520px);
+  min-height: 160px;
+
+  padding: 18px 20px;
+
+  background: #f6f1e6; /* soft paper tone */
+  border-radius: 10px;
+
+  color: var(--brandcarbon-blackcarbon-black-005);
+
+  /* corkboard separation shadow */
+  box-shadow:
+    0 2px 3px rgba(0,0,0,0.08),
+    0 10px 18px rgba(0,0,0,0.12);
+
+  transition: transform 180ms ease, box-shadow 180ms ease;
+
+  /* IMPORTANT: no clipping issues */
+  overflow: visible;
+
+  background:
+    radial-gradient(circle at 20% 30%, rgba(0,0,0,0.05), transparent 40%),
+    radial-gradient(circle at 70% 60%, rgba(0,0,0,0.04), transparent 45%),
+    var(--brandeggshelleggshell-005); /* cork base color */
+}
+
+.card::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+
+  background: var(--brandmuted-periwinklemuted-periwinkle-004);
+
+  box-shadow:
+    0 2px 3px rgba(0,0,0,0.25);
+
+  pointer-events: none;
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+
+  /* multiple offset dot layers = non-uniform speckle */
+  background:
+    radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(0,0,0,0.05) 1px, transparent 1.5px),
+    radial-gradient(circle, rgba(255,255,255,0.04) 1px, transparent 1.5px);
+
+  background-size:
+    18px 18px,
+    23px 23px,
+    31px 31px;
+
+  background-position:
+    0 0,
+    7px 11px,
+    13px 5px;
+
+  opacity: 1;
+}
+
+.card:hover {
+  transform: translateY(-3px) rotate(0.1deg);
+
+  box-shadow:
+    0 4px 6px rgba(0,0,0,0.10),
+    0 18px 28px rgba(0,0,0,0.18);
+}
+
+.card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.card.size-2 {
+  width: clamp(320px, 45vw, 700px);
+}
+
+.card.size-3 {
+  width: clamp(500px, 80vw, 1200px);
+}
+
+.card.max {
+  width: 100%;
+  min-height: 220px;
+}
+
+.card-grid {
+  display: flex;
+  flex-wrap: wrap; /* Allows cards to dynamically drop into new rows */
+  gap: 18px;
+
+  justify-content: center;
+  align-items: flex-start; /* FIX #1: Stops short cards from stretching to match the tallest card */
+  padding-bottom: 05%;
+  text-decoration: none;   
+}
+
+
+
+/* =========================
+   Entry Wrapper / Overlay
+========================= */
+.entry-wrapper { 
+  position: relative; 
+  overflow: hidden; 
+  border-radius: var(--radius-card); 
+}
+
+.entry-wrapper textarea {
+  width: 100%; 
+  resize: vertical; 
+  position: relative; 
+  z-index: 1; 
+  background: inherit;
+  padding: var(--space-2); 
+  border: var(--border-input); 
+  border-radius: var(--radius-card);
+  font-size: 1rem; 
+  line-height: 1.4;
+  transition: filter 0.3s ease, opacity 0.3s ease;
+}
+
+/* Double-layer protection: Soft blur directly onto the textbox when locked */
+.entry-wrapper[data-locked="true"] textarea {
+  filter: blur(0.8px);
+  opacity: 0.35; /* Dims the gray placeholder text way down */
+}
+
+
+.overlay-content { overflow-y: auto;}
+
+
+
+/* Buttons & toggles */
+
+:root {
+  --button-height: 48px;
+  --toggle-width: 250px;
+  --toggle-height: 36px;
+  --toggle-knob-size: 28px;
+  --toggle-knob-margin: 4px;
+  --toggle-knob-transform-on: 214px;
+  --accent-hover: #6B708F;
+}
+
+
+/* ========================================
+   UNIFIED CONSENT TOGGLE PILL + KNOB 
+======================================== */
+.consent-toggle {
+  position: relative; 
+  width: 250px; 
+  height: 36px;
+  border-radius: 999px; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2); 
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-sizing: border-box;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* 1. Kills the annoying vertical jumping/raising behavior on hover entirely */
+.consent-toggle:hover { 
+  background: var(--brandmuted-periwinklemuted-periwinkle-004); 
+  transform: none !important; 
+}
+
+.consent-toggle .toggle-knob {
+  position: absolute; 
+  width: 28px; 
+  height: 28px;
+  border-radius: 50%; 
+  background: linear-gradient(145deg, #fff, #f2f2f2);
+  left: 4px; 
+  z-index: 2;
+  transition: transform 0.3s ease;
+
+  /* 2. DIRECT PIXEL TUNING 
+     Change this value to adjust the layout height.
+     Try 3px, 4px, or 5px depending on your browser's rendering. */
+  top: 3px; 
+}
+
+/* Active State Styles */
+.consent-toggle[data-state="on"] { 
+  background: var(--brandmuted-periwinklemuted-periwinkle-004); 
+  color: var(--white); 
+}
+
+.consent-toggle[data-state="on"] .toggle-knob { 
+  transform: translateX(214px); 
+}
+
+/* =========================
+   FONTS
+========================= */
+
+@font-face {
+  font-family: "Lexend";
+  src: url("/static/fonts/Lexend/Lexend-VariableFont_wght.ttf") format("truetype");
+  font-weight: 100 900;
+  font-style: normal;
+}
+
+/* since google fonts didn't give a bold file, the browser will try to fake it when requesting other weights*/
+@font-face {
+  font-family: "Metal";
+  src: url("/static/fonts/Metal - front by Danh Hong/Metal-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Thin.ttf") format("truetype");
+  font-weight: 100;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ThinItalic.ttf") format("truetype");
+  font-weight: 100;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraLight.ttf") format("truetype");
+  font-weight: 200;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraLightItalic.ttf") format("truetype");
+  font-weight: 200;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-LightItalic.ttf") format("truetype");
+  font-weight: 300;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-MediumItalic.ttf") format("truetype");
+  font-weight: 500;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-SemiBoldItalic.ttf") format("truetype");
+  font-weight: 600;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraBold.ttf") format("truetype");
+  font-weight: 800;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-ExtraBoldItalic.ttf") format("truetype");
+  font-weight: 800;
+  font-style: italic;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-Black.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+}
+
+@font-face {
+  font-family: "Montserrat Alternates";
+  src: url("/static/fonts/Montserrat_Alternates/MontserratAlternates-BlackItalic.ttf") format("truetype");
+  font-weight: 900;
+  font-style: italic;
+}

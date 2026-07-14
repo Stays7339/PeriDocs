@@ -1,6 +1,6 @@
 # ===========================
 # core/nlp/__init__.py
-# save-state updated 2026-04-05T20:28:05-04:00
+# save-state updated 2026-06-14T16:08-04:00
 # ===========================
 """
 Async-only NLP pipeline interface for PeriDocs.
@@ -11,7 +11,6 @@ Exposes:
 - redact_pii, COMMON_NAMES: PII utilities
 - check_crisis_phrases, crisis_notification: crisis detection
 - repetition_score: repetition/echo detection
-- compute_emotion_profile_async, get_intensifiers, get_deintensifiers: async emotion analysis
 - Hashing utilities
 """
 

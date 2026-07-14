@@ -1,13 +1,13 @@
-{# PeriDocs-code/app/templates/privacy.html save-state 2026-03-19T18:23:10-04:00  #}
+{# PeriDocs-code/app/templates/privacy.html save-state 2026-07-10T09:46-04:00  #}
 {% extends "base.html" %}
 {% block title %}Privacy Policy | PeriDocs.org{% endblock %}
 
 {% block content %}
-  <div class="card">
-    <div class="card-content">
+  <div class="card-grid">
+    <div class="card size-3">
       <h1>PeriDocs Privacy Policy</h1>
       
-      <p><strong>Last Updated:</strong> 20 February 2026</p>
+      <p><strong>Last Updated:</strong> 10 July 2026</p>
       <br> <br>
       <h2>1. Acceptance of Policy</h2>
       <p>PeriDocs is an educational platform focused on heuristic-based semantic analysis, heuristic-based pragmatic interpretation, relevant hyperlink retreival based on the contents of the queries ("Entry," "Entries") submitted to the platform. <br> By accessing or using PeriDocs.org, operated by PeriDocs LLC, (“PeriDocs,” “we,” “us,” or “the Service”), the individual(s) using the Service (“User,” “Users”) agree to this Privacy Policy. <br> This Privacy Policy explains what personal data is processed, how it is processed, and the rights available to users under applicable data protection laws. <br> This document must be read together with our  <a href="/terms-of-service">Terms of Service</a>, which governs licensing, acceptable use, and deletion.</p> 
@@ -18,7 +18,7 @@
       <p>PeriDocs is designed around the principles of data minimization, determinism, auditability, and human oversight. Personal data is processed only where necessary to operate the Service, comply with legal obligations, and maintain system integrity. No personal data is processed for advertising, behavioral profiling, or resale.</p>
       <br>
       <p>Where applicable, PeriDocs aims to process personal data in accordance with the General Data Protection Regulation (GDPR) and the laws of the State of Georgia, United States of America. Users subject to CCPA/CPRA (California), VCDPA (Virginia), CPA (Colorado), CTDPA (Connecticut), and other applicable US state privacy legislation may have additional rights.</p>
-      <p><br><strong>Data Controller Identity:</strong> PeriDocs LLC is the data controller responsible for the processing of your personal data. While our company is operated from the United States (State of Georgia), all personal data, information, and intellectual property are hosted within the European Union (Germany). Where required, we implement appropriate safeguards such as Standard Contractual Clauses (SCCs). For data protection inquiries, contact our Data Protection team at <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p> <br>
+      <p><br><strong>Data Controller Identity:</strong> PeriDocs LLC is the data controller responsible for the processing of your personal data. While our company is operated from the United States (State of Georgia), all personal data, information, and intellectual property are hosted within the European Union (Germany). For international data transfers to our US operational footprint, the Service relies on your explicit, informed consent collected via our mandatory user interface toggle prior to data submission, in accordance with Article 49(1)(a) of the GDPR. For data protection inquiries, contact our Data Protection team at <a href="mailto:info@peridocs.org">info@peridocs.org</a>.</p>
       <br> <br>
   <p><strong>Simple English Terms:</strong></p>
 <ul>
@@ -174,11 +174,13 @@
       <p>We do not sell personal information. We have not sold personal information in the preceding 12 months.</p>
       <br> <br>
       <h2>11. International Data Transfers</h2>
-      <p>PeriDocs is operated from the United States (State of Georgia). However, all personal data from Users is stored and processed exclusively within the European Union (Germany). Where required, we implement appropriate safeguards such as Standard Contractual Clauses (SCCs).</p>
-      <p>For Users Outside the EU: If you are located outside the European Union, please be aware that your personal data will be transferred to and stored in Germany (EU). The EU has been recognized as providing an adequate level of data protection by various jurisdictions.</p>
-      <p>For US Operations: While our company is based in the United States, we operate data servers in the EU. Any operational access to data from the US is conducted under appropriate safeguards, including Standard Contractual Clauses (SCCs) approved by the European Commission.</p>
-      <p>For Australian Users: Your personal information will be stored in Germany (EU). Germany is subject to the GDPR, which provides strong privacy protections. Before any disclosure of personal information overseas, we take reasonable steps to ensure the overseas recipient handles your information in accordance with the Australian Privacy Principles.</p>
-      <p>You may request a copy of the safeguards we use for any data transfers by contacting us.</p>
+      <p>PeriDocs is operated from the United States (State of Georgia). However, all production database infrastructure, text processing nodes, and user data are hosted and processed exclusively within the European Union (Germany).</p>
+      <br>
+      <p><strong>The Article 49 Consent Framework:</strong> Because our operational agents are located in the United States, any transient administrative oversight or viewing of pseudonymized analytical text output via encrypted SSH secure tunnels may technically constitute a cross-border data transfer under the GDPR. To ensure absolute compliance, the Service does not ingest or process any user text until the User has interacted with a mandatory, explicit, opt-in consent toggle within our user interface. By interacting with this toggle, you explicitly authorize the cross-border processing of your data between Germany and the United States under the derogation provided by <strong>Article 49(1)(a) of the GDPR</strong>.</p>
+      <br>
+      <p><strong>For Users Outside the EU:</strong> If you are accessing the platform from outside the European Union or the United States, please be aware that your submitted Entries will be routed to and stored securely on our servers in Germany (EU), which aims to maintain a high, globally recognized standard of data protection.</p>
+      <br>
+      <p><strong>For Australian Users:</strong> Your personal information is hosted exclusively on infrastructure within Germany, which is governed by the robust protections of the GDPR. To the extent that operational administration occurs from our United States office, we take systematic and hardware-bound steps to ensure that your data is treated pseudonymously and handles your information in alignment with the Australian Privacy Principles (APPs).</p>
       <br> <br>
       <h2>12. Children's Privacy</h2>
       <p>Our Service is not directed to children under the applicable age of consent for data processing in their jurisdiction. We do not knowingly collect personal information from children under the applicable age.</p>
@@ -234,8 +236,6 @@
       <br> <br>
       <h2>17. Limitation of Liability</h2>
       <p>By using the Service, Users acknowledge and agree that any limitations of liability, disclaimers, and remedies for claims relating to personal data, privacy, or the use of the Service are governed by the Terms of Service. For avoidance of doubt, all provisions in the Terms of Service concerning limitation of liability, indemnification, and dispute resolution apply to any claims arising under or in connection with this Privacy Policy. Users should review the Terms of Service to understand the scope and effect of these limitations.</p>
-      <h2>18. General Provisions</h2>
-      <p>If any provision of this Agreement is held invalid or unenforceable, the remaining provisions shall remain in full force and effect.</p>
     </div>
   </div>
 {% endblock %}

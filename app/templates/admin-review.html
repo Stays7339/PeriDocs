@@ -1,27 +1,65 @@
-{# PeriDocs/app/templates/admin-review.html save-state 2026-04-24T14:04:00-04:00 #}
+{# PeriDocs/app/templates/admin-review.html save-state 2026-07-07T10:48-04:00 #}
 {% extends "base.html" %}
 {% block title %}Admin Review | PeriDocs.org{% endblock %}
 
 {% block content %}
+
+<div class="card-grid">
 <div class="card">
   <h1>Review Queue</h1>
   <div id="review-list" class="card-content"></div>
+  <template id="review-item-template">
+  <div class="excerpt" data-id="">
+    <strong class="clickable"></strong><br>
+    <span class="summary"></span><br>
+    Entries: <span class="entry-count"></span>
+
+    <div style="margin-top:10px;">
+      <button class="btn primary expand-btn">View Entries</button>
+      <button class="btn primary approve-btn">Approve</button>
+      <button class="btn ghost reject-btn">Reject</button>
+    </div>
+
+    <div class="entries-container" style="display:none; margin-top:10px;"></div>
+  </div>
+</template>
 </div>
 
 <div class="card">
   <h2>Create Heuristic</h2>
 
   <div id="givens-container"></div>
-  <button class="btn" onclick="addGiven()">+ Add Given</button>
+  <button id="add-given-btn" class="general-button">+ Add Given</button>
 
   <hr>
 
   <div id="outputs-container"></div>
-  <button class="btn" onclick="addOutput()">+ Add Output</button>
+  <button id="add-output-btn" class="general-button">+ Add Output</button>
 
   <br><br>
-  <button class="btn primary" onclick="submitHeuristic()">Submit</button>
+  <button id="submit-heuristic-btn" class="general-button">Submit Heuristic</button>
 
 </div>
+
+<div class="card">
+  <h2>Create Resource</h2>
+
+  <input id="resource-title" class="input" placeholder="Resource Title" style="margin-bottom: 8px; width: 100%;">
+  <input id="resource-url" class="input" placeholder="Resource URL" style="margin-bottom: 8px; width: 100%;">
+  <input id="resource-type" class="input" placeholder="Resource Type (Medium/Genre)" style="margin-bottom: 8px; width: 100%;">
+  <input id="resource-desc" class="input" placeholder="Resource Description" style="margin-bottom: 8px; width: 100%;">
+
+  <hr>
+  <h3>Linked Concepts</h3>
+  <div id="resource-concepts-container"></div>
+  <button id="add-resource-concept-btn" class="general-button">+ Add Linked Concept</button>
+
+  <br><br>
+  <button id="submit-resource-btn" class="general-button">Submit Resource</button>
+</div>
+
+</div>
+
 <script src="/static/admin_review_ux.js" defer></script>
+
 {% endblock %}

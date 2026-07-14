@@ -1,0 +1,69 @@
+{# PeriDocs/app/templates/account-signup.html save-state 2026-05-25T17:04:50-04:00 #}
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card-grid">
+  <div class="card">
+
+    <h1>Create An Account</h1>
+
+    <div class="card-content">
+
+      <input class="typeahead-dropdown typeahead-item" id="username" type="text" placeholder="username" />
+
+      <div style="height:10px"></div>
+
+      <input class="typeahead-dropdown typeahead-item" id="password" type="password" placeholder="password" />
+      
+      <div style="height:10px"></div>
+
+      <input class="typeahead-dropdown typeahead-item"
+       id="password-confirm"
+       type="password"
+       placeholder="re-type password" />
+
+      <div style="height:20px"></div>
+
+      <button class="general-button" id="create-account-btn">
+        Create Account
+      </button>
+
+      <!-- TOTP DISPLAY -->
+      <div id="totp-section" style="display:none; margin-top:20px;">
+
+        <p><strong>Save this TOTP secret:</strong></p>
+        <div class="excerpt" id="totp-secret"></div>
+
+        <details>
+          <summary>Show manual URI</summary>
+          <div class="excerpt" id="totp-uri"></div>
+        </details>
+
+        <!-- hide the image until there's something to render  -->
+        <img id="qr" style="margin-top:15px; width:180px; height:180px; image-rendering:pixelated; display:none;" />
+
+        <br>
+
+        <input
+          id="signup-totp-code"
+          type="text"
+          placeholder="Enter current TOTP code"
+        />
+
+        <div style="height:10px"></div>
+
+        <button class="general-button" id="complete-account-creation-btn">
+          Verify & Create Account
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block page_scripts %}
+<script src="/static/account-signup-responsiveness.js"></script>
+{% endblock %}

@@ -1,0 +1,25 @@
+/* ---------------------- 
+PeriDocs/app/static/custom-styled-text-field.css 
+save-state 2026-05-08T12:12:30-04:00 
+---------------------- */
+
+.typeahead-dropdown {
+  position: relative;
+  background: var(--card-bg, #fff);
+  border: 1px solid #ccc;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 2px;
+  z-index: 100;
+}
+
+.typeahead-item {
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: normal; /* IMPORTANT: allows wrapping */
+}
+
+.typeahead-item:hover,
+.typeahead-item.active {
+  background: #eee;
+}

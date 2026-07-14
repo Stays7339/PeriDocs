@@ -10,7 +10,7 @@ import numpy as np
 EXPECTED_DIM = 1024
 
 if len(sys.argv) < 2:
-    raise RuntimeError("Usage: python tools/check_npz.py <path_to_npz>")
+    raise RuntimeError("Usage: python list_the_table_of_contents_for_this_npz_file.py <full filepath> ")
 
 raw_path = sys.argv[1]
 path = os.path.abspath(raw_path)
