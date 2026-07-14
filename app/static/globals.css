@@ -1,6 +1,6 @@
 /* 
 PeriDocs/app/static/globals.css
-save-state 2026-05-25T19:07:10-04:00
+save-state 2027-07-13T21:57-04:00
 */
 
 /* =========================
@@ -189,6 +189,15 @@ button:focus-visible {
 
 .general-button:hover {
   filter: brightness(1.05);
+}
+
+/* ADD THIS NEW BLOCK BELOW TO HANDLE THE GREY DISABLED STATE */
+.general-button:disabled {
+  background-color: #cccccc !important; /* Neutral slate grey */
+  color: #777777 !important;            /* Muted grey text */
+  cursor: not-allowed;                  /* Changes mouse cursor on hover */
+  box-shadow: none;                     /* Removes active button shadow depth */
+  filter: none;                         /* Disables brightness hover changes */
 }
 
 
@@ -779,68 +788,113 @@ The next mention is to control the width as button are added and removed from th
 
 .card-grid {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: wrap; /* Allows cards to dynamically drop into new rows */
   gap: 18px;
 
   justify-content: center;
-  align-items: stretch;
-
+  align-items: flex-start; /* FIX #1: Stops short cards from stretching to match the tallest card */
   padding-bottom: 05%;
-  text-decoration: none;
+  text-decoration: none;   
 }
-
 
 
 
 /* =========================
    Entry Wrapper / Overlay
 ========================= */
-.entry-wrapper { position: relative; overflow:hidden; border-radius: var(--radius-card); }
+.entry-wrapper { 
+  position: relative; 
+  overflow: hidden; 
+  border-radius: var(--radius-card); 
+}
+
 .entry-wrapper textarea {
-  width:100%; resize:vertical; position:relative; z-index:1; background:inherit;
-  padding: var(--space-2); border: var(--border-input); border-radius: var(--radius-card);
-  font-size:1rem; line-height:1.4;
+  width: 100%; 
+  resize: vertical; 
+  position: relative; 
+  z-index: 1; 
+  background: inherit;
+  padding: var(--space-2); 
+  border: var(--border-input); 
+  border-radius: var(--radius-card);
+  font-size: 1rem; 
+  line-height: 1.4;
+  transition: filter 0.3s ease, opacity 0.3s ease;
 }
-.entry-overlay {
-  position:absolute; inset:0; z-index:10; pointer-events:none;
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  background-color: rgba(255,255,255,var(--overlay-opacity));
-  backdrop-filter: blur(var(--streaks-blur)) saturate(120%);
-  border-radius:inherit; border:1px solid rgba(255,255,255,0.15);
-  opacity:0; transition: opacity 0.3s ease, backdrop-filter 0.3s ease;
-  overflow-y: auto;
+
+/* Double-layer protection: Soft blur directly onto the textbox when locked */
+.entry-wrapper[data-locked="true"] textarea {
+  filter: blur(0.8px);
+  opacity: 0.35; /* Dims the gray placeholder text way down */
 }
-.entry-wrapper[data-locked="true"] .entry-overlay { opacity:1; pointer-events:auto; }
-.entry-overlay-streaks {
-  position:absolute; inset:0; z-index:7; pointer-events:none; border-radius:inherit;
-  filter: blur(var(--streaks-blur)); background: var(--streaks-bg);
-  mask-image: var(--streaks-mask); -webkit-mask-image: var(--streaks-mask);
-  mask-repeat:repeat; -webkit-mask-repeat:repeat; opacity:0;
-  transition: opacity 0.3s ease, visibility 0s linear 0.3s;
-}
-.entry-wrapper[data-locked="true"] .entry-overlay-streaks {
-  opacity:1; visibility:visible; transition: opacity 0.6s ease, visibility 0s;
-}
+
 
 .overlay-content { overflow-y: auto;}
 
 
-/* =========================
-   Consent Toggle
-========================= */
+
+/* Buttons & toggles */
+
+:root {
+  --button-height: 48px;
+  --toggle-width: 250px;
+  --toggle-height: 36px;
+  --toggle-knob-size: 28px;
+  --toggle-knob-margin: 4px;
+  --toggle-knob-transform-on: 214px;
+  --accent-hover: #6B708F;
+}
+
+
+/* ========================================
+   UNIFIED CONSENT TOGGLE PILL + KNOB 
+======================================== */
 .consent-toggle {
-  position: relative; width: var(--toggle-width); height: var(--toggle-height);
-  border-radius:999px; cursor:pointer; display:flex; align-items:center; justify-content:center;
-  background: rgba(255,255,255,0.2); border:1px solid rgba(255,255,255,0.3);
+  position: relative; 
+  width: 250px; 
+  height: 36px;
+  border-radius: 999px; 
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2); 
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-sizing: border-box;
+  transition: background 0.3s ease, color 0.3s ease;
 }
+
+/* 1. Kills the annoying vertical jumping/raising behavior on hover entirely */
+.consent-toggle:hover { 
+  background: var(--brandmuted-periwinklemuted-periwinkle-004); 
+  transform: none !important; 
+}
+
 .consent-toggle .toggle-knob {
-  position:absolute; width: var(--toggle-knob-size); height: var(--toggle-knob-size);
-  border-radius:50%; background: linear-gradient(145deg,#fff,#f2f2f2);
-  left: var(--toggle-knob-margin); top: var(--toggle-knob-margin); z-index:2;
+  position: absolute; 
+  width: 28px; 
+  height: 28px;
+  border-radius: 50%; 
+  background: linear-gradient(145deg, #fff, #f2f2f2);
+  left: 4px; 
+  z-index: 2;
   transition: transform 0.3s ease;
+
+  /* 2. DIRECT PIXEL TUNING 
+     Change this value to adjust the layout height.
+     Try 3px, 4px, or 5px depending on your browser's rendering. */
+  top: 3px; 
 }
-.consent-toggle[data-state="on"] .toggle-knob { transform: translateX(var(--toggle-knob-transform-on)); }
-.consent-toggle[data-state="on"] { background: var(--accent); color: var(--white); }
+
+/* Active State Styles */
+.consent-toggle[data-state="on"] { 
+  background: var(--brandmuted-periwinklemuted-periwinkle-004); 
+  color: var(--white); 
+}
+
+.consent-toggle[data-state="on"] .toggle-knob { 
+  transform: translateX(214px); 
+}
 
 /* =========================
    FONTS

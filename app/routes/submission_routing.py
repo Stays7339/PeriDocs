@@ -1,6 +1,6 @@
 # ==========================================
-# app/routes/entry.py
-# save-state 2026-06-05T19:56-04:00
+# app/routes/submission_routing.py
+# save-state 2026-07-13T22:28-04:00
 # ==========================================
 from fastapi import Request, Form, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
@@ -12,10 +12,11 @@ import numpy as np
 import asyncio
 import hashlib
 import os
+import regex
 import logging
 
 from app.routes import app
-from app.helpers.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
+from core.entry_orchestrator.entry_similarity import cosine_similarity, deterministic_mean, safe_load_embedding
 from app.helpers.json_safe import json_safe
 from core.nlp.process_entry import process_entry_async
 from core.map.deletion import DeletionManager
@@ -43,7 +44,16 @@ delete_tokens_memory: dict[str, str] = {}  # key: real_entry_id, value: delete_t
 # ---------------- Active WebSocket connections ----------------
 active_ws_connections: dict[str, WebSocket] = {}
 
-async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,  user_id: str | None = None,):
+# ---------------- Storage block for unpersisted transient submissions ----------------
+ephemeral_entries: dict[str, dict] = {}
+
+async def process_entry_background(
+    entry_text: str, 
+    user_ip: str, 
+    entry_id: str,  
+    user_id: str | None = None,
+    opt_in: bool = False # <--- Pass flag down from endpoint
+):
     logger.debug(
         "[BACKGROUND] user_id=%r",
         user_id
@@ -58,47 +68,29 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
     def wrapped_progress(fraction: float):
         progress_dict[entry_id] = min(max(fraction, 0.0), 1.0)  # clamp 0–1
 
+    # Pass opt_in down to NLP module
     entry, delete_token = await process_entry_async(
         entry_text,
         user_ip=user_ip,
         user_id=user_id,
-        progress_callback=wrapped_progress
-    )
-
-    logger.debug(
-        "process_entry_async returned user_id=%r",
-        entry.get("user_id")
-    )
-
-    await entry_runtime.append_entry(entry)
-
-    
-
-    logger.debug(
-        "process_entry_async returned: %s",
-        sorted(entry.keys())
-    )
-
-    logger.debug(
-        "Entry runtime contains id after processing? %s",
-        entry_runtime.get_entry_by_id(
-            entry["entry_id"]
-        ) is not None
-    )
-
-    logger.debug(
-        "Entry count immediately after processing: %d",
-        len(entry_runtime.get_all_entries())
-    )
-
-    logger.debug(
-        "Returned entry_id=%s",
-        entry.get("entry_id")
+        progress_callback=wrapped_progress,
+        opt_in=opt_in
     )
 
     real_entry_id = entry["entry_id"]
 
-    delete_tokens_memory[entry["entry_id"]] = delete_token
+    # Target Fix: Conditionally save data based on opt-in request
+    if opt_in:
+        await entry_runtime.append_entry(entry)
+        delete_tokens_memory[real_entry_id] = delete_token
+
+        # Wrap the directory setup and flush request safely inside the opt_in check
+        os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
+        await entry_runtime.request_flush() 
+    else:
+        # Cache memory references directly to handle UI responses without writes
+        ephemeral_entries[real_entry_id] = entry
+        delete_tokens_memory[real_entry_id] = None  # Ephemeral records don't track deletion tokens
 
     # ---------------- Option A: push crisis immediately ----------------
     if entry.get("crisis_flag"):
@@ -111,25 +103,13 @@ async def process_entry_background(entry_text: str, user_ip: str, entry_id: str,
                     "real_id": entry["entry_id"]
                 })
             except WebSocketDisconnect:
-                # client already closed, safe to ignore
                 pass
 
     # ---------------- Map temp ID → real entry_id ----------------
     temp_to_real_entry_id[entry_id] = entry["entry_id"]
 
 
-    os.makedirs(os.path.join(os.getenv("PERIDOCS_DATA_DIR", "data"), "entries"), exist_ok=True)
     logger.info("Entries in memory: %d", len(entry_runtime.get_all_entries()))
-
-
-    logger.debug(
-        "Entries before flush: %d",
-        len(entry_runtime.get_all_entries())
-    )
-
-
-    await entry_runtime.request_flush()
-
     
 
     # by using request_flush, rather than anything else, 
@@ -152,6 +132,7 @@ async def debug_all_requests(request: Request, call_next):
 async def submit_entry(
     request: Request,
     entry_text: str | None = Form(None),
+    opt_in: str | bool = Form(False), # Changed to accept raw string input from HTML
     background_tasks: BackgroundTasks = None
 ):
     
@@ -159,6 +140,16 @@ async def submit_entry(
     if "application/json" in request.headers.get("content-type", ""):
         data = await request.json()
         entry_text = data.get("entry_text", "")
+        opt_in = data.get("opt_in", False)
+
+    # ============================================================
+    # STRING-TO-BOOLEAN SANITIZATION
+    # ============================================================
+    if isinstance(opt_in, str):
+        opt_in = opt_in.strip().lower() == "true"
+    else:
+        opt_in = bool(opt_in)
+    # ============================================================
 
     if not entry_text:
         return JSONResponse({"status": "error", "message": "No entry provided"}, status_code=400)
@@ -172,7 +163,14 @@ async def submit_entry(
     progress_dict[temp_entry_id] = 0.0  # ensure initial progress is 0
 
     # ---------------- Start background processing ----------------
-    background_tasks.add_task(process_entry_background, entry_text, client_host, temp_entry_id, user_id)
+    background_tasks.add_task(
+        process_entry_background, 
+        entry_text, 
+        client_host, 
+        temp_entry_id, 
+        user_id, 
+        opt_in
+    )
 
     logger.debug(
         "Submit function triggered for temp_id=%s user_id=%s",
@@ -202,9 +200,10 @@ async def entry_progress_ws(websocket: WebSocket, entry_id: str):
             entry = entry_runtime.get_entry_by_id(real_id)
 
             if entry is None:
-                crisis_flag = None  # unknown state, not False
-            else:
-                crisis_flag = entry.get("crisis_flag")
+                entry = ephemeral_entries.get(real_id) # Fallback to transient storage block
+
+            # Unify extraction so crisis flags are captured from both storage variants
+            crisis_flag = entry.get("crisis_flag") if entry else None
 
             # --- MINIMAL OPTION A: push crisis immediately ---
             if crisis_flag and not crisis_triggered:
@@ -247,6 +246,8 @@ async def submit_success(request: Request, id: str):
     id = temp_to_real_entry_id.get(id, id)
         
     entry = entry_runtime.get_entry_by_id(id)
+    if not entry:
+        entry = ephemeral_entries.get(id) # <--- Fallback reference resolution
 
     logger.debug(
         "submit_success entry=%r",
@@ -277,6 +278,11 @@ async def submit_success(request: Request, id: str):
     entry_vec = embeddings.get(entry_id)
 
     scored_entries = []
+
+    # Target Fix: If vector doesn't exist globally, draw it out from our hidden transport key
+    entry_vec = embeddings.get(entry_id)
+    if entry_vec is None and "_tmp_embedding" in entry:
+        entry_vec = entry["_tmp_embedding"]
 
     if entry_vec is not None:
         for eid, vec in embeddings.items():
@@ -311,6 +317,84 @@ async def submit_success(request: Request, id: str):
 
     # logger.debug("Submit_success function triggered for id=%s", id)
 
+    import copy
+
+    reasoning = copy.deepcopy(entry.get("reasoning"))
+
+    if reasoning:
+        # ---------------- Build concept lookup ----------------
+        concept_lookup = {}
+        from core.mode_lock import SystemModeLock  
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            from core.database import db_engine
+
+            async with db_engine.pool.connection() as conn:
+                cursor = await conn.execute(
+                    "SELECT concept_id AS id, label FROM kb.concepts"
+                )
+                rows = await cursor.fetchall()
+
+            concept_lookup = {
+                concept["id"]: concept["label"]
+                for concept in rows
+            }
+
+            logger.debug(
+                "Loaded %d concept labels. Sample keys: %s",
+                len(concept_lookup),
+                list(concept_lookup.keys())[:5],
+            )
+
+        else:
+            ttl_dir = Path("data/reasoning")
+
+            if ttl_dir.exists():
+                for file in ttl_dir.glob("*.ttl"):
+                    text = file.read_text(encoding="utf-8")
+
+                    urn_match = regex.search(
+                        r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
+                        text
+                    )
+                    label_match = regex.search(
+                        r'rdfs:label\s+"([^"]+)"',
+                        text
+                    )
+
+                    if urn_match and label_match:
+                        concept_lookup[urn_match.group(1)] = label_match.group(1).strip()
+
+        logger.debug(
+            "Reasoning concept IDs: %s",
+            list(reasoning.get("final_concepts", {}).keys()),
+        )
+
+        # ---------------- Replace final_concepts ----------------
+        if "final_concepts" in reasoning:
+            reasoning["final_concepts"] = {
+                concept_lookup.get(cid, cid): score
+                for cid, score in reasoning["final_concepts"].items()
+            }
+
+        # ---------------- Replace receipt ----------------
+        for step in reasoning.get("receipt", []):
+            step["input_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in step.get("input_concepts", [])
+            ]
+
+            step["output_concept"] = concept_lookup.get(
+                step.get("output_concept"),
+                step.get("output_concept"),
+            )
+
+        # ---------------- Replace resource concepts ----------------
+        for resource in reasoning.get("culled_resource_list", []):
+            resource["assigned_concepts"] = [
+                concept_lookup.get(cid, cid)
+                for cid in resource.get("assigned_concepts", [])
+            ]
+
     return templates.TemplateResponse(
         "submit-success.html",
         {
@@ -320,7 +404,7 @@ async def submit_success(request: Request, id: str):
             "safe_text": entry.get("safe_text"),
             "top_matches": top_matches_formatted,
             "delete_token": delete_token,
-            "reasoning": entry.get("reasoning"),
+            "reasoning": reasoning,
         },
     )
 
@@ -382,3 +466,46 @@ async def delete_entry_api(request: Request, delete_token: str = Form(...)):
             "delete.html",
             {"request": request, "error": "Deletion requests are currently not working. Please contact support."}
         )
+
+async def fetch_matching_resources(deduced_tags: list[str]) -> list[dict]:
+    """
+    Unified read abstraction to gather resources for submit-success formatting.
+    Works seamlessly with both Postgres and Flat-File JSON configurations.
+    """
+    if not deduced_tags:
+        return []
+
+    # CASE A: POSTGRESQL ENGINE MODE
+    if getattr(mode_lock, "mode", "JSON") == "POSTGRESQL":
+        from core.database import db_engine
+        try:
+            async with db_engine.pool.connection() as conn:
+                rows = await conn.execute(
+                    """
+                    SELECT DISTINCT er.title, er.url, er.description 
+                    FROM kb.external_resources er
+                    JOIN kb.resource_concept_mappings rcm ON er.resource_id = rcm.resource_id
+                    WHERE rcm.concept_id = ANY($1);
+                    """,
+                    deduced_tags
+                )
+                return [dict(r) for r in rows]
+        except Exception:
+            return []  # Fallback gracefully to empty list on database hiccups
+
+    # CASE B: FLAT-FILE MODE (JSON/NPZ)
+    else:
+        if not os.path.exists(RESOURCES_JSON_FILE):
+            return []
+        try:
+            with open(RESOURCES_JSON_FILE, "r", encoding="utf-8") as f:
+                all_res = json.load(f)
+            
+            # Intersection match: pull resources that share at least one tag
+            return [
+                {"title": r["title"], "url": r["url"], "description": r["description"]}
+                for r in all_res 
+                if len(set(r.get("assigned_concepts", [])) & set(deduced_tags)) > 0
+            ]
+        except Exception:
+            return []

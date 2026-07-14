@@ -1,6 +1,6 @@
 /* ---------------------- 
 PeriDocs/app/static/stylesheet.css 
-save-state 2026-05-10T12:31:10-04:00 
+save-state 2026-07-14T08:09-04:00 
 ---------------------- */
 /* ======= Viasuals for Front Page Landing Hero =========*/
 
@@ -549,4 +549,76 @@ save-state 2026-05-10T12:31:10-04:00
     justify-content: center;
   }
 
+}
+
+/* ====================================================================
+   Unified Layout Anchors (Desktop/Universal Rules)
+   ==================================================================== */
+
+/* Standard layout wrapper for your toggles inside card articles */
+.toggle-container-row {
+    display: flex;
+    flex-direction: row;
+    align-items: flex-start;
+    gap: 20px;
+    width: 100%;
+}
+
+/* Keeps text layout blocks predictable when nested next to buttons */
+.opt-in-message-block,
+.consent-message-block {
+    flex: 1;
+}
+
+
+/* ====================================================================
+   Responsive Alignment — Matches Your App's Breakpoint (<= 850px)
+   ==================================================================== */
+@media (max-width: 850px) {
+    
+    /* 1. Cookie Notice Layout Pivot */
+    #privacy-toast {
+        flex-direction: column;         /* Switch row sequence to a vertical y-height flow */
+        align-items: center;            /* Center elements horizontally inside the banner */
+        text-align: center;             /* Keep text elements neatly uniform */
+        width: calc(100% - 32px);       /* Fit full width while maintaining structural margins */
+        max-width: 480px;               /* Prevent it from becoming excessively wide on small tablets */
+        height: auto;                   /* Allow elastic adjustments to content size */
+        padding: 20px 16px;
+    }
+
+    /* Counteract the desktop auto-margin pushing the close option out of alignment */
+    #privacy-toast button {
+        margin: 12px 0 0 0;             /* Center cleanly and add spacing below message text */
+    }
+
+    /* 2. Form Toggles Mobile Pivot */
+    .toggle-container-row {
+        flex-direction: column;         /* Stack the toggle above the explanation */
+        align-items: flex-start;        /* Keep toggle switches neatly left-aligned */
+        gap: 12px;                      /* Compact gaps appropriate for form inputs */
+    }
+}
+
+/* ====================================================================
+   Header Left Brand Layout Rules
+   ==================================================================== */
+
+.header-left {
+    display: flex;
+    flex-direction: column;    /* Stack contents vertically (Logo top, text bottom) */
+    align-items: flex-start;   /* Align both items flush to the left edge */
+    justify-content: center;   /* Keep container vertically centered in header space */
+    gap: 2px;                  /* Tight micro-spacing between logo and version text */
+}
+
+/* Version subtitle configuration */
+.header-left .header-version {
+    font-size: 10px;           /* Crisp, lightweight compact text size */
+    font-weight: 500;
+    line-height: 1;            /* Eliminates invisible bounding box line padding */
+    margin: 0;                 /* Strips away default browser paragraph margin-blowout */
+    padding: 0;
+    color: rgba(0, 0, 0, 0.4); /* Subdued gray ink color so it remains unobtrusive */
+    letter-spacing: 0.02em;    /* Enhances readability for microscopic characters */
 }

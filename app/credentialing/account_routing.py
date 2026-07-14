@@ -1,6 +1,6 @@
 # ==========================================
 # app/credentialing/account_routing.py
-# save-state 2026-06-03T22:32-04:00
+# save-state 2026-07-13T12:17-04:00
 # ==========================================
 
 import io
@@ -64,7 +64,16 @@ class DeleteAccountRequest(BaseModel):
 async def account_signup_start(
     data: AccountSignupStartRequest
 ):
-
+    # 1. Check Username Uniqueness
+    if account_runtime.is_username_taken(data.username):
+        # By raising this, FastAPI automatically stops the function
+        # and returns a 409 Conflict to the user's browser.
+        raise HTTPException(
+            status_code=409, 
+            detail="Username already taken"
+        )
+    
+    # 2. Proceed with signup logic if the username is available
     result = await (
         account_runtime.begin_account_signup(
             username=data.username,
@@ -98,17 +107,20 @@ async def account_signup_complete(
         key="session",
         value=result["session_token"],
         httponly=True,
-        secure=request.app.state.production_mode,
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
     )
 
+    # csrf_token cookie appears the moment the user loads the page, even in an incognito window,
+    # so it's important to notify them that we're using cookies for account security.
+
     response.set_cookie(
         key="csrf_token",
         value=result["csrf_token"],
         httponly=False,
-        secure=request.app.state.production_mode,
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
@@ -126,7 +138,8 @@ async def account_page(request: Request):
         {
             "request": request,
             "is_authenticated": request.state.is_authenticated,
-            "username": request.state.username
+            "username": request.state.username,
+            "user_role": request.state.role
         }
     )
 
@@ -217,17 +230,25 @@ async def signin(request: Request, data: SigninRequest):
         key="session",
         value=session_token,
         httponly=True, # httponly=True JavaScript cannot read the cookie at all.
-        secure=request.app.state.production_mode,
-        samesite="Strict", # Prevents cookie interception on unencrypted networks. The cookie is ONLY sent over HTTPS, never HTTP.
+        # The 'secure' flag is what forces HTTPS-only transmission.
+        secure=request.app.state.enforce_https_cookies,
+        # 'samesite' protects against CSRF (Cross-Site Request Forgery), 
+        # NOT interception on unencrypted networks
+        samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,
     )
 
+
+
+    # csrf_token cookie appears the moment the user loads the page, even in an incognito window,
+    # so it's important to notify them that we're using cookies for account security.
+
     response.set_cookie(
         key="csrf_token",
         value=csrf_token,
-        httponly=False,  # allow JS access for X-CSRF-Token header injection
-        secure=request.app.state.production_mode,
+        httponly=False,  # httponly = false allow JS access for X-CSRF-Token header injection
+        secure=request.app.state.enforce_https_cookies,
         samesite="Strict",
         path="/",
         max_age=Session_Time_to_Live_in_Seconds,

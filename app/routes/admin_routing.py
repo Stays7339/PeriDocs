@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/admin_routing.py
-# save-state 2026-05-11T14:33:08-04:00
+# save-state 2026-07-13T17:59-04:00
 # ==========================================
 import os
 import json
@@ -9,6 +9,8 @@ from typing import List, Dict, Any
 import hashlib
 import re as regex
 import uuid
+import traceback
+import logging
 
 from datetime import datetime, timezone
 from rdflib import Graph
@@ -18,7 +20,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from pathlib import Path
 
-
+from core.mode_lock import SystemModeLock  # Enforces DB vs Flat-File runtime constraint
 from core.map.mapping_runtime import centroid_system
 from core.map.__init__ import MINIMUM_SIMILARITY_THRESHOLD, BURST_PRECENTROID_STARTING_THRESHOLD
 from core.map.perist_reasoning_data import (
@@ -28,9 +30,12 @@ from core.map.perist_reasoning_data import (
     concept_exists
 )
 
+logger = logging.getLogger(__name__)
+
 DATA_DIR = os.getenv("PERIDOCS_DATA_DIR", "data")
 HEURISTICS_FILE = os.path.join("data", "reasoning", "heuristics.json")
 os.makedirs(os.path.dirname(HEURISTICS_FILE), exist_ok=True)
+RESOURCES_JSON_FILE = os.path.join("data", "reasoning", "resources.json")
 
 # Initialize router with proper prefix and tags
 router = APIRouter(
@@ -60,6 +65,15 @@ class EntriesSafeTextPayload(BaseModel):
 class CreateHeuristicPayload(BaseModel):
     givens: List[str]
     outputs: List[Dict[str, Any]]  # {concept, likelihood, justification?}
+
+class CreateResourcePayload(BaseModel):
+    title: str = Field(..., min_length=1)
+    url: str = Field(..., min_length=1)
+    resource_type: str = Field(..., min_length=1)
+    description: str | None = None
+    assigned_concepts: List[str] = Field(..., min_length=1)
+
+
 # -----------------------------
 # Admin HTML Dashboard Route
 # -----------------------------
@@ -126,15 +140,31 @@ async def load_entries_index() -> List[Dict]:
     if ENTRIES_INDEX:
         return ENTRIES_INDEX
 
-    try:
-        loop = asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
-        if isinstance(data, list):
-            ENTRIES_INDEX = data
-        else:
+    from core.mode_lock import SystemModeLock
+    
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        try:
+            from core.database import db_engine
+            async with db_engine.pool.connection() as conn:
+                rows = await conn.execute("SELECT * FROM content.entries")
+                entries = []
+                async for row in rows:
+                    # Convert row to dictionary/dict-like structure
+                    entries.append(dict(row)) 
+                ENTRIES_INDEX = entries
+        except Exception as e:
+            logger.error(f"Failed to load entries from Database: {e}")
             ENTRIES_INDEX = []
-    except Exception:
-        ENTRIES_INDEX = []
+    else:
+        try:
+            loop = asyncio.get_event_loop()
+            data = await loop.run_in_executor(None, lambda: json.load(open(ENTRIES_FILE, "r")))
+            if isinstance(data, list):
+                ENTRIES_INDEX = data
+            else:
+                ENTRIES_INDEX = []
+        except Exception:
+            ENTRIES_INDEX = []
 
     return ENTRIES_INDEX
 
@@ -197,131 +227,281 @@ def extract_concept_id(value: str) -> str:
 
 @router.post("/create-heuristic")
 async def create_heuristic(payload: CreateHeuristicPayload):
+    # 1. PRE-PROCESSING (Unified logic)
     if not payload.givens or not payload.outputs:
         raise HTTPException(status_code=400, detail="Missing givens or outputs")
 
+    # Resolve existing concepts for context
+    concepts_resp = await get_concepts()
+    existing_concepts = concepts_resp.get("concepts", [])
+
     cleaned_givens = [extract_concept_id(g.strip()) for g in payload.givens]
-
     cleaned_outputs = []
+    output_meta = []  # Tracks metadata for new concepts
+
     for o in payload.outputs:
-        concept = extract_concept_id(o.get("concept", "").strip())
+        raw_concept = o.get("concept", "").strip()
+        extracted_id = extract_concept_id(raw_concept)
+        extracted_label = regex.sub(r"\s*\([^)]+\)$", "", raw_concept).strip()
 
-        if not concept:
-            raise HTTPException(status_code=400, detail="Output concept missing")
+        # Find or create concept logic (Safe from KeyErrors)
+        matched_concept = next(
+            (c for c in existing_concepts 
+             if str(c.get("concept_id") or c.get("id") or "").lower() == extracted_id.lower() 
+             or str(c.get("label") or "").lower() == extracted_label.lower()), 
+            None
+        )
 
-        likelihood = o.get("likelihood", 0)
 
-        try:
-            likelihood = float(likelihood)
-        except:
-            raise HTTPException(status_code=400, detail="Invalid likelihood")
+        if matched_concept:
+            concept_val = matched_concept["concept_id"]
+            is_new = False
+            file_id_part = None
+            label_val = matched_concept["label"]
+        else:
+            dt = datetime.now(timezone.utc)
+            file_id_part = f"cfh_{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
+            concept_val = f"concept_from_heuristic:{file_id_part}"
+            is_new = True
+            label_val = extracted_label
 
-        if likelihood > 1:
-            likelihood = likelihood / 100.0
-        if likelihood < 0:
-            likelihood = 0.0
+        likelihood = float(o.get("likelihood", 0))
+        likelihood = max(0.0, min(1.0, likelihood / 100.0 if likelihood > 1 else likelihood))
 
         cleaned_outputs.append({
-            "concept": concept,
-            "likelihood": float(likelihood),
+            "concept": concept_val,
+            "likelihood": likelihood,
             "justification": o.get("justification")
         })
+        output_meta.append({"is_new": is_new, "file_id": file_id_part, "label": label_val})
 
     heuristic = {
-        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:12]}",
+        # Changed slice from [:12] to [:10] to fit VARCHAR(12) database constraints
+        "heuristic_id": f"h_{hashlib.sha256(os.urandom(16)).hexdigest()[:10]}",
         "givens": cleaned_givens,
         "outputs": cleaned_outputs
     }
 
-    # persist heuristic log (unchanged)
-    if os.path.exists(HEURISTICS_FILE):
-        with open(HEURISTICS_FILE, "r") as f:
-            data = json.load(f)
+    # 2. STORAGE FORK
+    # --- DATABASE MODE ---
+    if SystemModeLock.resolve_operational_mode() == "DATABASE":
+        from core.database import db_engine
+        DEFAULT_RELEASE_ID = "v0.3.0" 
+        
+        async with db_engine.pool.connection() as conn:
+            async with conn.transaction():
+
+                # Target Fix: Automatically seed the missing release to satisfy the foreign key constraint
+                await conn.execute(
+                    """
+                    INSERT INTO admin.release_information (release_id, release_version, build_target)
+                    VALUES (%s, %s, %s)
+                    ON CONFLICT (release_id) DO NOTHING
+                    """,
+                    (DEFAULT_RELEASE_ID, "0.3.0", "local-dev")
+                )
+                # A. Register any brand-new concepts first
+                for i, meta in enumerate(output_meta):
+                    if meta["is_new"]:
+                        await conn.execute(
+                            "INSERT INTO kb.concepts (concept_id, label) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+                            (cleaned_outputs[i]["concept"], meta["label"])
+                        )
+                
+                # B. Insert the heuristic
+                await conn.execute(
+                    """
+                    INSERT INTO kb.heuristics (heuristic_id, givens, outputs, introduced_in_release)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (heuristic["heuristic_id"], heuristic["givens"], json.dumps(heuristic["outputs"]), DEFAULT_RELEASE_ID)
+                )
+        return {"status": "success", "mode": "database", "heuristic": heuristic}
+
+    # --- FLAT-FILE MODE ---
     else:
-        data = []
-
-    data.append(heuristic)
-
-    with open(HEURISTICS_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-    heuristic_description = " | ".join(cleaned_givens)
-
-    # ============================================================
-    # NEW BEHAVIOR: ONE OUTPUT → ONE GRAPH → ONE TTL FILE
-    # ============================================================
-    for o in cleaned_outputs:
-        concept_id = o["concept"]
-
-        dt = datetime.now(timezone.utc)
-        file_id = f"{dt.isoformat(timespec='milliseconds').replace('+00:00', 'Z')}_{uuid.uuid4().hex[:3]}"
-
-        # IMPORTANT: each output gets its own isolated graph
-        g = Graph()
-
-        already_exists = concept_exists(
-            label=concept_id,
-            description=heuristic_description
-        )
-
-        if not already_exists:
-            create_reasoning_data_from_heuristic(
-                g,
-                heuristic_id=heuristic["heuristic_id"],
-                concept_id=concept_id,
-                file_id=file_id,
-                label=concept_id,
-                description=heuristic_description
-            )
+        # A. Log the heuristic
+        if os.path.exists(HEURISTICS_FILE):
+            with open(HEURISTICS_FILE, "r") as f:
+                data = json.load(f)
         else:
-            # concept already exists → skip TTL creation entirely
-            continue
+            data = []
+        data.append(heuristic)
+        with open(HEURISTICS_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2)
 
-        # nothing to serialize if we didn't add anything
-        if len(g) == 0:
-            continue
-
-        turtle = serialize_graph_to_turtle(g)
-
-        await persist_reasoning_data(
-            file_id,
-            turtle
-        )
-
-    return {"status": "ok", "heuristic": heuristic}
+        # B. Generate TTLs for new concepts (Original Logic)
+        heuristic_description = " | ".join(cleaned_givens)
+        for i, o in enumerate(cleaned_outputs):
+            meta = output_meta[i]
+            if not meta["is_new"]:
+                continue
+            
+            g = Graph()
+            if not concept_exists(label=meta["label"], description=heuristic_description):
+                create_reasoning_data_from_heuristic(
+                    g,
+                    heuristic_id=heuristic["heuristic_id"],
+                    concept_id=o["concept"],
+                    file_id=meta["file_id"],
+                    label=meta["label"],
+                    description=heuristic_description
+                )
+                if len(g) > 0:
+                    await persist_reasoning_data(meta["file_id"], serialize_graph_to_turtle(g))
+        
+        return {"status": "success", "mode": "flat-file", "heuristic": heuristic}
 
 @router.get("/concepts")
 async def get_concepts():
-    """
-    Return list of concepts from TTL files for autocomplete.
-    Each item includes:
-    - id
-    - label (human-readable)
-    """
+    try:
+        # 1. DATABASE MODE
+        if SystemModeLock.resolve_operational_mode() == "DATABASE":
+            from core.database import db_engine
+            async with db_engine.pool.connection() as conn:
+                # 1. Execute the query to get the cursor
+                cursor = await conn.execute("SELECT concept_id AS id, label, description FROM kb.concepts")
+                # 2. Await the fetchall() to pull rows into a standard list
+                rows = await cursor.fetchall()
+                # 3. Return the rows directly (they are already dicts!)
+                return {"concepts": rows}
 
-    concepts = []
-    ttl_dir = Path("data/reasoning")
+        # 2. FLAT-FILE MODE
+        else:
+            concepts = []
+            ttl_dir = Path("data/reasoning")
+            if not ttl_dir.exists():
+                return {"concepts": []}
 
-    if not ttl_dir.exists():
-        return {"concepts": []}
+            for file in ttl_dir.glob("*.ttl"):
+                text = file.read_text(encoding="utf-8")
+                urn_match = regex.search(
+                    r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
+                    text
+                )
+                label_match = regex.search(r'rdfs:label\s+"([^"]+)"', text)
+                
+                if urn_match and label_match:
+                    concepts.append({
+                        "id": urn_match.group(1),
+                        "label": label_match.group(1).strip()
+                    })
+            return {"concepts": concepts}
 
-    for file in ttl_dir.glob("*.ttl"):
-        text = file.read_text(encoding="utf-8")
+    except Exception:
+        # This will now correctly capture the full stack trace for 500 errors
+        logger.error(f"CRITICAL: /admin/concepts failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail="Internal server error during concept retrieval")
 
-        urn_match = regex.search(
-            r"urn:peridocs:(centroid:centroid_\d+|concept_from_heuristic:[^>\s]+)",
-            text
-        )
+@router.post("/create-resource")
+async def create_resource(payload: CreateResourcePayload):
+    # Target Fix 1: Extract the clean ID from composite format 'Label (id)'
+    cleaned_concepts = [extract_concept_id(c.strip()) for c in payload.assigned_concepts if c.strip()]
+    if not cleaned_concepts:
+        raise HTTPException(status_code=400, detail="Resource must be linked to at least one valid concept.")
 
-        label_match = regex.search(r'rdfs:label\s+"([^"]+)"', text)
-        
-        if urn_match and label_match:
-            cid = urn_match.group(1)
-            label = label_match.group(1).strip()
+    url_clean = payload.url.strip()
+    deterministic_id = str(uuid.uuid5(uuid.NAMESPACE_URL, url_clean))
 
-            concepts.append({
-                "id": cid,
-                "label": label
-            })
+    new_resource = {
+        "resource_id": deterministic_id,
+        "title": payload.title.strip(),
+        "url": url_clean,
+        "resource_type": payload.resource_type.strip(),
+        "description": payload.description.strip() if payload.description else "",
+        "assigned_concepts": cleaned_concepts,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
 
-    return {"concepts": concepts}
+    mode = SystemModeLock.resolve_operational_mode()
+
+    # --- CASE A: DATABASE MODE ---
+    if mode == "DATABASE":
+        from core.database import db_engine
+        from psycopg.rows import dict_row
+        try:
+            async with db_engine.pool.connection() as conn:
+                async with conn.transaction():
+                    
+                    # Target Fix 2: Pre-seed unknown concepts to fulfill downstream Foreign Keys
+                    for concept in cleaned_concepts:
+                        # Extract a fallback label from raw concept if it was created dynamically
+                        inferred_label = regex.sub(r"\s*\([^)]+\)$", "", concept).strip()
+                        await conn.execute(
+                            """
+                            INSERT INTO kb.concepts (concept_id, label, description)
+                            VALUES (%s, %s, %s)
+                            ON CONFLICT (concept_id) DO NOTHING;
+                            """,
+                            (concept, inferred_label, "Auto-registered during resource curation link")
+                        )
+
+                    # 1. Insert or update primary resource block
+                    await conn.execute(
+                        """
+                        INSERT INTO content.resources (resource_id, title, resource_url, resource_type, description)
+                        VALUES (%s, %s, %s, %s, %s) 
+                        ON CONFLICT (resource_url) DO UPDATE 
+                        SET title = EXCLUDED.title, resource_type = EXCLUDED.resource_type, description = EXCLUDED.description;
+                        """,
+                        (
+                            uuid.UUID(new_resource["resource_id"]), 
+                            new_resource["title"], 
+                            new_resource["url"], 
+                            new_resource["resource_type"], 
+                            new_resource["description"]
+                        )
+                    )
+                    
+                    # 2. Safely capture the correct primary UUID reference
+                    async with conn.cursor(row_factory=dict_row) as cursor:
+                        await cursor.execute(
+                            "SELECT resource_id FROM content.resources WHERE resource_url = %s;", 
+                            (new_resource["url"],)
+                        )
+                        row = await cursor.fetchone()
+                        r_id = row["resource_id"] if row else uuid.UUID(new_resource["resource_id"])
+
+                    # 3. Establish the safe concept mapping links
+                    for concept in cleaned_concepts:
+                        await conn.execute(
+                            """
+                            INSERT INTO kb.resource_concept_mappings (resource_id, concept_id)
+                            VALUES (%s, %s) ON CONFLICT (resource_id, concept_id) DO NOTHING;
+                            """,
+                            (r_id, concept)
+                        )
+            return {"status": "success", "mode": "database", "resource_id": deterministic_id}
+        except Exception as e:
+            logger.error(f"Resource creation failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Database persistence failure: {str(e)}")
+
+    # --- CASE B: FLAT-FILE MODE ---
+    else:
+        try:
+            os.makedirs(os.path.dirname(RESOURCES_JSON_FILE), exist_ok=True)
+            
+            if os.path.exists(RESOURCES_JSON_FILE):
+                loop = asyncio.get_event_loop()
+                resources_list = await loop.run_in_executor(None, lambda: json.load(open(RESOURCES_JSON_FILE, "r")))
+            else:
+                resources_list = []
+
+            existing_record = next((r for r in resources_list if r["url"] == new_resource["url"]), None)
+            
+            if existing_record:
+                existing_record.update({
+                    "title": new_resource["title"],
+                    "resource_type": new_resource["resource_type"],
+                    "description": new_resource["description"],
+                    "assigned_concepts": list(set(existing_record["assigned_concepts"] + cleaned_concepts))
+                })
+            else:
+                resources_list.append(new_resource)
+
+            with open(RESOURCES_JSON_FILE, "w", encoding="utf-8") as f:
+                json.dump(resources_list, f, indent=2)
+                
+            return {"status": "success", "mode": "flat-file", "resource_id": deterministic_id}
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Flat-file JSON persistence failure: {str(e)}")

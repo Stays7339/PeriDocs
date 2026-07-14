@@ -1,13 +1,13 @@
 # ==========================================
 # app/routes/info_navigation.py
 # routes to /create-entry, /about , /privacy-policy , /terms-of-service and renders the homepage
-# save-state 2026-05-11T14:11:35-04:00 (YYYYMMDDhhmm)
+# save-state 2026-07-14T08:51-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 from fastapi import Request, Depends, HTTPException, status
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
-from app.routes import app, ProductionMode  # FastAPI instance from __init__.py
+from app.routes import app, PreventNewEntries  # FastAPI instance from __init__.py
 from psycopg import AsyncConnection
 from core.database import get_db
 
@@ -22,7 +22,7 @@ async def validation_health_check(db: AsyncConnection = Depends(get_db)):
     """
     try:
         # Check active communication pathways by reading the pinned bundle info
-        result = await db.execute('SELECT release_id FROM "ADMIN".release_information WHERE is_active = true LIMIT 1;')
+        result = await db.execute('SELECT release_id FROM admin.release_information WHERE is_active = true LIMIT 1;')
         active_bundle = await result.fetchone()
         
         return {
@@ -50,7 +50,7 @@ async def about(request: Request):
     """
     Render the Create Entry page.
     """
-    return templates.TemplateResponse("create-entry.html", {"request": request, "ProductionMode": ProductionMode,})
+    return templates.TemplateResponse("create-entry.html", {"request": request, "PreventNewEntries": PreventNewEntries,})
 
 
 @app.get("/about", response_class=HTMLResponse)
@@ -75,3 +75,24 @@ async def terms_of_service(request: Request):
     Render the Terms of Service page.
     """
     return templates.TemplateResponse("terms-of-service.html", {"request": request})
+
+@app.get("/ways-to-help", response_class=HTMLResponse)
+async def ways_to_help(request: Request):
+    """
+    Render the Ways To Help page.
+    """
+    return templates.TemplateResponse("ways-to-help.html", {"request": request})
+
+@app.get("/using-the-site", response_class=HTMLResponse)
+async def using_the_site(request: Request):
+    """
+    Render the Using The Site page.
+    """
+    return templates.TemplateResponse("using-the-site.html", {"request": request})
+
+@app.get("/suggest-resource", response_class=HTMLResponse)
+async def suggest_resource(request: Request):
+    """
+    Render the Suggest Resource page.
+    """
+    return templates.TemplateResponse("suggest-resource.html", {"request": request})

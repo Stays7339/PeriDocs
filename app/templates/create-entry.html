@@ -1,53 +1,96 @@
-{# create-entry.html, extends base.html save-state 2026-05-09T12:42:25-04:00 #}
+{# create-entry.html, extends base.html save-state 2026-07-14T07:59-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
 
 {% block content %}
     <h3>• Entry Creation • <br> See our <a href="/about">elaborated philosophy</a> for more. <br><br></h3>
+    
     <div class="card-grid">
-    <article class="card size-3">
-    <form id="entry-form" action="/submit" method="post">
-
-      <div id="entry-wrapper" class="entry-wrapper" data-locked="false">
-
-        <textarea 
-          name="entry_text" 
-          rows="10"
-          placeholder="We do not share or sell any of your identifiable user data. Feel free to jot your thoughts, without stopping yourself short."
-          disabled
-        ></textarea>
-
-        <div class="entry-overlay" aria-hidden="true">
-          <div class="overlay-content">
-            <button 
-              type="button"
-              id="consent-toggle"
-              role="switch"
-              aria-checked="false"
-              data-state="off"
-              class="consent-toggle"
-            >
-              <span class="toggle-knob"></span>
-              <span class="toggle-label"></span>
-            </button>
-            <p class="overlay-message">
-            You may use the platform without revealing personal or sensitive information. 
-            <br> PeriDocs is based in the US, but your data will be hosted and processed in Germany (EU). 
-            <br> <br> By continuing, you consent to 1) transfer of your data between Germany and the US, <br> 2) processing of your data in Germany to provide and improve our service, and <br> 3) the safeguards we have in place, including pseudonymization and human oversight. 
-            <br> See our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages for details. 
+    <form id="entry-form" action="/submit" method="post" style="display: contents;">
+      
+      <!-- CARD 1: UNIFIED PREFERENCES, TERMS, & CONSENT PANEL -->
+      <article class="card size-3" style="margin-bottom: 12px; position: relative; display: flex; flex-direction: column; gap: 24px; padding: 24px;">
+        
+        <!-- SECTION A: PERMANENT POST OPT-IN -->
+        <div class="toggle-container-row">
+          <button 
+            type="button"
+            id="opt-in-toggle"
+            role="switch"
+            aria-checked="false"
+            data-state="off"
+            class="consent-toggle"
+            style="flex-shrink: 0; position: relative; transform: none; top: auto; left: auto;"
+          >
+            <span class="toggle-knob"></span>
+            <span class="toggle-label"></span>
+          </button>
+          
+          <div class="opt-in-message-block">
+            <strong style="display: block; margin-bottom: 4px; font-size: 16px;">Would you like to make your entry a permanent post?</strong>
+            <p style="font-size: 14px; line-height: 1.4; color: var(--brandcarbon-blackcarbon-black-005, #333); margin: 0;">
+              The system is a forum-like search engine that improves each time you allow the system to save your entry. <br> Opting in allows the system to retain the text you type, the semantic calculations it gets from that text, and the metadata from your post (e.g. timestamp, a pseudonym for your IP address, and your user-id if you choose to create one.)
             </p>
           </div>
         </div>
-      <div class="entry-overlay-streaks" aria-hidden="true"></div>
 
-      </div>
+        <!-- Hidden input field for backend form submission -->
+        <input type="hidden" name="opt_in" id="opt-in-input" value="false">
 
-      <div class="meta" style="margin-top:12px;">
-        <button type="submit" class="btn primary general-button" disabled>Analyze &amp; Search</button>
-      </div>
+        <!-- DECORATIVE SEPARATOR LINE -->
+        <div style="width: 100%; height: 1px; background: rgba(0, 0, 0, 0.1);"></div>
+
+        <!-- SECTION B: MANDATORY PROCESSING & TRANSFER CONSENT -->
+        <div class="toggle-container-row">
+          <!-- Moved out of the overlay directly into the control card panel -->
+          <button 
+            type="button"
+            id="consent-toggle"
+            role="switch"
+            aria-checked="false"
+            data-state="off"
+            class="consent-toggle"
+            style="flex-shrink: 0; position: relative; transform: none; top: auto; left: auto;"
+          >
+            <span class="toggle-knob"></span>
+            <span class="toggle-label"></span>
+          </button>
+          
+          <div class="consent-message-block">
+            <strong style="display: block; margin-bottom: 4px; font-size: 16px;">Do you consent to processing and hosting in the European Union?</strong>
+            <p style="font-size: 14px; line-height: 1.4; color: var(--brandcarbon-blackcarbon-black-005, #333); margin: 0;">
+              You may use the platform without revealing personal or sensitive information. 
+              PeriDocs is based in the US, but your data will be hosted and processed in Germany (EU). 
+              <br><br>
+              By toggling this switch and continuing, you consent to: <br> 1) transfer of your data between Germany and the US, <br> 2) processing of your data in Germany to provide and improve our service, and <br> 3) the safeguards we have in place, including pseudonymization and human oversight. 
+              <br> See our <a href="/privacy-policy" style="text-decoration: underline;">Privacy Policy</a> and <a href="/terms-of-service" style="text-decoration: underline;">Terms of Service</a> pages for details.
+            </p>
+          </div>
+        </div>
+
+      </article>
+
+      <!-- CARD 2: CLEAN ENTRY WORKSPACE -->
+      <article class="card size-3">
+        <div id="entry-wrapper" class="entry-wrapper" data-locked="true">
+          <textarea 
+            name="entry_text" 
+            rows="10"
+            placeholder="We do not share or sell any of your identifiable user data. Feel free to jot your thoughts, without stopping yourself short."
+            disabled
+          ></textarea>
+
+          <!-- ADD THESE TWO LINES BACK RIGHT HERE TO LINK TO YOUR CSS -->
+          <div class="entry-overlay-streaks"></div>
+          <div class="entry-overlay"></div>
+        </div>
+
+        <div class="meta" style="margin-top:12px;">
+          <button type="submit" class="btn primary general-button" disabled>Analyze &amp; Search</button>
+        </div>
+      </article>
 
     </form>
-    </article>
     </div>
 {% endblock %}

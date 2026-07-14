@@ -1,6 +1,6 @@
 # ==========================================
 # core/nlp/process_entry.py
-# save-state 2026-06-05T19:45-04:00
+# save-state 2026-07-13T23:19-04:00
 # ==========================================
 
 
@@ -28,7 +28,7 @@ from .clause_utils import split_into_clauses, sliding_window_clauses
 from core.map.mapping_runtime import centroid_system, entry_runtime
 from core.map import entry_membership_sequencer
 
-from app.helpers.entry_similarity import highlight_standout_clauses
+from core.entry_orchestrator.entry_similarity import highlight_standout_clauses
 from core.reasoning.reasoning_runtime import run_reasoning
 
 
@@ -40,12 +40,13 @@ async def process_entry_async(
     user_ip: str,
     user_id: str | None = None,
     max_words_in_window_of_clauses: int = 66,
-    progress_callback: Callable[[float], None] | None = None
-) -> Dict[str, Any]:
+    progress_callback: Callable[[float], None] | None = None,
+    opt_in: bool = False, # <--- 1. Add opt-in switch with safe default
+) -> tuple[Dict[str, Any], str | None]:
     if not text.strip():
         raise ValueError("Empty or whitespace-only entry.")
 
-    timestamp = datetime.now(timezone.utc).isoformat()
+    timestamp = datetime.now(timezone.utc)
     ip_hash = hashlib.sha256(user_ip.encode()).hexdigest()
     encrypted_raw_ip = encrypt_text(user_ip)
     encrypted_raw_text = encrypt_text(text)
@@ -192,12 +193,12 @@ async def process_entry_async(
         append_crisis_record(entry)
         report_progress()  # 6 / total_steps
         # Return immediately so we skip embeddings/centroids
-        return entry
+        return entry, None  # Added None to satisfy the 2-tuple unpacking requirement
 
     report_progress()  # 6 / total_steps
 
     # ---------------- PERSIST EMBEDDINGS (only if no crisis) ----------------
-    if not crisis_msg:
+    if not crisis_msg and opt_in: # <--- 2. Gate runtime embedding writes
         await entry_runtime.set_runtime_bundle(
             entry["entry_id"],
             embedding=entry.get("embedding"),
@@ -209,43 +210,59 @@ async def process_entry_async(
     report_progress()  # 7 / total_steps
 
     # ---------------- CENTROID / PRECENTROID ASSIGNMENT ----------------
-    applied = await entry_membership_sequencer.link_entry(entry["entry_id"])
+    if opt_in: # <--- 3. Gate structural categorization links
+        applied = await entry_membership_sequencer.link_entry(entry["entry_id"])
 
-    if applied:
-        # Sort defensively by similarity descending (link_entry already does this,
-        # but we do not assume ordering across future changes)
-        applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+        if applied:
+            applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+            centroid_links = []
+            for cid, similarity, event_index in applied_sorted:
+                centroid_links.append({
+                    "centroid_id": cid,
+                    "similarity": similarity,
+                    "event_index": event_index
+                })
+            entry["centroids"] = centroid_links
+    else:
+        # Ephemeral Pathway: Read-only match using the raw doc_embedding calculated earlier.
+        # This populates the context structure bidirectionally without permanent links.
+        applied = await entry_membership_sequencer.match_embedding_ephemerally(doc_embedding)
 
-        centroid_links = []
-
-        for cid, similarity, event_index in applied_sorted:
-            centroid_links.append({
-                "centroid_id": cid,
-                "similarity": similarity,
-                "event_index": event_index
-            })
-
-        entry["centroids"] = centroid_links
+        if applied:
+            applied_sorted = sorted(applied, key=lambda x: (-x[1], x[0]))
+            centroid_links = []
+            for cid, similarity, event_index in applied_sorted:
+                centroid_links.append({
+                    "centroid_id": cid,
+                    "similarity": similarity,
+                    "event_index": event_index
+                })
+            entry["centroids"] = centroid_links
+        else:
+            entry["centroids"] = [] # Bypassed cleanly if no threshold is met
 
     report_progress()  # 8 / total_steps
-
-    # ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
+# ---------------- EPHEMERAL INFERENCE EVALUATOR ----------------
+    reasoning_result = None
     try:
-
+        # Opt-in (True): run_reasoning reads normally via database / runtime caches using entry_id
+        # Opt-out (False): run_reasoning reads the _tmp fallback properties attached above
         reasoning_result = await run_reasoning(entry)
-
-        # attach but DO NOT persist to embeddings / centroid system
-        entry["reasoning"] = reasoning_result
-
     except Exception as e:
         logger.exception("Reasoning pipeline failed; continuing without it.")
-        entry["reasoning"] = None
+    finally:
+        # Memory Hygiene: Drop large numpy references immediately after reasoning finishes
+        if not opt_in:
+            entry.pop("_tmp_window_embeddings", None)
+            entry.pop("_tmp_window_text", None)
 
     report_progress()  # 9 / total_steps
 
     # --------------------- LOGIC FOR DELETE TOKEN  ---------------------
+    # we've got to convert the more efficient yet complex timestamp into a simple string
+    timestamp_str = timestamp.isoformat()
     # compact timestamp to embed in the token
-    timestamp_compact = timestamp.replace(":", "").replace("-", "")
+    timestamp_compact = timestamp_str.replace(":", "").replace("-", "").replace(".", "")
 
     # construct user-visible deletion token with a random sceret included
     delete_token = f"{entry['entry_id']}.{timestamp}.{secrets.token_hex(16)}"
@@ -266,14 +283,24 @@ async def process_entry_async(
 
     entry["centroids"] = entry.get("centroids", [])
 
-    return (
-        build_persisted_entry(
-            entry=entry,
-            user_id=user_id,
-            centroids=entry.get("centroids", [])
-        ),
-        delete_token
+    entry["centroids"] = entry.get("centroids", [])
+
+    # 1. Build the clean, standard persistence dictionary
+    formatted_entry = build_persisted_entry(
+        entry=entry,
+        user_id=user_id,
+        centroids=entry.get("centroids", [])
     )
+
+    # 2. Inject the ephemeral reasoning results solely for the in-memory runtime cache
+    formatted_entry["reasoning"] = reasoning_result
+
+    # For who do not choose to opt-in into saving their entry into our system,
+    # Attach raw vector temporarily for fallback similarity matching
+    formatted_entry["_tmp_embedding"] = doc_embedding
+
+    # 3. Return the exact 2-tuple the background routing expects
+    return formatted_entry, delete_token
 
 
 def build_persisted_entry(

@@ -1,5 +1,5 @@
 // peridocs-misc-ux.js — unified UI state: theme, cooldowns, toasts, feedback/entry, privacy toast 
-// save-state 2026-05-26T16:40:40-04:00
+// save-state 2026-07-13T22:30-04:00
 // ==========================================
 
 
@@ -24,8 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Streaks element
   const streaks = entryWrapper?.querySelector(".entry-overlay-streaks");
 
-
-  const productionMode = document.body.dataset.productionMode === "true";
+  // The dataset API automatically converts 'data-prevent-new-entries' 
+  // to 'dataset.preventNewEntries'
+  const PreventNewEntries = document.body.dataset.preventNewEntries === "true";
 
   // ---------------------- Apply Consent State ---------------------- //
   function applyConsentState(granted) {
@@ -62,7 +63,7 @@ document.addEventListener("DOMContentLoaded", () => {
       consentToggle.setAttribute("data-state", granted ? "on" : "off");
       consentToggle.setAttribute("aria-checked", granted ? "true" : "false");
       const label = consentToggle.querySelector(".toggle-label");
-      if (label) label.textContent = granted ? " Consent Given" : "Consent Requested";
+      if (label) label.textContent = granted ? "Current Setting: Yes" : "Current Setting: No";
     }
 
     // Persist consent
@@ -78,7 +79,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // PRODUCTION MODE:
     // hard-disable consent interaction
     // ------------------------------------------------
-    if (productionMode) {
+    if (PreventNewEntries) {
 
       consentToggle.disabled = true;
 
@@ -177,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
         title="Cookie icon by Trinh Ho from Flaticon"
         style="width:85px; height:85px;">
       <span>
-        We use <strong>minimal</strong> local storage to improve your experience.
+        We only use strictly necessary session cookies to maintain account security and user preferences. <br><strong>We do not use third-party analytics or behavioral tracking.</strong>
         By continuing to use this site, you agree to our <a href="/privacy-policy">Privacy Policy</a> and <a href="/terms-of-service">Terms of Service</a> pages.
       </span>
       <button id="privacy-toast-dismiss">&times;</button>

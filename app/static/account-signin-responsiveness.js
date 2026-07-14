@@ -1,5 +1,5 @@
 // account-signin-responsiveness.js
-// save-state 2026-05-20T20:25:15-04:00
+// save-state 2026-07-06T17:24-04:00
 // ==========================================
 
 async function signin() {
@@ -28,7 +28,7 @@ async function signin() {
   }
 
   if (data.status === "ok") {
-    window.location.href = "/";
+    window.location.href = "/account";
   } else {
     showToast(data.detail || "signin failed", "error");
   }

@@ -1,6 +1,6 @@
 # ==========================================
 # app/routes/__init__.py
-# save-state 2026-06-11T13:04-04:00 (ISO 8601)
+# save-state 2026-07-12T12:06-04:00
 # ========================================== 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -33,12 +33,22 @@ from core.map import ledger, centroids
 from core.map.mapping_runtime import initialize_runtime
 from core.database import initialize_database, close_database
 
+# Load environment variables immediately
+load_dotenv()
+
+# Setup Logging
+# Retrieve from .env, default to INFO if not set, and ensure it is uppercase
+log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
+
+# Convert the string to the actual logging constant (e.g., 'DEBUG' -> logging.DEBUG)
+# If an invalid string is provided, it defaults to logging.INFO
+log_level = getattr(logging, log_level_str, logging.INFO)
 
 
 # ------------------- logging setup -------------------
 logger = logging.getLogger(__name__)
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=log_level,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)]
 )
@@ -63,13 +73,16 @@ logger.info(">>> FASTAPI APP INSTANTIATED FROM app/routes/__init__.py <<<")
 # ==========================================
 
 load_dotenv()
-ProductionMode = os.getenv("PeriDocs_ProductionMode", "false").strip().lower() == "true"
+PreventNewEntries = os.getenv("PreventNewEntries", "false").strip().lower() == "true"
+Enforce_HTTPS_Cookies = os.getenv("Enforce_HTTPS_Cookies", "true").strip().lower() == "true"
 
-logger.warning("ProductionMode=%s", ProductionMode)
+logger.warning("PreventNewEntries=%s", PreventNewEntries)
+logger.warning("Enforce_HTTPS_Cookies=%s", Enforce_HTTPS_Cookies)
 
-app.state.production_mode = ProductionMode
+app.state.PreventNewEntries = PreventNewEntries
+app.state.enforce_https_cookies = Enforce_HTTPS_Cookies
 templates = Jinja2Templates(directory="app/templates")
-templates.env.globals["ProductionMode"] = ProductionMode
+templates.env.globals["PreventNewEntries"] = PreventNewEntries
 
 
 # ---------------- Static Files ----------------
@@ -77,12 +90,10 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 
 # ---------------- Import app-bound routes (side effects only) ----------------
 from app.routes import info_navigation
-from app.routes import entry
+from app.routes import submission_routing
 from app.routes import feedback
 
 # ---------------- Include router-based routes ----------------
-# Inject lifespan parameters
-# app.router.lifespan_context = database_lifespan
 
 from app.routes import admin_routing
 app.include_router(admin_routing.router)
@@ -159,33 +170,59 @@ async def startup_sequence():
     await initialize_account_runtime()
 
     logger.info("Startup sequence complete.")
-    logger.warning("STARTUP EVENT COMPLETE")
 
 @app.on_event("shutdown")
 async def shutdown_sequence():
     logger.info("Starting shutdown sequence...")
 
-    logger.info("Draining database connections...")
-    await close_database()
+    # 1. Authoritatively flush and close the entry runtime while DB connections are still hot
+    try:
+        from core.map.mapping_runtime import entry_runtime
+        logger.info("Draining entry runtime memory layers to database...")
+        
+        # Invoke standard shutdown routine first
+        await entry_runtime.shutdown()
+        
+        # FORCE an unconditional guarded flush to catch entries orphaned by the dirty counter race condition
+        logger.warning("[SHUTDOWN FIX] Forcing unconditional guarded persist of all memory states...")
+        if hasattr(entry_runtime, '_persist_guarded'):
+            await entry_runtime._persist_guarded()
+        elif hasattr(entry_runtime, '_persist'):
+            await entry_runtime._persist()
+            
+    except Exception as e:
+        logger.warning("Failed to safely flush entry runtime during shutdown: %s", e)
 
-    await shutdown_account_runtime()
+    # 2. Shutdown your account runtime tracking
+    try:
+        await shutdown_account_runtime()
+    except Exception as e:
+        logger.warning("Failed to shutdown account runtime: %s", e)
+
+    # 3. Always drain and close database connection pools safely
+    logger.info("Draining database connections...")
+    try:
+        await close_database()
+    except Exception as e:
+        logger.warning("Error occurred while closing database engine: %s", e)
+
+    # 4. Handle file system backup house-cleaning (isolated so it can't block core components)
     """
     Keep only the most recent backup, delete all others.
     Triggered on SIGINT (Ctrl+C) or SIGTERM (systemctl stop).
     """
     backup_dir = Path.cwd() / "backups-for-the-main-data-folder"
-    if not backup_dir.exists():
-        return
-
-    backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
-    # Keep the most recent
-    to_delete = backups[1:]
-    for f in to_delete:
-        try:
-            f.unlink()
-            logger.info(f"[shutdown] Deleted old backup: {f.name}")
-        except Exception as e:
-            logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
+    if backup_dir.exists():
+        backups = sorted(backup_dir.glob("peridocs_data_folder_backup_*.zip"), reverse=True)
+        to_delete = backups[1:]
+        for f in to_delete:
+            try:
+                f.unlink()
+                logger.info(f"[shutdown] Deleted old backup: {f.name}")
+            except Exception as e:
+                logger.warning(f"[shutdown] Failed to delete {f.name}: {e}")
+    else:
+        logger.debug("[shutdown] Backup directory not found, skipping zip pruning.")
 
 @app.get("/favicon.ico")
 def favicon():
