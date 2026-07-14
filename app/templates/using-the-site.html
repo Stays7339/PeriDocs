@@ -1,13 +1,68 @@
-{# PeriDocs-code/app/templates/using-the-site.html save-state 2026-07-11T15:43-04:00 #}
+{# PeriDocs-code/app/templates/using-the-site.html save-state 2026-07-14T08:41-04:00 #}
 {% extends "base.html" %}
 {% block title %}Using The Site | PeriDocs.org{% endblock %}
 
 {% block content %}
-  <div class="card-grid">
-    <div class="card size-3">
-      <h1 class="center">Using The Site<br><br></h1>
-      <p class="center"><strong><a href="/create-entry">Contributing an Entry</a></strong></p><br>
-      <p class="center">When you create an Entry on PeriDocs.org, we allow you to select whether you'd like your Entry to be saved permanently to our database or only used a temporary search, similar to how a person uses traditional search engines. Where PeriDocs differs is that you are allowed to submit your Entry in any amount of detail that you'd like; we aim to provide search functionality for any Entry that abides by our  <a href="/terms-of-service">Terms of Service</a>, but please note that our search capabilities grows stronger with each Entry that you allow us to store as its own persistent post.<br></p>
-    </div>
+  <div class="card-grid" style="display: flex; flex-direction: column; gap: 24px; align-items: center;">
+    <h1 class="center" style="margin-bottom: 16px;">Using The Site</h1>
+    
+    <article class="card size-3" style="padding: 24px;">
+      
+      <h3 style="margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">A Quick Look At The Process</h3>
+      <p style="font-size: 15px; line-height: 1.6; color: var(--brandcarbon-blackcarbon-black-005, #333); margin-bottom: 16px;">
+        Start by writing an Entry that is as detailed or as concise as you want it to be. There is no need to edit yourself down; the more context you give your thoughts, the more coordinates our interface has to work with. <br> <br>
+        Instead of evaluating your text through a rigid literal lens, your Entry is mapped against multi-layered concept clusters. These semantic neighborhoods are curated and approved by real humans, allowing the system to map different perspectives, without requiring Entries to be very similar word-for-word. <br> <br>
+        PeriDocs embraces a deterministic, white-box approach to language. The system maps the relationships between your ideas using heuristics, which keeps every discovered connection entirely traceable and anchored in clear linguistic structural rules. <br> <br>
+        Your results are designed to be an expansive starting point. After submitting your Entry, the system shows you helpful outlink-resources and a visual map of public entries sharing a adjacent conceptual space. This will improve gradually over time, since work with the entries we have to add in resources we think might be interesting to our users. 
+      </p>
+      <p class="center" style="margin-top: 24px;">
+        <strong><a href="/create-entry" class="btn primary" style="padding: 10px 20px; text-decoration: none; border-radius: 4px;">Go to Entry Workspace →</a></strong>
+      </p>
+    </article>
+
+    <article class="card size-3" style="padding: 24px;">
+      
+      <h3 style="margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">Contributing an Entry</h3>
+      <p style="font-size: 15px; line-height: 1.6; color: var(--brandcarbon-blackcarbon-black-005, #333); margin-bottom: 16px;">
+        When you create an Entry on PeriDocs.org, we allow you to select whether you'd like your Entry to be saved permanently to our database or only used as a temporary search, similar to how a person uses traditional search engines. Where PeriDocs differs is that you are allowed to submit your Entry in any amount of detail that you'd like; we aim to provide search functionality for any Entry that abides by our <a href="/terms-of-service" style="text-decoration: underline;">Terms of Service</a>, but please note that our search capabilities grows stronger with each Entry that you allow us to store as its own persistent post.
+      </p>
+    </article>
+
+    <article class="card size-3" style="padding: 24px;">
+      <h3 style="margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">Data Hosting Practices</h3>
+      <p style="font-size: 14px; line-height: 1.6; margin: 0;">
+        All data processing operations and storage clusters are hosted securely within Germany (European Union). PeriDocs is hosting the data in Germany with the goal of establishing structural boundary protections under strict data privacy regulations. 
+        <br><br>
+        Any interaction with the search interface involves deterministic PII redaction protocols, advanced cryptographic pseudonymization routines, and intentional human-moderator oversight lines to help create a preferrable environment for writing your thoughts.
+      </p>
+    </article>
+
+    <article class="card size-3" style="padding: 24px;">
+      <h3 style="margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">Temporary Search vs. Permanent Posts</h3>
+      
+      <div style="margin-bottom: 20px;">
+        <strong style="display: block; font-size: 16px; margin-bottom: 4px;">1. The Temporary Search (Opt-In Turned Off)</strong>
+        <p style="font-size: 14px; line-height: 1.5; margin: 0;">
+          If you choose not to save your entry, our pipeline treats your submission as strictly ephemeral. The system maps your text into a temporary mathematical representation in high-performance application memory to trace matches against existing concept clusters. The raw text and vector mappings are discarded completely once your session completes and are never written to our storage layer.
+        </p>
+      </div>
+
+      <div>
+        <strong style="display: block; font-size: 16px; margin-bottom: 4px;">2. The Permanent Post (Opt-In Turned On)</strong>
+        <p style="font-size: 14px; line-height: 1.5; margin: 0;">
+          By enabling the Permanent Post switch, you permit your Entry to be handled by our asynchronous write-behind storage runtime. This saves your structured content to our permanent index, anchoring future conceptual matches and allowing the underlying web directory map to dynamically evolve and scale from your unique perspective.
+        </p>
+      </div>
+    </article>
+
+    <article class="card size-3" style="padding: 24px;">
+      <h3 style="margin-bottom: 12px; border-bottom: 1px solid rgba(0,0,0,0.1); padding-bottom: 8px;">Deleting An Entry</h3>
+      <p style="font-size: 14px; line-height: 1.6; margin: 0;">
+        We believe that you should retain absolute authority over what you share. Whenever you choose to generate a Permanent Post, the system compiles a highly secure, cryptographic <strong>Deletion Token</strong> exclusively for you. 
+        <br><br>
+        If you ever wish to delete your Entry, submitting this Deletion Token to our <a href="/delete" style="text-decoration: underline;">deletion page</a> immediately begins the process of purging your plain text and individual tracking associations from our active memory dictionaries and disk logs. Because we do not store secondary matching trails, once an Entry is deleted via its token, it cannot be recovered by anyone.
+      </p>
+    </article>
+
   </div>
 {% endblock %}

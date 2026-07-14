@@ -1,4 +1,4 @@
-{# create-entry.html, extends base.html save-state 2026-07-13T22:00-04:00 #}
+{# create-entry.html, extends base.html save-state 2026-07-14T07:59-04:00 #}
 {% extends "base.html" %}
 
 {% block title %}PeriDocs.org | Alpha{% endblock %}
@@ -13,7 +13,7 @@
       <article class="card size-3" style="margin-bottom: 12px; position: relative; display: flex; flex-direction: column; gap: 24px; padding: 24px;">
         
         <!-- SECTION A: PERMANENT POST OPT-IN -->
-        <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div class="toggle-container-row">
           <button 
             type="button"
             id="opt-in-toggle"
@@ -42,7 +42,7 @@
         <div style="width: 100%; height: 1px; background: rgba(0, 0, 0, 0.1);"></div>
 
         <!-- SECTION B: MANDATORY PROCESSING & TRANSFER CONSENT -->
-        <div style="display: flex; align-items: flex-start; gap: 20px;">
+        <div class="toggle-container-row">
           <!-- Moved out of the overlay directly into the control card panel -->
           <button 
             type="button"

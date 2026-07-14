@@ -1,7 +1,7 @@
 # ==========================================
 # app/routes/info_navigation.py
 # routes to /create-entry, /about , /privacy-policy , /terms-of-service and renders the homepage
-# save-state 2026-07-13T11:12-04:00 (YYYYMMDDhhmm)
+# save-state 2026-07-14T08:51-04:00 (YYYYMMDDhhmm)
 # ==========================================
 
 from fastapi import Request, Depends, HTTPException, status
@@ -89,3 +89,10 @@ async def using_the_site(request: Request):
     Render the Using The Site page.
     """
     return templates.TemplateResponse("using-the-site.html", {"request": request})
+
+@app.get("/suggest-resource", response_class=HTMLResponse)
+async def suggest_resource(request: Request):
+    """
+    Render the Suggest Resource page.
+    """
+    return templates.TemplateResponse("suggest-resource.html", {"request": request})
